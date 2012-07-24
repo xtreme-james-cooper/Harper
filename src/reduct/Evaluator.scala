@@ -13,8 +13,6 @@ import model.PairEx
 import model.InL
 import model.InR
 import model.UnitTy
-import model.ExprDefn
-import model.TypeDefn
 import model.Match
 import model.Rule
 import model.Pattern
@@ -26,6 +24,7 @@ import model.TrivPat
 import model.InLPat
 import model.InRPat
 import model.PairPat
+import model.Defn
 
 object Evaluator {
 
@@ -80,9 +79,6 @@ object Evaluator {
     case _ => None
   }
 
-  def evaluate(p : Prog) : Expr = evalExpr(p.defs.foldRight(p.e)({
-    case (ExprDefn(n, b), expr) => expr.replace(n, b)
-    case (TypeDefn(n, t), expr) => expr
-  }))(Nil)
+  def evaluate(p : Prog) : Expr = evalExpr(p.defs.foldRight(p.e)({case (Defn(n, b), expr) => expr.replace(n, b)}))(Nil)
 
 }

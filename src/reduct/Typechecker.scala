@@ -19,8 +19,6 @@ import model.Product
 import model.InL
 import model.InR
 import model.Sum
-import model.TypeDefn
-import model.ExprDefn
 import model.Match
 import model.Rule
 import model.Pattern
@@ -106,10 +104,7 @@ object Typechecker {
     case (InRPat(p), Sum(t1, t2)) => typeverify(p)(t2)(env)
   }
     
-  def typecheck(d : Defn)(env : Env) : Env = d match {
-    case ExprDefn(n, b) => env.addBind(n -> typecheck(b)(env).get)
-    case TypeDefn(n, t) => env.addSyn(n -> t)
-  }
+  def typecheck(d : Defn)(env : Env) : Env = d match {case Defn(n, b) => env.addBind(n -> typecheck(b)(env).get)}
 
   class Env(val typeSyns : Map[String, Type], val bindings : Map[String, Type]) {
     def addSyn(syn : (String, Type)) : Env = new Env(typeSyns + syn, bindings)

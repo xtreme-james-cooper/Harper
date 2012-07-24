@@ -25,12 +25,6 @@ object Main {
        + "plus(a : Nat, b : Nat) : Nat = case a of {Z -> b | S(n) -> S(((plus n) b))};"
        + "((plus (((ifC inl () : (Unit + Unit)) S(Z)) Z)) (((ifC inr () : (Unit + Unit)) S(S(S(S(Z))))) S(S(Z))))")
        
-    test("type Bool = (Unit + Unit);"
-       + "true : Bool = inl () : Bool;"
-       + "false : Bool = inr () : Bool;"
-       + "plus(a : Nat, b : Nat) : Nat = case a of {Z -> b | S(n) -> S(((plus n) b))};"
-       + "((plus if true then S(Z) else Z) if false then S(S(S(S(Z)))) else S(S(Z)))")
-       
     test("case inr inl () : (Unit + Nat) : ((Nat, Nat) + (Unit + Nat)) of {"
        + "inl (S(_), y) -> y |"
        + "inl (Z, y) -> S(y) |"

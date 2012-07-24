@@ -12,8 +12,6 @@ import model.Type
 import model.Var
 import model.Prog
 import model.Defn
-import model.TypeDefn
-import model.ExprDefn
 import model.Fix
 import model.S
 import model.Z
@@ -101,12 +99,8 @@ object Parserizer {
     pLit("inl") thenJ exprParser thenK pLit(":") thenS typeParser appl ({case (e, t) => InL(e, t)})
   val inrParser : Parser[Expr] = 
     pLit("inr") thenJ exprParser thenK pLit(":") thenS typeParser appl ({case (e, t) => InR(e, t)})
-  val ifParser : Parser[Expr] =
-    pLit("if") thenJ exprParser thenK pLit("then") thenS exprParser thenK pLit("else") thenS exprParser appl({
-      case((b, t), f) => Match(b, List(new Rule(WildPat, t), new Rule(WildPat, f)))
-    })
   val exprParser : Parser[Expr] = 
-    zParser or sParser or matchParser or lamParser or appParser or fixParser or ifParser or varParser or trivParser or pairParser or inlParser or inrParser
+    zParser or sParser or matchParser or lamParser or appParser or fixParser or varParser or trivParser or pairParser or inlParser or inrParser
   
     
   val paramListParser : Parser[List[(String, Type)]] = 
@@ -114,8 +108,7 @@ object Parserizer {
     (pEmpty appl (_ => Nil))
   val nameParser : Parser[((String, List[(String, Type)]), Type)] = pIdent thenS paramListParser thenK pLit(":") thenS typeParser
   val defnParser : Parser[Defn] = 
-    (nameParser thenK pLit("=") thenS exprParser thenK pLit(";") appl ({case (((n, args), t), e) => new ExprDefn(n, args, t, e) : Defn})) or
-    (pLit("type") thenJ pUpperIdent thenK pLit("=") thenS typeParser thenK pLit(";") appl ({case (n, t) => new TypeDefn(n, t)}))
+    nameParser thenK pLit("=") thenS exprParser thenK pLit(";") appl ({case (((n, args), t), e) => new Defn(n, args, t, e)})
   val progParser : Parser[Prog] = defnParser.star thenS exprParser thenK pEnd appl ({case (defs, e) => new Prog(defs, e)})
   
   
