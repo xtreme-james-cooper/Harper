@@ -34,7 +34,7 @@ import model.InRPat
 object Typechecker {
 
   def typecheck(e : Expr)(env : Env) : Option[Type] = e match {
-    case Var(x) => env.bindings.get(x)
+    case Var(x) => env.get(x)
     case Z      => Some(Nat)
     case Triv   => Some(UnitTy)
     case S(n) =>
@@ -43,8 +43,8 @@ object Typechecker {
       } yield Nat
     case Lam(v, t, e) =>
       for {
-        t2 <- typecheck(e)(env.addBind(v -> t.replace(env.typeSyns)))
-      } yield Arrow(t.replace(env.typeSyns), t2)
+        t2 <- typecheck(e)(env + (v -> t))
+      } yield Arrow(t, t2)
     case App(e1, e2) =>
       for {
         Arrow(t1, t2) <- typecheck(e1)(env)
@@ -53,10 +53,9 @@ object Typechecker {
       } yield t2
     case Fix(v, t, e) =>
       for {
-        t2 <- typecheck(e)(env.addBind(v -> t.replace(env.typeSyns)))
-        tnorm = t.replace(env.typeSyns)
-        if tnorm == t2
-      } yield tnorm
+        t2 <- typecheck(e)(env + (v -> t))
+        if t == t2
+      } yield t
     case PairEx(e1, e2) =>
       for {
         t1 <- typecheck(e1)(env)
@@ -65,15 +64,15 @@ object Typechecker {
     case InL(i, t) =>
       for {
         t3 <- typecheck(i)(env)
-        Sum(t1, t2) = t.replace(env.typeSyns)
+        Sum(t1, t2) = t
         if t3 == t1
-      } yield t.replace(env.typeSyns)
+      } yield t
     case InR(i, t) =>
       for {
         t3 <- typecheck(i)(env)
-        Sum(t1, t2) = t.replace(env.typeSyns)
+        Sum(t1, t2) = t
         if t3 == t2
-      } yield t.replace(env.typeSyns)
+      } yield t
     case Match(e, rs) =>
       for {
         t1 <- typecheck(e)(env)
@@ -85,7 +84,7 @@ object Typechecker {
   def typeverify(rs : List[Rule])(t : Type)(env : Env) : Option[Type] = 
     rs.map(r => typeverify(r)(t)(env)).reduce[Option[Type]]({case (t1, t2) if t1 == t2 => t1})
   
-  def typeverify(r : Rule)(t : Type)(env : Env) : Option[Type] = typecheck(r.b)(env.addBinds(typeverify(r.p)(t)(env)))
+  def typeverify(r : Rule)(t : Type)(env : Env) : Option[Type] = typecheck(r.b)(env ++ typeverify(r.p)(t)(env))
   
   //Trying to match against t, it produces a list of variable-type bindings
   def typeverify(p : Pattern)(t : Type)(env : Env) : Map[String, Type] = (p, t) match {
@@ -104,15 +103,11 @@ object Typechecker {
     case (InRPat(p), Sum(t1, t2)) => typeverify(p)(t2)(env)
   }
     
-  def typecheck(d : Defn)(env : Env) : Env = d match {case Defn(n, b) => env.addBind(n -> typecheck(b)(env).get)}
+  def typecheck(d : Defn)(env : Env) : Env = d match {case Defn(n, b) => env + (n -> typecheck(b)(env).get)}
 
-  class Env(val typeSyns : Map[String, Type], val bindings : Map[String, Type]) {
-    def addSyn(syn : (String, Type)) : Env = new Env(typeSyns + syn, bindings)
-    def addBind(bind : (String, Type)) : Env = new Env(typeSyns, bindings + bind)
-    def addBinds(binds : Map[String, Type]) : Env = new Env(typeSyns, bindings ++ binds)
-  }
+  type Env = Map[String, Type]
 
-  def baseEnv : Env = new Env(Map("Nat" -> Nat, "Unit" -> UnitTy), Map())
+  def baseEnv : Env = Map()
 
   def typecheck(p : Prog) : Option[Type] =
     typecheck(p.e)(p.defs.foldLeft(baseEnv)({ case (env, defn) => typecheck(defn)(env) }))

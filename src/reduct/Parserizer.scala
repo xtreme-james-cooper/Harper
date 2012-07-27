@@ -56,8 +56,9 @@ object Parserizer {
     pLit("(") thenJ typeParser thenK pLit(",") thenS typeParser thenK pLit(")") appl ({case (t1, t2) => Product(t1, t2)})
   val sumParser : Parser[Type] = 
     pLit("(") thenJ typeParser thenK pLit("+") thenS typeParser thenK pLit(")") appl ({case (t1, t2) => Sum(t1, t2)})
-  val tynameParser : Parser[Type] = pUpperIdent appl (n => new TyName(n))
-  val typeParser : Parser[Type] = arrowParser or productParser or sumParser or tynameParser
+  val natParser : Parser[Type] = pLit("Nat") appl (_ => Nat)
+  val unitParser : Parser[Type] = pLit("Unit") appl (_ => UnitTy)
+  val typeParser : Parser[Type] = arrowParser or productParser or sumParser or natParser or unitParser
  
   val wildPatParser : Parser[Pattern] = pLit("_") appl (_ => WildPat)
   val varPatParser : Parser[Pattern] = pIdent appl (s => VarPat(s))
