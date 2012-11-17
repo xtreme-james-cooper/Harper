@@ -52,43 +52,43 @@ object Evaluator {
 
   def flattenEnv(e : Env) : Map[String, Value] = e.foldRight(Map[String, Value]())({ case (m1, m2) => m2 ++ m1 })
 
-  def evalExpr : (Expr, Env, List[Stack]) => Value = {
-    case (Var(x), m, s)                   => evalStack(getBinding(m, x), m, s)
-    case (Z, m, s)                        => evalStack(ZVal, m, s)
-    case (S(n), m, s)                     => evalExpr(n, m, StackS :: s)
-    case (Lam(v, t, e), m, s)             => evalStack(LamVal(v, e, flattenEnv(m)), m, s)
-    case (App(e1, e2), m, s)              => evalExpr(e1, m, StackLam(e2) :: s)
-    //Currently a hack; it only works on top-level functions. Fortunately the user can't write fixpoints manually
-    case (Fix(v, t, Lam(x, t2, e)), m, s) => evalExpr(Lam(x, t2, e), Map(v -> LamVal(x, e, flattenEnv(m))) :: m, PopFrame :: s)
-    //this will explode on CAFs (eg, recursive non-functions) so don't write them either
-    case (Fix(v, t, e), m, s)             => evalExpr(e, m, s)
-    case (Triv, m, s)                     => evalStack(TrivVal, m, s)
-    case (PairEx(e1, e2), m, s)           => evalExpr(e1, m, StackLPair(e2) :: s)
-    case (InL(e, t), m, s)                => evalExpr(e, m, StackInL :: s)
-    case (InR(e, t), m, s)                => evalExpr(e, m, StackInR :: s)
-    case (Match(e, rs), m, s)             => evalExpr(e, m, StackCase(rs) :: s)
-  }
-
-  def evalStack : (Value, Env, List[Stack]) => Value = {
-    case (v, m, Nil)                               => v
-    case (v, m, StackS :: s)                       => evalStack(SVal(v), m, s)
-    case (v, m, StackLam(e2) :: s)                 => evalExpr(e2, m, StackArg(v) :: s)
-    case (v, m, StackArg(LamVal(x, e, clos)) :: s) => evalExpr(e, clos + (x -> v) :: m, PopFrame :: s)
-    case (v, m, StackArg(v1) :: s)                 => throw new Exception("Application of a non-function : " + v1) //Typechecker should have caught this
-    case (v, m, StackLPair(e2) :: s)               => evalExpr(e2, m, StackRPair(v) :: s)
-    case (v, m, StackRPair(v1) :: s)               => evalStack(PairVal(v1, v), m, s)
-    case (v, m, StackInL :: s)                     => evalStack(InLVal(v), m, s)
-    case (v, m, StackInR :: s)                     => evalStack(InRVal(v), m, s)
-    case (v, m, StackCase(rs) :: s)                => matchRules(rs, v, m, s)
-    case (v, f :: m, PopFrame :: s)                => evalStack(v, m, s)
-    case (v, Nil, PopFrame :: s)                   => throw new Exception("Too few stack frames?") //Should never happen, pops are added only with a frame
+  def eval : State => Value = {
+    case (Eval(e), m, s) => e match {
+      case Var(x)                   => eval(Return(getBinding(m, x)), m, s)
+      case Z                        => eval(Return(ZVal), m, s)
+      case S(n)                     => eval(Eval(n), m, StackS :: s)
+      case Lam(v, t, e)             => eval(Return(LamVal(v, e, flattenEnv(m))), m, s)
+      case App(e1, e2)              => eval(Eval(e1), m, StackLam(e2) :: s)
+      //Currently a hack; it only works on top-level functions. Fortunately the user can't write fixpoints manually
+      case Fix(v, t, Lam(x, t2, e)) => eval(Eval(Lam(x, t2, e)), Map(v -> LamVal(x, e, flattenEnv(m))) :: m, PopFrame :: s)
+      //this will explode on CAFs (eg, recursive non-functions) so don't write them either
+      case Fix(v, t, e)             => eval(Eval(e), m, s)
+      case Triv                     => eval(Return(TrivVal), m, s)
+      case PairEx(e1, e2)           => eval(Eval(e1), m, StackLPair(e2) :: s)
+      case InL(e, t)                => eval(Eval(e), m, StackInL :: s)
+      case InR(e, t)                => eval(Eval(e), m, StackInR :: s)
+      case Match(e, rs)             => eval(Eval(e), m, StackCase(rs) :: s)
+    }
+    case (Return(v), m, Nil) => v
+    case (Return(v), m, stack :: s) => stack match {
+      case StackS                       => eval(Return(SVal(v)), m, s)
+      case StackLam(e2)                 => eval(Eval(e2), m, StackArg(v) :: s)
+      case StackArg(LamVal(x, e, clos)) => eval(Eval(e), clos + (x -> v) :: m, PopFrame :: s)
+      case StackArg(v1)                 => throw new Exception("Application of a non-function : " + v1) //Typechecker should have caught this
+      case StackLPair(e2)               => eval(Eval(e2), m, StackRPair(v) :: s)
+      case StackRPair(v1)               => eval(Return(PairVal(v1, v)), m, s)
+      case StackInL                     => eval(Return(InLVal(v)), m, s)
+      case StackInR                     => eval(Return(InRVal(v)), m, s)
+      case StackCase(rs)                => matchRules(rs, v, m, s)
+      case PopFrame                     => eval(Return(v), m.tail, s) //Should be safe, pops are added only with a frame
+    }
   }
 
   def matchRules : (List[Rule], Value, Env, List[Stack]) => Value = {
     case (Nil, v, m, s) => throw new Exception("No pattern match found for " + v)
     case (Rule(p, b) :: rs, v, m, s) => matchPattern(Nil, p, v) match {
       case None       => matchRules(rs, v, m, s)
-      case Some(bind) => evalExpr(b, bind :: m, PopFrame :: s)
+      case Some(bind) => eval(Eval(b), bind :: m, PopFrame :: s)
     }
   }
 
@@ -111,8 +111,8 @@ object Evaluator {
     case (PatStackRPair(m1) :: ps, m2) => throw new Exception("Patterns cannot have repeated variables") //genuine error; as of now, no way to check
   }
 
-  def evalDefn(d : Defn, m : Map[String, Value]) : Map[String, Value] = m + (d.name -> evalExpr(d.body, List(m), Nil))
+  def evalDefn(d : Defn, m : Map[String, Value]) : Map[String, Value] = m + (d.name -> eval(Eval(d.body), List(m), Nil))
 
-  def evaluate(p : Prog) : Value = evalExpr(p.e, List(p.defs.foldRight(Map[String, Value]())(evalDefn)), Nil)
+  def evaluate(p : Prog) : Value = eval(Eval(p.e), List(p.defs.foldRight(Map[String, Value]())(evalDefn)), Nil)
 
 }
