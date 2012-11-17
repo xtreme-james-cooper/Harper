@@ -17,19 +17,7 @@ case class StackRPair(v1 : Value) extends Stack("(" + v1 + ", (_))")
 case object StackInL extends Stack("inl (-)")
 case object StackInR extends Stack("inr (_)")
 case class StackCase(rs : List[Rule]) extends Stack("case (-) of { " + rs.foldRight("")({ case (r1, r2) => r1 + " | " + r2 }) + "}")
-case class Binding(x : String, v : Value) extends Stack(x + " -> " + v)
-
-object Stack {
-  
-  def getBinding(s : List[Stack], x : String) : Value = s match {
-    case Nil => throw new Exception("Unbound identifier : " + x) //Typechecker should blow up on this first
-    case Binding(y, v) :: s if x == y => v
-    case _ :: s => getBinding(s, x)
-  }
-  
-  def bindingsFromMap(m : Map[String, Value]) : List[Stack] = m.map({case (x, v) => Binding(x, v)}).toList
-  
-}
+case object PopFrame extends Stack(" ! ")
 
 sealed abstract class PatStack(name : String) {
   override def toString : String = name

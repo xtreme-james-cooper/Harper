@@ -7,6 +7,11 @@ import reduct.Evaluator
 object Main {
 
   def main(args : Array[String]) : Unit = {
+
+    test("null : Unit = (); null")
+
+    test("plus(a : Nat, b : Nat) : Nat = case a of {Z -> b | S(n) -> S(((plus n) b))}; ((plus 2) 3)")
+
     test("id(x : Nat) : Nat = x;"
       + "plus(a : Nat, b : Nat) : Nat = case a of {Z -> b | S(n) -> S(((plus n) b))};"
       + "times(a : Nat, b : Nat) : Nat = case a of {Z -> Z | S(n) -> ((plus b) ((times n) b))};"

@@ -90,10 +90,6 @@ object Parserizer {
     })
   val appParser : Parser[Expr] =
     pLit("(") thenJ exprParser thenS exprParser thenK pLit(")") appl ({ case (e1, e2) => App(e1, e2) })
-  val fixParser : Parser[Expr] =
-    pLit("fix") thenJ pIdent thenK pLit(":") thenS typeParser thenK pLit("in") thenS exprParser appl ({
-      case ((v, t), e) => Fix(v, t, e)
-    })
   val trivParser : Parser[Expr] = pLit("(") thenK pLit(")") appl (_ => Triv)
   val pairParser : Parser[Expr] =
     pLit("(") thenJ exprParser thenK pLit(",") thenS exprParser thenK pLit(")") appl ({ case (t1, t2) => PairEx(t1, t2) })
@@ -102,7 +98,7 @@ object Parserizer {
   val inrParser : Parser[Expr] =
     pLit("inr") thenJ exprParser thenK pLit(":") thenS typeParser appl ({ case (e, t) => InR(e, t) })
   val exprParser : Parser[Expr] =
-    zParser or sParser or numParser or matchParser or lamParser or appParser or fixParser or varParser or trivParser or pairParser or inlParser or inrParser
+    zParser or sParser or numParser or matchParser or lamParser or appParser or varParser or trivParser or pairParser or inlParser or inrParser
 
   val paramListParser : Parser[List[(String, Type)]] =
     (pLit("(") thenJ (pIdent thenK pLit(":") thenS typeParser).intersperse(pLit(",")) thenK pLit(")")) or
