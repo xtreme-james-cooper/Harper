@@ -29,7 +29,7 @@ import model.Defn
 object Evaluator {
 
   def evalExpr(s : List[Stack], e : Expr) : Expr = (s, e) match {
-    case (s, Var(x))         => throw new Exception("Unbound identifier : " + x)
+    case (s, Var(x))         => throw new Exception("Unbound identifier : " + x) //Typechecker should blow up on this first
     case (s, Z)              => evalStack(s, Z)
     case (s, S(n))           => evalExpr(StackS :: s, n)
     case (s, Lam(v, t, e))   => evalStack(s, Lam(v, t, e))
@@ -46,6 +46,7 @@ object Evaluator {
     case (Nil, e)                          => e
     case (StackS :: s, e)                  => evalStack(s, S(e))
     case (StackApp(e2) :: s, Lam(v, t, e)) => evalExpr(s, e.replace(v, e2))
+    case (StackApp(e2) :: s, e)            => throw new Exception("Application of a non-function : " + e) //Typechecker should get this
     case (StackLPair(e2) :: s, e)          => evalExpr(StackRPair(e) :: s, e2)
     case (StackRPair(e1) :: s, e)          => evalStack(s, PairEx(e1, e))
     case (StackInL :: s, e)                => evalStack(s, InL(e, UnitTy))
@@ -55,30 +56,31 @@ object Evaluator {
 
   def matchRules(e : Expr)(rs : List[Rule])(s : List[Stack]) : Expr = (e, rs) match {
     case (e, Nil) => throw new Exception("No pattern match found for " + e)
-    case (e, Rule(p, b) :: rs) => matchPattern(e, p) match {
+    case (e, Rule(p, b) :: rs) => matchPattern(Nil, e, p) match {
       case None       => matchRules(e)(rs)(s)
       case Some(bind) => evalExpr(s, b.replace(bind))
     }
   }
 
-  def matchPattern : (Expr, Pattern) => Option[Map[String, Expr]] = {
-    case (_, WildPat)           => Some(Map())
-    case (e, VarPat(x))         => Some(Map(x -> e))
-    case (Z, ZPat)              => Some(Map())
-    case (S(e), SPat(p))        => matchPattern(e, p)
-    case (Triv, TrivPat)        => Some(Map())
-    case (InL(e, t), InLPat(p)) => matchPattern(e, p)
-    case (InR(e, t), InRPat(p)) => matchPattern(e, p)
-    case (PairEx(e1, e2), PairPat(p1, p2)) => matchPattern(e1, p1) match {
-      case Some(b1) => matchPattern(e2, p2) match {
-        case Some(b2) => Some(b1 ++ b2)
-        case None     => None
-      }
-      case None => None
-    }
-    case _ => None
+  def matchPattern : (List[PatStack], Expr, Pattern) => Option[Map[String, Expr]] = {
+    case (s, _, WildPat)                      => matchStack(s, Map())
+    case (s, e, VarPat(x))                    => matchStack(s, Map(x -> e))
+    case (s, Z, ZPat)                         => matchStack(s, Map())
+    case (s, S(e), SPat(p))                   => matchPattern(s, e, p)
+    case (s, Triv, TrivPat)                   => matchStack(s, Map())
+    case (s, InL(e, t), InLPat(p))            => matchPattern(s, e, p)
+    case (s, InR(e, t), InRPat(p))            => matchPattern(s, e, p)
+    case (s, PairEx(e1, e2), PairPat(p1, p2)) => matchPattern(PatStackLPair(e2, p2) :: s, e1, p1)
+    case _                                    => None
   }
-  
+
+  def matchStack : (List[PatStack], Map[String, Expr]) => Option[Map[String, Expr]] = {
+    case (Nil, m) => Some(m)
+    case (PatStackLPair(e2, p2) :: s, m) => matchPattern(PatStackRPair(m) :: s, e2, p2)
+    case (PatStackRPair(m1) :: s, m2) if (m1.keySet & m2.keySet).isEmpty => matchStack(s, m1 ++ m2)
+    case (PatStackRPair(m1) :: s, m2) => throw new Exception("Patterns cannot have repeated variables")
+  }
+
   def evaluate(p : Prog) : Expr = evalExpr(Nil, p.defs.foldRight(p.e)({ case (Defn(n, b), expr) => expr.replace(n, b) }))
 
 }
