@@ -7,6 +7,7 @@ import src.Parser.pIdent
 import src.Parser.pUpperIdent
 import src.Parser.pLit
 import src.Parser.pEmpty
+import src.Parser.pNum
 import model.Expr
 import model.Type
 import model.Var
@@ -26,7 +27,6 @@ import model.PairEx
 import model.Sum
 import model.InR
 import model.InL
-import model.TyName
 import model.Match
 import model.Rule
 import model.WildPat
@@ -77,8 +77,10 @@ object Parserizer {
   val rulesParser : Parser[List[Rule]] = ruleParser thenS (pLit("|") thenJ ruleParser).star appl ({case (r, rs) => r :: rs})
   
   val varParser : Parser[Expr] = pIdent appl (s => Var(s))
-  val zParser : Parser[Expr] = pLit("Z") appl(s => Z)
+  val zParser : Parser[Expr] = pLit("Z") appl (s => Z)
   val sParser : Parser[Expr] = pLit("S") thenJ pLit("(") thenJ exprParser thenK pLit(")") appl(e => S(e))
+  val numParser : Parser[Expr] = pNum appl (digitToSZ _)
+  def digitToSZ(n : Int) : Expr = if (n == 0) Z else S(digitToSZ(n - 1))
   val matchParser : Parser[Expr] = 
     pLit("case") thenJ exprParser thenK pLit("of") thenK pLit("{") thenS rulesParser thenK pLit("}") appl({
       case (e, rs) => Match(e, rs)
@@ -101,7 +103,7 @@ object Parserizer {
   val inrParser : Parser[Expr] = 
     pLit("inr") thenJ exprParser thenK pLit(":") thenS typeParser appl ({case (e, t) => InR(e, t)})
   val exprParser : Parser[Expr] = 
-    zParser or sParser or matchParser or lamParser or appParser or fixParser or varParser or trivParser or pairParser or inlParser or inrParser
+    zParser or sParser or numParser or matchParser or lamParser or appParser or fixParser or varParser or trivParser or pairParser or inlParser or inrParser
   
     
   val paramListParser : Parser[List[(String, Type)]] = 

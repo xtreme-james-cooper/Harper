@@ -3,6 +3,7 @@ package model
 sealed abstract class Expr(name : String) {
   def replace(v : String, e : Expr) : Expr
   def replace(binds : Map[String, Expr]) : Expr = binds.foldLeft(this)({case (e, (v, b)) => e.replace(v, b)})
+  def numVal : Option[Int] = None
   override def toString : String = name
 }
 
@@ -10,11 +11,13 @@ case class Var(v : String) extends Expr(v) {
   override def replace(vbl : String, e : Expr) : Expr = if (v == vbl) e else this
 }
 
-case object Z extends Expr("Z") {
+case object Z extends Expr("0") {
+  override def numVal = Some(0)
   override def replace(v : String, e : Expr) : Expr = this
 }
 
-case class S(e : Expr) extends Expr("S(" + e + ")") {
+case class S(e : Expr) extends Expr(e.numVal match { case None => "S(" + e + ")"; case Some(n) => (n + 1).toString }) {
+  override def numVal = for (n <- e.numVal) yield n + 1
   override def replace(v : String, e1 : Expr) : Expr = S(e.replace(v, e1))
 }
 

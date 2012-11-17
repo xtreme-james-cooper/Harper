@@ -15,6 +15,8 @@ object Parser {
   
   def pUpperIdent : Parser[String] = pSat(s => s.head.isUpperCase)
   
+  def pNum : Parser[Int] = pSat(_ forall(_ isDigit)) appl (s => Integer.decode(s))
+  
   def pEnd : Parser[Unit] = new Parser({
     case tok::toks => Nil
     case Nil => List(((), Nil))
