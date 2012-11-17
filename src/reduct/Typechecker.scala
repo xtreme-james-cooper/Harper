@@ -81,20 +81,20 @@ object Typechecker {
   }
 
   //t is the type that the pattern is expected to have; under that assumption, it produces some type
-  def typeverify(rs : List[Rule])(t : Type)(env : Env) : Option[Type] = 
-    rs.map(r => typeverify(r)(t)(env)).reduce[Option[Type]]({case (t1, t2) if t1 == t2 => t1})
-  
+  def typeverify(rs : List[Rule])(t : Type)(env : Env) : Option[Type] =
+    rs.map(r => typeverify(r)(t)(env)).reduce[Option[Type]]({ case (t1, t2) if t1 == t2 => t1 })
+
   def typeverify(r : Rule)(t : Type)(env : Env) : Option[Type] = typecheck(r.b)(env ++ typeverify(r.p)(t)(env))
-  
+
   //Trying to match against t, it produces a list of variable-type bindings
   def typeverify(p : Pattern)(t : Type)(env : Env) : Map[String, Type] = (p, t) match {
-    case (WildPat, t) => Map()
-    case (VarPat(x), t) => Map(x -> t)
+    case (WildPat, t)      => Map()
+    case (VarPat(x), t)    => Map(x -> t)
     case (TrivPat, UnitTy) => Map()
-    case (ZPat, Nat) => Map()
-    case (SPat(p), Nat) => typeverify(p)(Nat)(env)
+    case (ZPat, Nat)       => Map()
+    case (SPat(p), Nat)    => typeverify(p)(Nat)(env)
     case (PairPat(p1, p2), Product(t1, t2)) => {
-      val p1binds = typeverify(p1)(t1)(env) 
+      val p1binds = typeverify(p1)(t1)(env)
       val p2binds = typeverify(p2)(t2)(env)
       if ((p1binds.keySet & p2binds.keySet).isEmpty) p1binds ++ p2binds
       else throw new Exception("Overlapping pattern variables")
@@ -102,8 +102,8 @@ object Typechecker {
     case (InLPat(p), Sum(t1, t2)) => typeverify(p)(t1)(env)
     case (InRPat(p), Sum(t1, t2)) => typeverify(p)(t2)(env)
   }
-    
-  def typecheck(d : Defn)(env : Env) : Env = d match {case Defn(n, b) => env + (n -> typecheck(b)(env).get)}
+
+  def typecheck(d : Defn)(env : Env) : Env = d match { case Defn(n, b) => env + (n -> typecheck(b)(env).get) }
 
   type Env = Map[String, Type]
 

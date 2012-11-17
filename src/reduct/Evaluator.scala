@@ -54,7 +54,7 @@ object Evaluator {
   }
 
   def matchRules(e : Expr)(rs : List[Rule])(s : List[Stack]) : Expr = (e, rs) match {
-    case (e, Nil)              => throw new Exception("No pattern match found for " + e)
+    case (e, Nil) => throw new Exception("No pattern match found for " + e)
     case (e, Rule(p, b) :: rs) => matchPattern(e, p) match {
       case None       => matchRules(e)(rs)(s)
       case Some(bind) => evalExpr(b.replace(bind))(s)
@@ -79,6 +79,6 @@ object Evaluator {
     case _ => None
   }
 
-  def evaluate(p : Prog) : Expr = evalExpr(p.defs.foldRight(p.e)({case (Defn(n, b), expr) => expr.replace(n, b)}))(Nil)
+  def evaluate(p : Prog) : Expr = evalExpr(p.defs.foldRight(p.e)({ case (Defn(n, b), expr) => expr.replace(n, b) }))(Nil)
 
 }

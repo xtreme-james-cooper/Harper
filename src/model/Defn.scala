@@ -1,9 +1,9 @@
 package model
 
 case class Defn(name : String, body : Expr) {
-  
+
   override def toString : String = name + " = " + body + "\n"
-  
+
   def this(name : String, args : List[(String, Type)], t : Type, e : Expr) =
     this(name,
       Fix(name,
