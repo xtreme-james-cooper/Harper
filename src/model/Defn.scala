@@ -11,3 +11,7 @@ case class Defn(name : String, body : Expr) {
         args.foldRight(e)({ case ((v, ty), ex) => Lam(v, ty, ex) })))
 
 }
+
+class Prog(val defs : List[Defn], val e : Expr) {
+  override def toString : String = defs.foldLeft("")({ case (s, defn) => s + defn }) + e
+}

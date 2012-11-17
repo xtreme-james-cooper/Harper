@@ -12,3 +12,7 @@ case class SPat(e : Pattern) extends Pattern("S(" + e + ")", e.freeVars)
 case class PairPat(e1 : Pattern, e2 : Pattern) extends Pattern("(" + e1 + ", " + e2 + ")", e1.freeVars ++ e2.freeVars)
 case class InLPat(i : Pattern) extends Pattern("inl " + i, i.freeVars)
 case class InRPat(i : Pattern) extends Pattern("inr " + i, i.freeVars)
+
+case class Rule(p : Pattern, b : Expr) {
+  override def toString : String = p + " -> " + b
+}

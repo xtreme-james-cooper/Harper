@@ -38,6 +38,12 @@ object Evaluator {
 
   type Env = List[Map[String, Value]]
 
+  type State = (Target, Env, List[Stack])
+
+  sealed abstract class Target
+  case class Eval(e : Expr) extends Target
+  case class Return(v : Value) extends Target
+
   def getBinding(e : Env, x : String) : Value = e match {
     case Nil                     => throw new Exception("Unbound identifier : " + x) //Typechecker should blow up on this first
     case m :: e if m.contains(x) => m(x)
@@ -80,35 +86,32 @@ object Evaluator {
 
   def matchRules : (List[Rule], Value, Env, List[Stack]) => Value = {
     case (Nil, v, m, s) => throw new Exception("No pattern match found for " + v)
-    case (Rule(p, b) :: rs, v, m, s) => matchPattern(Nil, v, p) match {
+    case (Rule(p, b) :: rs, v, m, s) => matchPattern(Nil, p, v) match {
       case None       => matchRules(rs, v, m, s)
       case Some(bind) => evalExpr(b, bind :: m, PopFrame :: s)
     }
   }
 
-  def matchPattern : (List[PatStack], Value, Pattern) => Option[Map[String, Value]] = {
-    case (s, _, WildPat)                       => matchStack(s, Map())
-    case (s, v, VarPat(x))                     => matchStack(s, Map(x -> v))
-    case (s, ZVal, ZPat)                       => matchStack(s, Map())
-    case (s, SVal(v), SPat(p))                 => matchPattern(s, v, p)
-    case (s, TrivVal, TrivPat)                 => matchStack(s, Map())
-    case (s, InLVal(v), InLPat(p))             => matchPattern(s, v, p)
-    case (s, InRVal(v), InRPat(p))             => matchPattern(s, v, p)
-    case (s, PairVal(v1, v2), PairPat(p1, p2)) => matchPattern(PatStackLPair(v2, p2) :: s, v1, p1)
-    case _                                     => None
+  def matchPattern : (List[PatStack], Pattern, Value) => Option[Map[String, Value]] = {
+    case (ps, WildPat, _)                       => matchStack(ps, Map())
+    case (ps, VarPat(x), v)                     => matchStack(ps, Map(x -> v))
+    case (ps, ZPat, ZVal)                       => matchStack(ps, Map())
+    case (ps, SPat(p), SVal(v))                 => matchPattern(ps, p, v)
+    case (ps, TrivPat, TrivVal)                 => matchStack(ps, Map())
+    case (ps, InLPat(p), InLVal(v))             => matchPattern(ps, p, v)
+    case (ps, InRPat(p), InRVal(v))             => matchPattern(ps, p, v)
+    case (ps, PairPat(p1, p2), PairVal(v1, v2)) => matchPattern(PatStackLPair(v2, p2) :: ps, p1, v1)
+    case _                                      => None
   }
 
   def matchStack : (List[PatStack], Map[String, Value]) => Option[Map[String, Value]] = {
     case (Nil, m) => Some(m)
-    case (PatStackLPair(e2, p2) :: s, m) => matchPattern(PatStackRPair(m) :: s, e2, p2)
-    case (PatStackRPair(m1) :: s, m2) if (m1.keySet & m2.keySet).isEmpty => matchStack(s, m1 ++ m2)
-    case (PatStackRPair(m1) :: s, m2) => throw new Exception("Patterns cannot have repeated variables") //genuine error; as of now, no way to check
+    case (PatStackLPair(v2, p2) :: ps, m) => matchPattern(PatStackRPair(m) :: ps, p2, v2)
+    case (PatStackRPair(m1) :: ps, m2) if (m1.keySet & m2.keySet).isEmpty => matchStack(ps, m1 ++ m2)
+    case (PatStackRPair(m1) :: ps, m2) => throw new Exception("Patterns cannot have repeated variables") //genuine error; as of now, no way to check
   }
 
-  def evalDefn(d : Defn, m : Map[String, Value]) : Map[String, Value] = {
-    println("new defn")
-    m + (d.name -> evalExpr(d.body, List(m), Nil))
-  }
+  def evalDefn(d : Defn, m : Map[String, Value]) : Map[String, Value] = m + (d.name -> evalExpr(d.body, List(m), Nil))
 
   def evaluate(p : Prog) : Value = evalExpr(p.e, List(p.defs.foldRight(Map[String, Value]())(evalDefn)), Nil)
 
