@@ -36,39 +36,39 @@ import model.PairVal
 
 object Evaluator {
 
-  def evalExpr(m : Map[String, Value])(s : List[Stack], e : Expr) : Value = (s, e) match {
-    case (s, Var(x)) if m.contains(x) => m(x)
-    case (s, Var(x))                  => throw new Exception("Unbound identifier : " + x) //Typechecker should blow up on this first
-    case (s, Z)                       => evalStack(m)(s, ZVal)
-    case (s, S(n))                    => evalExpr(m)(StackS :: s, n)
-    case (s, Lam(v, t, e))            => evalStack(m)(s, LamVal(v, e))
-    case (s, App(e1, e2))             => evalExpr(m)(StackLam(e2) :: s, e1)
-    case (s, Fix(v, t, e))            => evalExpr(m + (v -> Fix(v, t, e)))(s, e)
-    case (s, Triv)                    => evalStack(m)(s, TrivVal)
-    case (s, PairEx(e1, e2))          => evalExpr(m)(StackLPair(e2) :: s, e1)
-    case (s, InL(e, t))               => evalExpr(m)(StackInL :: s, e)
-    case (s, InR(e, t))               => evalExpr(m)(StackInR :: s, e)
-    case (s, Match(e, rs))            => evalExpr(m)(StackCase(rs) :: s, e)
+  def evalExpr(s : List[Stack], e : Expr) : Value = (s, e) match {
+    case (s, Var(x))         => Stack.getBinding(s, x)
+    case (s, Z)              => evalStack(s, ZVal)
+    case (s, S(n))           => evalExpr(StackS :: s, n)
+    case (s, Lam(v, t, e))   => evalStack(s, LamVal(v, e))
+    case (s, App(e1, e2))    => evalExpr(StackLam(e2) :: s, e1)
+    case (s, Fix(v, t, e))   => evalExpr(Binding(v, Fix(v, t, e)) :: s, e)
+    case (s, Triv)           => evalStack(s, TrivVal)
+    case (s, PairEx(e1, e2)) => evalExpr(StackLPair(e2) :: s, e1)
+    case (s, InL(e, t))      => evalExpr(StackInL :: s, e)
+    case (s, InR(e, t))      => evalExpr(StackInR :: s, e)
+    case (s, Match(e, rs))   => evalExpr(StackCase(rs) :: s, e)
   }
 
-  def evalStack(m : Map[String, Value]) : (List[Stack], Value) => Value = {
-    case (Nil, v)                           => v
-    case (StackS :: s, v)                   => evalStack(m)(s, SVal(v))
-    case (StackLam(e2) :: s, v)             => evalExpr(m)(StackArg(v) :: s, e2)
-    case (StackArg(LamVal(v1, e)) :: s, v2) => evalExpr(m + (v1 -> v2))(s, e)
-    case (StackArg(v1) :: s, v2)            => throw new Exception("Application of a non-function : " + v1) //Typechecker should get this
-    case (StackLPair(e2) :: s, v)           => evalExpr(m)(StackRPair(v) :: s, e2)
-    case (StackRPair(v1) :: s, v)           => evalStack(m)(s, PairVal(v1, v))
-    case (StackInL :: s, v)                 => evalStack(m)(s, InLVal(v))
-    case (StackInR :: s, v)                 => evalStack(m)(s, InRVal(v))
-    case (StackCase(rs) :: s, v)            => matchRules(m)(v)(rs)(s)
+  def evalStack : (List[Stack], Value) => Value = {
+    case (Nil, v)                          => v
+    case (StackS :: s, v)                  => evalStack(s, SVal(v))
+    case (StackLam(e2) :: s, v)            => evalExpr(StackArg(v) :: s, e2)
+    case (StackArg(LamVal(x, e)) :: s, v2) => evalExpr(Binding(x, v2) :: s, e)
+    case (StackArg(v1) :: s, v2)           => throw new Exception("Application of a non-function : " + v1) //Typechecker should get this
+    case (StackLPair(e2) :: s, v)          => evalExpr(StackRPair(v) :: s, e2)
+    case (StackRPair(v1) :: s, v)          => evalStack(s, PairVal(v1, v))
+    case (StackInL :: s, v)                => evalStack(s, InLVal(v))
+    case (StackInR :: s, v)                => evalStack(s, InRVal(v))
+    case (StackCase(rs) :: s, v)           => matchRules(v)(rs)(s)
+    case (Binding(_, _) :: s, v)           => evalStack(s, v)
   }
 
-  def matchRules(m : Map[String, Value])(e : Value)(rs : List[Rule])(s : List[Stack]) : Value = (e, rs) match {
+  def matchRules(e : Value)(rs : List[Rule])(s : List[Stack]) : Value = (e, rs) match {
     case (e, Nil) => throw new Exception("No pattern match found for " + e)
     case (e, Rule(p, b) :: rs) => matchPattern(Nil, e, p) match {
-      case None       => matchRules(m)(e)(rs)(s)
-      case Some(bind) => evalExpr(m ++ bind)(s, b)
+      case None       => matchRules(e)(rs)(s)
+      case Some(bind) => evalExpr(Stack.bindingsFromMap(bind) ++ s, b)
     }
   }
 
@@ -91,6 +91,8 @@ object Evaluator {
     case (PatStackRPair(m1) :: s, m2) => throw new Exception("Patterns cannot have repeated variables")
   }
 
-  def evaluate(p : Prog) : Value = evalExpr(p.defs.foldRight(Map[String, Value]())({ case (Defn(n, b), m) => m + (n -> evalExpr(m)(Nil, b)) }))(Nil, p.e)
-
+  def evalDefn(d : Defn, m : Map[String, Value]) : Map[String, Value] =  m + (d.name -> evalExpr(Stack.bindingsFromMap(m), d.body))
+  
+  def evaluate(p : Prog) : Value = evalExpr(Stack.bindingsFromMap(p.defs.foldRight(Map[String, Value]())(evalDefn)), p.e)
+  
 }
