@@ -33,6 +33,7 @@ import model.SVal
 import model.InLVal
 import model.InRVal
 import model.PairVal
+import model.RecursiveLamVal
 
 object Evaluator {
 
@@ -59,10 +60,8 @@ object Evaluator {
       case S(n)                     => eval(Eval(n), m, StackS :: s)
       case Lam(v, t, e)             => eval(Return(LamVal(v, e, flattenEnv(m))), m, s)
       case App(e1, e2)              => eval(Eval(e1), m, StackLam(e2) :: s)
-      //Currently a hack; it only works on top-level functions. Fortunately the user can't write fixpoints manually
-      case Fix(v, t, Lam(x, t2, e)) => eval(Eval(Lam(x, t2, e)), Map(v -> LamVal(x, e, flattenEnv(m))) :: m, PopFrame :: s)
-      //this will explode on CAFs (eg, recursive non-functions) so don't write them either
-      case Fix(v, t, e)             => eval(Eval(e), m, s)
+      case Fix(v, t, Lam(x, t2, e)) => eval(Eval(Lam(x, t2, e)), Map(v -> RecursiveLamVal(v, x, e, flattenEnv(m))) :: m, PopFrame :: s)
+      case Fix(v, t, e)             => eval(Eval(e), m, s) //this will explode on CAFs (eg, recursive non-functions) so don't write them
       case Triv                     => eval(Return(TrivVal), m, s)
       case PairEx(e1, e2)           => eval(Eval(e1), m, StackLPair(e2) :: s)
       case InL(e, t)                => eval(Eval(e), m, StackInL :: s)
@@ -80,7 +79,7 @@ object Evaluator {
       case StackInL                     => eval(Return(InLVal(v)), m, s)
       case StackInR                     => eval(Return(InRVal(v)), m, s)
       case StackCase(rs)                => matchRules(rs, v, m, s)
-      case PopFrame                     => eval(Return(v), m.tail, s) //Should be safe, pops are added only with a frame
+      case PopFrame                     => eval(Return(v), m.tail, s) //'tail' should be safe, pops are added only with a frame
     }
   }
 
