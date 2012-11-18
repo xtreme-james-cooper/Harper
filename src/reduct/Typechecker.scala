@@ -82,7 +82,10 @@ object Typechecker {
 
   //t is the type that the pattern is expected to have; under that assumption, it produces some type
   def typeverify(rs : List[Rule])(t : Type)(env : Env) : Option[Type] =
-    rs.map(r => typeverify(r)(t)(env)).reduce[Option[Type]]({ case (t1, t2) if t1 == t2 => t1 })
+    rs.map(r => typeverify(r)(t)(env)).reduce[Option[Type]]({ 
+      case (t1, t2) if t1 == t2 => t1 
+      case (t1, t2) => throw new Exception("Noncompatible types " + t1 + " and " + t2)
+    })
 
   def typeverify(r : Rule)(t : Type)(env : Env) : Option[Type] = typecheck(r.b)(env ++ typeverify(r.p)(t)(env))
 
@@ -101,6 +104,7 @@ object Typechecker {
     }
     case (InLPat(p), Sum(t1, t2)) => typeverify(p)(t1)(env)
     case (InRPat(p), Sum(t1, t2)) => typeverify(p)(t2)(env)
+    case (p, t) => throw new Exception("Pattern " + p + " cannot match type " + t)
   }
 
   def typecheck(d : Defn)(env : Env) : Env = d match { case Defn(n, b) => env + (n -> typecheck(b)(env).get) }
