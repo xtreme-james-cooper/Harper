@@ -43,21 +43,32 @@ import model.Sum
 
 object Evaluator {
 
-  type Env = List[Map[String, Value]]
-
-  type State = (Target, Env, List[Stack])
+  type State = (Target, List[Map[String, Value]], List[Stack])
 
   sealed abstract class Target
   case class Eval(e : Expr) extends Target
   case class Return(v : Value) extends Target
 
-  def getBinding(e : Env, x : String) : Value = e match {
+  def getBinding(e : List[Map[String, Value]], x : String) : Value = e match {
     case Nil                     => throw new Exception("Unbound identifier : " + x) //Typechecker should blow up on this first
     case m :: e if m.contains(x) => m(x)
     case m :: e                  => getBinding(e, x)
   }
 
-  def flattenEnv(e : Env) : Map[String, Value] = e.foldRight(Map[String, Value]())({ case (m1, m2) => m2 ++ m1 })
+  def flattenEnv(e : List[Map[String, Value]]) : Map[String, Value] = e.foldRight(Map[String, Value]())({ case (m1, m2) => m2 ++ m1 })
+
+  //All these are init'd to null, because they are manually set in each pass
+  var target : Target = null //TODO use for all parts The expressionbeing evaluated or the vaue being returned
+  var stack : List[Stack] = null //TODO use for all parts The parts of the expression whose evaluation has been deferred
+  var env : List[Map[String, Value]] = null //TODO use for all parts The stack of variable-binding frames
+
+  var rules : List[Rule] = null //Rules as yet untried
+  var matchVal : Value = null //Value being matched against
+  var body : Expr = null //The body to be evaluated if the match succeeds
+  var patternStack : List[PatStack] = null //The parts of the pattern still unmatched
+  var matchingTarget : MatchingTarget = null //Either a pattern against a variable, or a binding being returned
+
+  def runEval(t : Target, m : List[Map[String, Value]]) : Value = eval(t, m, Nil)
 
   def eval : State => Value = {
     case (Eval(e), m, s) => e match {
@@ -84,7 +95,7 @@ object Evaluator {
       //Typechecker should have caught this last, unless it was a function, which we refuse to allow (only polynomial generic types ATM)
     }
     case (Return(v), m, Nil) => v
-    case (Return(v), m, stack :: s) => stack match {
+    case (Return(v), m, stk :: s) => stk match {
       case StackS                       => eval(Return(SVal(v)), m, s)
       case StackLam(e2)                 => eval(Eval(e2), m, StackArg(v) :: s)
       case StackArg(LamVal(x, e, clos)) => eval(Eval(e), clos + (x -> v) :: m, PopFrame :: s)
@@ -97,37 +108,25 @@ object Evaluator {
       case StackCase(Rule(p, b) :: rs) => {
         rules = rs
         matchVal = v
-        stackDuringMatch = s
-        envDuringMatch = m
+        stack = s
+        env = m
         body = b
         patternStack = Nil
         matchingTarget = Against(p, matchVal)
-        runPatternMatch
+
+        while (!(matchingTarget.isInstanceOf[Binding] && patternStack.isEmpty)) {
+          matchPattern
+        }
+        eval(Eval(body), matchingTarget.asInstanceOf[Binding].b :: env, PopFrame :: stack)
       }
       case StackMap(x, e1) => eval(Eval(e1), Map(x -> v) :: m, s)
       case PopFrame        => eval(Return(v), m.tail, s) //'tail' should be safe, pops are added only with a frame
     }
   }
 
-  //All these are init'd to null, because they are manually set in each pass of the rules section
-  var rules : List[Rule] = null //Rules as yet untried
-  var matchVal : Value = null //Value being matched against
-  var body : Expr = null //The body to be evaluated if the match succeeds
-  var patternStack : List[PatStack] = null //The parts of the pattern still unmatched
-  var stackDuringMatch : List[Stack] = null //TODO use for all parts
-  var envDuringMatch : Env = null //TODO use for all parts
-  var matchingTarget : MatchingTarget = null //Either a pattern against a variable, or a binding being returned
-
   sealed abstract class MatchingTarget
   case class Against(p : Pattern, v : Value) extends MatchingTarget
   case class Binding(b : Map[String, Value]) extends MatchingTarget
-
-  def runPatternMatch : Value = {
-    while (!(matchingTarget.isInstanceOf[Binding] && patternStack.isEmpty)) {
-      matchPattern
-    }
-    eval(Eval(body), matchingTarget.asInstanceOf[Binding].b :: envDuringMatch, PopFrame :: stackDuringMatch)
-  }
 
   def matchPattern : Unit = matchingTarget match {
     case Against(WildPat, _)           => matchingTarget = Binding(Map())
@@ -151,7 +150,7 @@ object Evaluator {
       }
     }
     case Binding(bind) => patternStack match {
-      case Nil => throw new Exception("Should have aborted the driver loop!") //This is the escape case
+      case Nil => throw new Exception("Should have aborted the pattern-match driver loop!") //This is the escape case
       case PatStackLPair(v2, p2) :: ps => {
         patternStack = PatStackRPair(bind) :: ps
         matchingTarget = Against(p2, v2)
@@ -164,8 +163,8 @@ object Evaluator {
     }
   }
 
-  def evalDefn(d : Defn, m : Map[String, Value]) : Map[String, Value] = m + (d.name -> eval(Eval(d.body), List(m), Nil))
+  def evalDefn(d : Defn, m : Map[String, Value]) : Map[String, Value] = m + (d.name -> runEval(Eval(d.body), List(m)))
 
-  def evaluate(p : Prog) : Value = eval(Eval(p.e), List(p.defs.foldRight(Map[String, Value]())(evalDefn)), Nil)
+  def evaluate(p : Prog) : Value = runEval(Eval(p.e), List(p.defs.foldRight(Map[String, Value]())(evalDefn)))
 
 }
