@@ -34,12 +34,6 @@ import model.InLVal
 import model.InRVal
 import model.PairVal
 import model.RecursiveLamVal
-import model.GenericMap
-import model.TyVar
-import model.Nat
-import model.Arrow
-import model.Product
-import model.Sum
 
 object Evaluator {
 
@@ -109,17 +103,6 @@ object Evaluator {
         target = Eval(e)
         stack = StackCase(rs) :: stack
       }
-      case GenericMap(mu, TyVar(t), x, t2, e1, e2) => {
-        target = Eval(e2)
-        stack = StackMap(x, e1) :: stack
-      }
-      case GenericMap(mu, Nat, x, t2, e1, e2)                             => target = Eval(e2)
-      case GenericMap(mu, UnitTy, x, t2, e1, e2)                          => target = Eval(e2)
-      case GenericMap(mu, Product(st1, st2), x, t2, e1, PairEx(e2a, e2b)) => target = Eval(PairEx(GenericMap(mu, st1, x, t2, e1, e2a), GenericMap(mu, st2, x, t2, e1, e2b)))
-      case GenericMap(mu, Sum(st1, st2), x, t2, e1, InL(e, t))            => target = Eval(GenericMap(mu, st1, x, t2, e1, e))
-      case GenericMap(mu, Sum(st1, st2), x, t2, e1, InR(e, t))            => target = Eval(GenericMap(mu, st2, x, t2, e1, e))
-      //Typechecker should have caught this one, unless it was a function, which we refuse to allow (only polynomial generic types ATM)
-      case GenericMap(mu, t1, x, t2, e1, e2)                              => throw new Exception("Type " + t1 + " does not match expression " + e2)
     }
     case Return(v) => stack match {
       case Nil => throw new Exception("Should have aborted the eval driver loop!") //This is the escape case
@@ -168,11 +151,6 @@ object Evaluator {
         env = matchingTarget.asInstanceOf[Binding].b :: env
         target = Eval(body)
         stack = PopFrame :: stack
-      }
-      case StackMap(x, e1) :: s => {
-        env = Map(x -> v) :: env
-        target = Eval(e1)
-        stack = s
       }
       case PopFrame :: s => {
         env = env.tail //'tail' should be safe, pops are added only with a frame

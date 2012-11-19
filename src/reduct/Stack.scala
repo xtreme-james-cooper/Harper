@@ -17,7 +17,6 @@ case class StackRPair(v1 : Value) extends Stack("(" + v1 + ", (_))")
 case object StackInL extends Stack("inl (-)")
 case object StackInR extends Stack("inr (_)")
 case class StackCase(rs : List[Rule]) extends Stack("case (-) of { " + rs.foldRight("")({ case (r1, r2) => r1 + " | " + r2 }) + "}")
-case class StackMap(x : String, e1 : Expr) extends Stack(x + "." + e1 + " over (_)")
 case object PopFrame extends Stack(" ! ")
 
 sealed abstract class PatStack(name : String) {

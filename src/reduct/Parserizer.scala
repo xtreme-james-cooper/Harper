@@ -102,11 +102,6 @@ object Parserizer {
   val inrParser : Parser[Expr] =
     pLit("inr") thenJ exprParser thenK pLit(":") thenS typeParser appl ({ case (e, t) => InR(e, t) })
 
-  val mapParser : Parser[Expr] = //TODO eliminate once fold is added
-    pLit("map") thenJ pIdent thenK pLit(":") thenS typeParser thenK pLit(".") thenS exprParser thenK pLit("over") thenS exprParser thenK
-      pLit(":") thenS pIdent thenK pLit(".") thenS typeParser appl ({
-        case (((((x, t1), e1), e2), mu), t2) => GenericMap(mu, t2, x, t1, e1, e2)
-      })
 //  val recurseParser : Parser[Expr] =
 //    pLit("rec") thenJ pIdent thenK pLit(":") thenS typeParser thenK pLit(".") thenS exprParser thenK pLit("over???") thenS exprParser thenK
 //      pLit(":") thenS pIdent thenK pLit(".") thenS typeParser appl ({
@@ -119,7 +114,7 @@ object Parserizer {
 
   val exprParser : Parser[Expr] =
     zParser or sParser or numParser or matchParser or lamParser or appParser or varParser or
-      trivParser or pairParser or inlParser or inrParser or mapParser // or recurseParser or foldParser
+      trivParser or pairParser or inlParser or inrParser // or recurseParser or foldParser
 
   val paramListParser : Parser[List[(String, Type)]] =
     (pLit("(") thenJ (pIdent thenK pLit(":") thenS typeParser).intersperse(pLit(",")) thenK pLit(")")) or
