@@ -38,12 +38,12 @@ object Main {
     test("map x:Nat.(S(x), ()) over (3, 5) : t.(t, t)")
     test("map x:Nat.(S(x), ()) over inr 5 : (Unit + Nat) : t.(Unit + t)")
 
-//    //Test stack depth!
-//    test("id(x : Nat) : Nat = x;"
-//      + "plus(a : Nat, b : Nat) : Nat = case a of {Z -> b | S(n) -> S(((plus n) b))};"
-//      + "times(a : Nat, b : Nat) : Nat = case a of {Z -> Z | S(n) -> ((plus b) ((times n) b))};"
-//      + "fact(n : Nat) : Nat = case n of {Z -> 1 | S(n) -> ((times S(n)) (fact n))};"
-//      + "(fact 4)")
+    //Test stack depth!
+    test("id(x : Nat) : Nat = x;"
+      + "plus(a : Nat, b : Nat) : Nat = case a of {Z -> b | S(n) -> S(((plus n) b))};"
+      + "times(a : Nat, b : Nat) : Nat = case a of {Z -> Z | S(n) -> ((plus b) ((times n) b))};"
+      + "fact(n : Nat) : Nat = case n of {Z -> 1 | S(n) -> ((times S(n)) (fact n))};"
+      + "(fact 6)")
 
   }
 

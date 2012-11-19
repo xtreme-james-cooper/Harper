@@ -48,7 +48,7 @@ object Evaluator {
   case class Return(v : Value) extends Target
 
   //All these are init'd to null, because they are manually set in each pass
-  var target : Target = null //TODO use for all parts The expression being evaluated or the value being returned
+  var target : Target = null //The expression being evaluated or the value being returned
   var stack : List[Stack] = null //TODO use for all parts The parts of the expression whose evaluation has been deferred
   var env : List[Map[String, Value]] = null //The stack of variable-binding frames
 
@@ -63,52 +63,98 @@ object Evaluator {
   def flattenEnv : Map[String, Value] = env.foldRight(Map[String, Value]())({ case (m1, m2) => m2 ++ m1 })
 
   def runEval(t : Target, m : List[Map[String, Value]]) : Value = {
+    target = t
     env = m
-    eval(t, Nil)
+    stack = Nil
+
+    while (!(target.isInstanceOf[Return] && stack.isEmpty)) {
+      eval
+    }
+    target.asInstanceOf[Return].v
   }
 
-  def eval : (Target, List[Stack]) => Value = {
-    case (Eval(e), s) => e match {
-      case Var(x)       => eval(Return(getBinding(x)), s)
-      case Z            => eval(Return(ZVal), s)
-      case S(n)         => eval(Eval(n), StackS :: s)
-      case Lam(v, t, e) => eval(Return(LamVal(v, e, flattenEnv)), s)
-      case App(e1, e2)  => eval(Eval(e1), StackLam(e2) :: s)
+  def eval : Unit = target match {
+    case Eval(e) => e match {
+      case Var(x) => target = Return(getBinding(x))
+      case Z      => target = Return(ZVal)
+      case S(n) => {
+        target = Eval(n)
+        stack = StackS :: stack
+      }
+      case Lam(v, t, e) => target = Return(LamVal(v, e, flattenEnv))
+      case App(e1, e2) => {
+        target = Eval(e1)
+        stack = StackLam(e2) :: stack
+      }
       case Fix(v, t, Lam(x, t2, e)) => {
         env = Map(v -> RecursiveLamVal(v, x, e, flattenEnv)) :: env
-        eval(Eval(Lam(x, t2, e)), PopFrame :: s)
+        target = Eval(Lam(x, t2, e))
+        stack = PopFrame :: stack
       }
-      case Fix(v, t, e)                            => eval(Eval(e), s) //this will explode on CAFs (eg, recursive non-functions) so don't write them
-      case Triv                                    => eval(Return(TrivVal), s)
-      case PairEx(e1, e2)                          => eval(Eval(e1), StackLPair(e2) :: s)
-      case InL(e, t)                               => eval(Eval(e), StackInL :: s)
-      case InR(e, t)                               => eval(Eval(e), StackInR :: s)
-      case Match(e, rs)                            => eval(Eval(e), StackCase(rs) :: s)
-      case GenericMap(mu, TyVar(t), x, t2, e1, e2) => eval(Eval(e2), StackMap(x, e1) :: s)
-      case GenericMap(mu, Nat, x, t2, e1, e2)      => eval(Eval(e2), s)
-      case GenericMap(mu, UnitTy, x, t2, e1, e2)   => eval(Eval(e2), s)
-      case GenericMap(mu, Product(st1, st2), x, t2, e1, PairEx(e2a, e2b)) =>
-        eval(Eval(PairEx(GenericMap(mu, st1, x, t2, e1, e2a), GenericMap(mu, st2, x, t2, e1, e2b))), s)
-      case GenericMap(mu, Sum(st1, st2), x, t2, e1, InL(e, t)) => eval(Eval(GenericMap(mu, st1, x, t2, e1, e)), s)
-      case GenericMap(mu, Sum(st1, st2), x, t2, e1, InR(e, t)) => eval(Eval(GenericMap(mu, st2, x, t2, e1, e)), s)
+      case Fix(v, t, e) => target = Eval(e) //this will explode on CAFs (eg, recursive non-functions) so don't write them
+      case Triv         => target = Return(TrivVal)
+      case PairEx(e1, e2) => {
+        target = Eval(e1)
+        stack = StackLPair(e2) :: stack
+      }
+      case InL(e, t) => {
+        target = Eval(e)
+        stack = StackInL :: stack
+      }
+      case InR(e, t) => {
+        target = Eval(e)
+        stack = StackInR :: stack
+      }
+      case Match(e, rs) => {
+        target = Eval(e)
+        stack = StackCase(rs) :: stack
+      }
+      case GenericMap(mu, TyVar(t), x, t2, e1, e2) => {
+        target = Eval(e2)
+        stack = StackMap(x, e1) :: stack
+      }
+      case GenericMap(mu, Nat, x, t2, e1, e2)                             => target = Eval(e2)
+      case GenericMap(mu, UnitTy, x, t2, e1, e2)                          => target = Eval(e2)
+      case GenericMap(mu, Product(st1, st2), x, t2, e1, PairEx(e2a, e2b)) => target = Eval(PairEx(GenericMap(mu, st1, x, t2, e1, e2a), GenericMap(mu, st2, x, t2, e1, e2b)))
+      case GenericMap(mu, Sum(st1, st2), x, t2, e1, InL(e, t))            => target = Eval(GenericMap(mu, st1, x, t2, e1, e))
+      case GenericMap(mu, Sum(st1, st2), x, t2, e1, InR(e, t))            => target = Eval(GenericMap(mu, st2, x, t2, e1, e))
       //Typechecker should have caught this one, unless it was a function, which we refuse to allow (only polynomial generic types ATM)
-      case GenericMap(mu, t1, x, t2, e1, e2)                   => throw new Exception("Type " + t1 + " does not match expression " + e2)
+      case GenericMap(mu, t1, x, t2, e1, e2)                              => throw new Exception("Type " + t1 + " does not match expression " + e2)
     }
-    case (Return(v), Nil) => v
-    case (Return(v), stk :: s) => stk match {
-      case StackS       => eval(Return(SVal(v)), s)
-      case StackLam(e2) => eval(Eval(e2), StackArg(v) :: s)
-      case StackArg(LamVal(x, e, clos)) => {
-        env = clos + (x -> v) :: env
-        eval(Eval(e), PopFrame :: s)
+    case Return(v) => stack match {
+      case Nil => throw new Exception("Should have aborted the eval driver loop!") //This is the escape case
+      case StackS :: s => {
+        target = Return(SVal(v))
+        stack = s
       }
-      case StackArg(v1)   => throw new Exception("Application of a non-function : " + v1) //Typechecker should have caught this
-      case StackLPair(e2) => eval(Eval(e2), StackRPair(v) :: s)
-      case StackRPair(v1) => eval(Return(PairVal(v1, v)), s)
-      case StackInL       => eval(Return(InLVal(v)), s)
-      case StackInR       => eval(Return(InRVal(v)), s)
-      case StackCase(Nil) => throw new Exception("Empty set of rules?")
-      case StackCase(Rule(p, b) :: rs) => {
+      case StackLam(e2) :: s => {
+        target = Eval(e2)
+        stack = StackArg(v) :: s
+      }
+      case StackArg(LamVal(x, e, clos)) :: s => {
+        env = clos + (x -> v) :: env
+        target = Eval(e)
+        stack = PopFrame :: s
+      }
+      case StackArg(v1) :: s => throw new Exception("Application of a non-function : " + v1) //Typechecker should have caught this
+      case StackLPair(e2) :: s => {
+        target = Eval(e2)
+        stack = StackRPair(v) :: s
+      }
+      case StackRPair(v1) :: s => {
+        target = Return(PairVal(v1, v))
+        stack = s
+      }
+      case StackInL :: s => {
+        target = Return(InLVal(v))
+        stack = s
+      }
+      case StackInR :: s => {
+        target = Return(InRVal(v))
+        stack = s
+      }
+      case StackCase(Nil) :: s => throw new Exception("Empty set of rules?")
+      case StackCase(Rule(p, b) :: rs) :: s => {
         rules = rs
         matchVal = v
         stack = s
@@ -120,15 +166,17 @@ object Evaluator {
           matchPattern
         }
         env = matchingTarget.asInstanceOf[Binding].b :: env
-        eval(Eval(body), PopFrame :: stack)
+        target = Eval(body)
+        stack = PopFrame :: stack
       }
-      case StackMap(x, e1) => {
+      case StackMap(x, e1) :: s => {
         env = Map(x -> v) :: env
-        eval(Eval(e1), s)
+        target = Eval(e1)
+        stack = s
       }
-      case PopFrame => {
+      case PopFrame :: s => {
         env = env.tail //'tail' should be safe, pops are added only with a frame
-        eval(Return(v), s)
+        stack = s
       }
     }
   }
