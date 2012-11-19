@@ -43,73 +43,75 @@ import model.Sum
 
 object Evaluator {
 
-  type State = (Target, List[Map[String, Value]], List[Stack])
-
   sealed abstract class Target
   case class Eval(e : Expr) extends Target
   case class Return(v : Value) extends Target
 
-  def getBinding(e : List[Map[String, Value]], x : String) : Value = e match {
+  //All these are init'd to null, because they are manually set in each pass
+  var target : Target = null //TODO use for all parts The expression being evaluated or the value being returned
+  var stack : List[Stack] = null //TODO use for all parts The parts of the expression whose evaluation has been deferred
+  var env : List[Map[String, Value]] = null //The stack of variable-binding frames
+
+  def getBinding(x : String) : Value = innerGetBinding(env, x)
+  def innerGetBinding(e : List[Map[String, Value]], x : String) : Value = e match {
     case Nil                     => throw new Exception("Unbound identifier : " + x) //Typechecker should blow up on this first
     case m :: e if m.contains(x) => m(x)
-    case m :: e                  => getBinding(e, x)
+    case m :: e                  => innerGetBinding(e, x)
   }
 
-  def flattenEnv(e : List[Map[String, Value]]) : Map[String, Value] = e.foldRight(Map[String, Value]())({ case (m1, m2) => m2 ++ m1 })
+  //Crush the env down into a single stack frame for use as a closure
+  def flattenEnv : Map[String, Value] = env.foldRight(Map[String, Value]())({ case (m1, m2) => m2 ++ m1 })
 
-  //All these are init'd to null, because they are manually set in each pass
-  var target : Target = null //TODO use for all parts The expressionbeing evaluated or the vaue being returned
-  var stack : List[Stack] = null //TODO use for all parts The parts of the expression whose evaluation has been deferred
-  var env : List[Map[String, Value]] = null //TODO use for all parts The stack of variable-binding frames
+  def runEval(t : Target, m : List[Map[String, Value]]) : Value = {
+    env = m
+    eval(t, Nil)
+  }
 
-  var rules : List[Rule] = null //Rules as yet untried
-  var matchVal : Value = null //Value being matched against
-  var body : Expr = null //The body to be evaluated if the match succeeds
-  var patternStack : List[PatStack] = null //The parts of the pattern still unmatched
-  var matchingTarget : MatchingTarget = null //Either a pattern against a variable, or a binding being returned
-
-  def runEval(t : Target, m : List[Map[String, Value]]) : Value = eval(t, m, Nil)
-
-  def eval : State => Value = {
-    case (Eval(e), m, s) => e match {
-      case Var(x)                                  => eval(Return(getBinding(m, x)), m, s)
-      case Z                                       => eval(Return(ZVal), m, s)
-      case S(n)                                    => eval(Eval(n), m, StackS :: s)
-      case Lam(v, t, e)                            => eval(Return(LamVal(v, e, flattenEnv(m))), m, s)
-      case App(e1, e2)                             => eval(Eval(e1), m, StackLam(e2) :: s)
-      case Fix(v, t, Lam(x, t2, e))                => eval(Eval(Lam(x, t2, e)), Map(v -> RecursiveLamVal(v, x, e, flattenEnv(m))) :: m, PopFrame :: s)
-      case Fix(v, t, e)                            => eval(Eval(e), m, s) //this will explode on CAFs (eg, recursive non-functions) so don't write them
-      case Triv                                    => eval(Return(TrivVal), m, s)
-      case PairEx(e1, e2)                          => eval(Eval(e1), m, StackLPair(e2) :: s)
-      case InL(e, t)                               => eval(Eval(e), m, StackInL :: s)
-      case InR(e, t)                               => eval(Eval(e), m, StackInR :: s)
-      case Match(e, rs)                            => eval(Eval(e), m, StackCase(rs) :: s)
-      case GenericMap(mu, TyVar(t), x, t2, e1, e2) => eval(Eval(e2), m, StackMap(x, e1) :: s)
-      case GenericMap(mu, Nat, x, t2, e1, e2)      => eval(Eval(e2), m, s)
-      case GenericMap(mu, UnitTy, x, t2, e1, e2)   => eval(Eval(e2), m, s)
+  def eval : (Target, List[Stack]) => Value = {
+    case (Eval(e), s) => e match {
+      case Var(x)       => eval(Return(getBinding(x)), s)
+      case Z            => eval(Return(ZVal), s)
+      case S(n)         => eval(Eval(n), StackS :: s)
+      case Lam(v, t, e) => eval(Return(LamVal(v, e, flattenEnv)), s)
+      case App(e1, e2)  => eval(Eval(e1), StackLam(e2) :: s)
+      case Fix(v, t, Lam(x, t2, e)) => {
+        env = Map(v -> RecursiveLamVal(v, x, e, flattenEnv)) :: env
+        eval(Eval(Lam(x, t2, e)), PopFrame :: s)
+      }
+      case Fix(v, t, e)                            => eval(Eval(e), s) //this will explode on CAFs (eg, recursive non-functions) so don't write them
+      case Triv                                    => eval(Return(TrivVal), s)
+      case PairEx(e1, e2)                          => eval(Eval(e1), StackLPair(e2) :: s)
+      case InL(e, t)                               => eval(Eval(e), StackInL :: s)
+      case InR(e, t)                               => eval(Eval(e), StackInR :: s)
+      case Match(e, rs)                            => eval(Eval(e), StackCase(rs) :: s)
+      case GenericMap(mu, TyVar(t), x, t2, e1, e2) => eval(Eval(e2), StackMap(x, e1) :: s)
+      case GenericMap(mu, Nat, x, t2, e1, e2)      => eval(Eval(e2), s)
+      case GenericMap(mu, UnitTy, x, t2, e1, e2)   => eval(Eval(e2), s)
       case GenericMap(mu, Product(st1, st2), x, t2, e1, PairEx(e2a, e2b)) =>
-        eval(Eval(PairEx(GenericMap(mu, st1, x, t2, e1, e2a), GenericMap(mu, st2, x, t2, e1, e2b))), m, s)
-      case GenericMap(mu, Sum(st1, st2), x, t2, e1, InL(e, t)) => eval(Eval(GenericMap(mu, st1, x, t2, e1, e)), m, s)
-      case GenericMap(mu, Sum(st1, st2), x, t2, e1, InR(e, t)) => eval(Eval(GenericMap(mu, st2, x, t2, e1, e)), m, s)
+        eval(Eval(PairEx(GenericMap(mu, st1, x, t2, e1, e2a), GenericMap(mu, st2, x, t2, e1, e2b))), s)
+      case GenericMap(mu, Sum(st1, st2), x, t2, e1, InL(e, t)) => eval(Eval(GenericMap(mu, st1, x, t2, e1, e)), s)
+      case GenericMap(mu, Sum(st1, st2), x, t2, e1, InR(e, t)) => eval(Eval(GenericMap(mu, st2, x, t2, e1, e)), s)
+      //Typechecker should have caught this one, unless it was a function, which we refuse to allow (only polynomial generic types ATM)
       case GenericMap(mu, t1, x, t2, e1, e2)                   => throw new Exception("Type " + t1 + " does not match expression " + e2)
-      //Typechecker should have caught this last, unless it was a function, which we refuse to allow (only polynomial generic types ATM)
     }
-    case (Return(v), m, Nil) => v
-    case (Return(v), m, stk :: s) => stk match {
-      case StackS                       => eval(Return(SVal(v)), m, s)
-      case StackLam(e2)                 => eval(Eval(e2), m, StackArg(v) :: s)
-      case StackArg(LamVal(x, e, clos)) => eval(Eval(e), clos + (x -> v) :: m, PopFrame :: s)
-      case StackArg(v1)                 => throw new Exception("Application of a non-function : " + v1) //Typechecker should have caught this
-      case StackLPair(e2)               => eval(Eval(e2), m, StackRPair(v) :: s)
-      case StackRPair(v1)               => eval(Return(PairVal(v1, v)), m, s)
-      case StackInL                     => eval(Return(InLVal(v)), m, s)
-      case StackInR                     => eval(Return(InRVal(v)), m, s)
-      case StackCase(Nil)               => throw new Exception("Empty set of rules?")
+    case (Return(v), Nil) => v
+    case (Return(v), stk :: s) => stk match {
+      case StackS       => eval(Return(SVal(v)), s)
+      case StackLam(e2) => eval(Eval(e2), StackArg(v) :: s)
+      case StackArg(LamVal(x, e, clos)) => {
+        env = clos + (x -> v) :: env
+        eval(Eval(e), PopFrame :: s)
+      }
+      case StackArg(v1)   => throw new Exception("Application of a non-function : " + v1) //Typechecker should have caught this
+      case StackLPair(e2) => eval(Eval(e2), StackRPair(v) :: s)
+      case StackRPair(v1) => eval(Return(PairVal(v1, v)), s)
+      case StackInL       => eval(Return(InLVal(v)), s)
+      case StackInR       => eval(Return(InRVal(v)), s)
+      case StackCase(Nil) => throw new Exception("Empty set of rules?")
       case StackCase(Rule(p, b) :: rs) => {
         rules = rs
         matchVal = v
         stack = s
-        env = m
         body = b
         patternStack = Nil
         matchingTarget = Against(p, matchVal)
@@ -117,16 +119,29 @@ object Evaluator {
         while (!(matchingTarget.isInstanceOf[Binding] && patternStack.isEmpty)) {
           matchPattern
         }
-        eval(Eval(body), matchingTarget.asInstanceOf[Binding].b :: env, PopFrame :: stack)
+        env = matchingTarget.asInstanceOf[Binding].b :: env
+        eval(Eval(body), PopFrame :: stack)
       }
-      case StackMap(x, e1) => eval(Eval(e1), Map(x -> v) :: m, s)
-      case PopFrame        => eval(Return(v), m.tail, s) //'tail' should be safe, pops are added only with a frame
+      case StackMap(x, e1) => {
+        env = Map(x -> v) :: env
+        eval(Eval(e1), s)
+      }
+      case PopFrame => {
+        env = env.tail //'tail' should be safe, pops are added only with a frame
+        eval(Return(v), s)
+      }
     }
   }
 
   sealed abstract class MatchingTarget
   case class Against(p : Pattern, v : Value) extends MatchingTarget
   case class Binding(b : Map[String, Value]) extends MatchingTarget
+
+  var rules : List[Rule] = null //Rules as yet untried
+  var matchVal : Value = null //Value being matched against
+  var body : Expr = null //The body to be evaluated if the match succeeds
+  var patternStack : List[PatStack] = null //The parts of the pattern still unmatched
+  var matchingTarget : MatchingTarget = null //Either a pattern against a variable, or a binding being returned
 
   def matchPattern : Unit = matchingTarget match {
     case Against(WildPat, _)           => matchingTarget = Binding(Map())
