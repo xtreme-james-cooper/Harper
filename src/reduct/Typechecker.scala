@@ -30,6 +30,8 @@ import model.PairPat
 import model.ZPat
 import model.InLPat
 import model.InRPat
+import model.GenericMap
+import model.TyVar
 
 object Typechecker {
 
@@ -78,13 +80,29 @@ object Typechecker {
         t1 <- typecheck(e)(env)
         t2 <- typeverify(rs)(t1)(env)
       } yield t2
+    case GenericMap(mu, t1, x, t2, e1, e2) =>
+      for {
+        te1 <- typecheck(e1)(env + (x -> t2))
+        te2 <- typecheck(e2)(env)
+        if te2 == typeSwap(mu, t2)(t1)
+      } yield typeSwap(mu, te1)(t1)
+//    case Recurse(mu, t1, x, t2, e1, e2) =>
+//      for {
+//        te1 <- typecheck(e1)(env + (x -> typeSwap(mu, te1)(t1)))
+//        Inductive(mu, t1) <- typecheck(e2)(env)
+//      } yield te1
+//    case Fold(mu, t, e) =>
+//      for {
+//        t2 <- typecheck(e)(env)
+//        if t2 == typeSwap(mu, Inductive(mu, t))(t)
+//      } yield Inductive(mu, t)
   }
 
   //t is the type that the pattern is expected to have; under that assumption, it produces some type
   def typeverify(rs : List[Rule])(t : Type)(env : Env) : Option[Type] =
-    rs.map(r => typeverify(r)(t)(env)).reduce[Option[Type]]({ 
-      case (t1, t2) if t1 == t2 => t1 
-      case (t1, t2) => throw new Exception("Noncompatible types " + t1 + " and " + t2)
+    rs.map(r => typeverify(r)(t)(env)).reduce[Option[Type]]({
+      case (t1, t2) if t1 == t2 => t1
+      case (t1, t2)             => throw new Exception("Noncompatible types " + t1 + " and " + t2)
     })
 
   def typeverify(r : Rule)(t : Type)(env : Env) : Option[Type] = typecheck(r.b)(env ++ typeverify(r.p)(t)(env))
@@ -104,7 +122,18 @@ object Typechecker {
     }
     case (InLPat(p), Sum(t1, t2)) => typeverify(p)(t1)(env)
     case (InRPat(p), Sum(t1, t2)) => typeverify(p)(t2)(env)
-    case (p, t) => throw new Exception("Pattern " + p + " cannot match type " + t)
+    case (p, t)                   => throw new Exception("Pattern " + p + " cannot match type " + t)
+  }
+
+  //replace all type variables mu with x
+  def typeSwap(mu : String, x : Type) : Type => Type = {
+    case Nat                 => Nat
+    case Arrow(t1, t2)       => Arrow(typeSwap(mu, x)(t1), typeSwap(mu, x)(t2))
+    case UnitTy              => UnitTy
+    case Product(t1, t2)     => Product(typeSwap(mu, x)(t1), typeSwap(mu, x)(t2))
+    case Sum(t1, t2)         => Sum(typeSwap(mu, x)(t1), typeSwap(mu, x)(t2))
+    case TyVar(y) if y == mu => x
+    case TyVar(y)            => TyVar(y)
   }
 
   def typecheck(d : Defn)(env : Env) : Env = d match { case Defn(n, b) => env + (n -> typecheck(b)(env).get) }

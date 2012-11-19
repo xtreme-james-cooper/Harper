@@ -9,3 +9,5 @@ case class Arrow(t1 : Type, t2 : Type) extends Type("(" + t1 + " -> " + t2 + ")"
 case object UnitTy extends Type("Unit")
 case class Product(t1 : Type, t2 : Type) extends Type("(" + t1 + ", " + t2 + ")")
 case class Sum(t1 : Type, t2 : Type) extends Type("(" + t1 + " + " + t2 + ")")
+case class TyVar(t : String) extends Type(t)
+//case class Inductive(x : String, t : Type) extends Type(x + "." + t)

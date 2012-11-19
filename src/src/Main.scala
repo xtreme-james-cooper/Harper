@@ -8,6 +8,8 @@ object Main {
 
   def main(args : Array[String]) : Unit = {
 
+    test("()")
+
     test("null : Unit = (); null")
 
     test("plus(a : Nat, b : Nat) : Nat = case a of {Z -> b | S(n) -> S(((plus n) b))}; ((plus 2) 3)")
@@ -35,6 +37,13 @@ object Main {
       + "inl (Z, y) -> S(y) |"
       + "inr inl () -> 2 |"
       + "inr inr x -> S(S(S(x))) }")
+
+    test("map x:Nat.S(x) over 5 : t.t")
+    test("map x:Nat.(S(x), ()) over ((), 5) : t.(Unit, t)")
+    test("map x:Nat.(S(x), ()) over (3, 5) : t.(Nat, t)")
+    test("map x:Nat.(S(x), ()) over (3, 5) : t.(t, t)")
+    test("map x:Nat.(S(x), ()) over inl 5 : (Unit + Nat) : t.(Unit + t)")
+
   }
 
   def test(progs : String) {
@@ -44,6 +53,7 @@ object Main {
     println("type\n" + Typechecker.typecheck(prog).get + "\n")
     println("value\n" + Evaluator.evaluate(prog) + "\n")
     println("-----------------------------")
+    Thread.sleep(1000)
   }
 
 }
