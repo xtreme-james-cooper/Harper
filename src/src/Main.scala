@@ -14,12 +14,6 @@ object Main {
 
     test("plus(a : Nat, b : Nat) : Nat = case a of {Z -> b | S(n) -> S(((plus n) b))}; ((plus 2) 3)")
 
-    test("id(x : Nat) : Nat = x;"
-      + "plus(a : Nat, b : Nat) : Nat = case a of {Z -> b | S(n) -> S(((plus n) b))};"
-      + "times(a : Nat, b : Nat) : Nat = case a of {Z -> Z | S(n) -> ((plus b) ((times n) b))};"
-      + "fact(n : Nat) : Nat = case n of {Z -> 1 | S(n) -> ((times S(n)) (fact n))};"
-      + "(fact 4)")
-
     test("swap(p : (Unit, Nat)) : (Nat, Unit) = case p of {(a, b) -> (b, a)};"
       + "null : Unit = ();"
       + "(swap (null, S(Z)))")
@@ -42,7 +36,14 @@ object Main {
     test("map x:Nat.(S(x), ()) over ((), 5) : t.(Unit, t)")
     test("map x:Nat.(S(x), ()) over (3, 5) : t.(Nat, t)")
     test("map x:Nat.(S(x), ()) over (3, 5) : t.(t, t)")
-    test("map x:Nat.(S(x), ()) over inl 5 : (Unit + Nat) : t.(Unit + t)")
+    test("map x:Nat.(S(x), ()) over inr 5 : (Unit + Nat) : t.(Unit + t)")
+
+//    //Test stack depth!
+//    test("id(x : Nat) : Nat = x;"
+//      + "plus(a : Nat, b : Nat) : Nat = case a of {Z -> b | S(n) -> S(((plus n) b))};"
+//      + "times(a : Nat, b : Nat) : Nat = case a of {Z -> Z | S(n) -> ((plus b) ((times n) b))};"
+//      + "fact(n : Nat) : Nat = case n of {Z -> 1 | S(n) -> ((times S(n)) (fact n))};"
+//      + "(fact 4)")
 
   }
 
@@ -53,7 +54,6 @@ object Main {
     println("type\n" + Typechecker.typecheck(prog).get + "\n")
     println("value\n" + Evaluator.evaluate(prog) + "\n")
     println("-----------------------------")
-    Thread.sleep(1000)
   }
 
 }

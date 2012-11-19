@@ -74,12 +74,12 @@ object Evaluator {
       case InR(e, t)                               => eval(Eval(e), m, StackInR :: s)
       case Match(e, rs)                            => eval(Eval(e), m, StackCase(rs) :: s)
       case GenericMap(mu, TyVar(t), x, t2, e1, e2) => eval(Eval(e2), m, StackMap(x, e1) :: s)
-//      case GenericMap(mu, Nat, x, t2, e1, e2)      => eval(Eval(e2), m, s)
-//      case GenericMap(mu, UnitTy, x, t2, e1, e2)   => eval(Eval(e2), m, s)
-//      case GenericMap(mu, Product(st1, st2), x, t2, e1, PairEx(e2a, e2b)) =>
-//        eval(Eval(PairEx(GenericMap(mu, st1, x, t2, e1, e2a), GenericMap(mu, st2, x, t2, e1, e2b))), m, s)
-//      case GenericMap(mu, Sum(st1, st2), x, t2, e1, InL(e, t)) => eval(Eval(GenericMap(mu, st1, x, t2, e1, e)), m, s)
-//      case GenericMap(mu, Sum(st1, st2), x, t2, e1, InR(e, t)) => eval(Eval(GenericMap(mu, st2, x, t2, e1, e)), m, s)
+      case GenericMap(mu, Nat, x, t2, e1, e2)      => eval(Eval(e2), m, s)
+      case GenericMap(mu, UnitTy, x, t2, e1, e2)   => eval(Eval(e2), m, s)
+      case GenericMap(mu, Product(st1, st2), x, t2, e1, PairEx(e2a, e2b)) =>
+        eval(Eval(PairEx(GenericMap(mu, st1, x, t2, e1, e2a), GenericMap(mu, st2, x, t2, e1, e2b))), m, s)
+      case GenericMap(mu, Sum(st1, st2), x, t2, e1, InL(e, t)) => eval(Eval(GenericMap(mu, st1, x, t2, e1, e)), m, s)
+      case GenericMap(mu, Sum(st1, st2), x, t2, e1, InR(e, t)) => eval(Eval(GenericMap(mu, st2, x, t2, e1, e)), m, s)
       case GenericMap(mu, t1, x, t2, e1, e2)                   => throw new Exception("Type " + t1 + " does not match expression " + e2)
       //Typechecker should have caught this last, unless it was a function, which we refuse to allow (only polynomial generic types ATM)
     }
@@ -94,7 +94,7 @@ object Evaluator {
       case StackInL                     => eval(Return(InLVal(v)), m, s)
       case StackInR                     => eval(Return(InRVal(v)), m, s)
       case StackCase(rs)                => matchRules(rs, v, m, s)
-      case StackMap(x, e1)				=> eval(Eval(e1), Map(x -> v) :: m, s)
+      case StackMap(x, e1)              => eval(Eval(e1), Map(x -> v) :: m, s)
       case PopFrame                     => eval(Return(v), m.tail, s) //'tail' should be safe, pops are added only with a frame
     }
   }
