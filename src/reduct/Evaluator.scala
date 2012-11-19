@@ -93,40 +93,75 @@ object Evaluator {
       case StackRPair(v1)               => eval(Return(PairVal(v1, v)), m, s)
       case StackInL                     => eval(Return(InLVal(v)), m, s)
       case StackInR                     => eval(Return(InRVal(v)), m, s)
-      case StackCase(rs)                => matchRules(rs, v, m, s)
-      case StackMap(x, e1)              => eval(Eval(e1), Map(x -> v) :: m, s)
-      case PopFrame                     => eval(Return(v), m.tail, s) //'tail' should be safe, pops are added only with a frame
+      case StackCase(Nil)               => throw new Exception("Empty set of rules?")
+      case StackCase(Rule(p, b) :: rs) => {
+        rules = rs
+        matchVal = v
+        stackDuringMatch = s
+        envDuringMatch = m
+        body = b
+        patternStack = Nil
+        matchingTarget = Against(p, matchVal)
+        runPatternMatch
+      }
+      case StackMap(x, e1) => eval(Eval(e1), Map(x -> v) :: m, s)
+      case PopFrame        => eval(Return(v), m.tail, s) //'tail' should be safe, pops are added only with a frame
     }
   }
 
-  def matchRules : (List[Rule], Value, Env, List[Stack]) => Value = {
-    case (Nil, v, m, s)              => throw new Exception("No pattern match found for " + v)
-    case (Rule(p, b) :: rs, v, m, s) => matchPattern(p, v, Nil, rs, v, m, s, b)
-  }
+  //All these are init'd to null, because they are manually set in each pass of the rules section
+  var rules : List[Rule] = null //Rules as yet untried
+  var matchVal : Value = null //Value being matched against
+  var body : Expr = null //The body to be evaluated if the match succeeds
+  var patternStack : List[PatStack] = null //The parts of the pattern still unmatched
+  var stackDuringMatch : List[Stack] = null //TODO use for all parts
+  var envDuringMatch : Env = null //TODO use for all parts
+  var matchingTarget : MatchingTarget = null //Either a pattern against a variable, or a binding being returned
 
-  def matchPattern : (Pattern, Value, List[PatStack], List[Rule], Value, Env, List[Stack], Expr) => Value = {
-    case (p, v, ps, rs, v0, m, s, b) => (p, v) match {
-      case (WildPat, _)                       => matchStack(ps, Map(), rs, v0, m, s, b)
-      case (VarPat(x), v)                     => matchStack(ps, Map(x -> v), rs, v0, m, s, b)
-      case (ZPat, ZVal)                       => matchStack(ps, Map(), rs, v0, m, s, b)
-      case (SPat(p), SVal(v))                 => matchPattern(p, v, ps, rs, v0, m, s, b)
-      case (TrivPat, TrivVal)                 => matchStack(ps, Map(), rs, v0, m, s, b)
-      case (InLPat(p), InLVal(v))             => matchPattern(p, v, ps, rs, v0, m, s, b)
-      case (InRPat(p), InRVal(v))             => matchPattern(p, v, ps, rs, v0, m, s, b)
-      case (PairPat(p1, p2), PairVal(v1, v2)) => matchPattern(p1, v1, PatStackLPair(v2, p2) :: ps, rs, v0, m, s, b)
-      case _                                  => matchRules(rs, v0, m, s) //Match failed; move on to the next pattern
+  sealed abstract class MatchingTarget
+  case class Against(p : Pattern, v : Value) extends MatchingTarget
+  case class Binding(b : Map[String, Value]) extends MatchingTarget
+
+  def runPatternMatch : Value = {
+    while (!(matchingTarget.isInstanceOf[Binding] && patternStack.isEmpty)) {
+      matchPattern
     }
+    eval(Eval(body), matchingTarget.asInstanceOf[Binding].b :: envDuringMatch, PopFrame :: stackDuringMatch)
   }
 
-  def matchStack : (List[PatStack], Map[String, Value], List[Rule], Value, Env, List[Stack], Expr) => Value = {
-    case (Nil, bind, rs, v0, m0, s, b)                      => eval(Eval(b), bind :: m0, PopFrame :: s) //Match succeeded; continue evaluating
-    case (PatStackLPair(v2, p2) :: ps, m, rs, v0, m0, s, b) => matchPattern(p2, v2, PatStackRPair(m) :: ps, rs, v0, m0, s, b)
-    case (PatStackRPair(m1) :: ps, m2, rs, v0, m, s, b) =>
-      if ((m1.keySet & m2.keySet).isEmpty)
-        matchStack(ps, m1 ++ m2, rs, v0, m, s, b)
-      else
-        //genuine error; as of now, no way to check
-        throw new Exception("Patterns cannot have repeated variables")
+  def matchPattern : Unit = matchingTarget match {
+    case Against(WildPat, _)           => matchingTarget = Binding(Map())
+    case Against(VarPat(x), v)         => matchingTarget = Binding(Map(x -> v))
+    case Against(ZPat, ZVal)           => matchingTarget = Binding(Map())
+    case Against(SPat(p), SVal(v))     => matchingTarget = Against(p, v)
+    case Against(TrivPat, TrivVal)     => matchingTarget = Binding(Map())
+    case Against(InLPat(p), InLVal(v)) => matchingTarget = Against(p, v)
+    case Against(InRPat(p), InRVal(v)) => matchingTarget = Against(p, v)
+    case Against(PairPat(p1, p2), PairVal(v1, v2)) => {
+      patternStack = PatStackLPair(v2, p2) :: patternStack
+      matchingTarget = Against(p1, v1)
+    }
+    case Against(_, _) => rules match { //Match failed; move on to the next pattern
+      case Nil => throw new Exception("No pattern match found for " + matchVal)
+      case Rule(p, b) :: rs => {
+        rules = rs
+        body = b
+        patternStack = Nil
+        matchingTarget = Against(p, matchVal)
+      }
+    }
+    case Binding(bind) => patternStack match {
+      case Nil => throw new Exception("Should have aborted the driver loop!") //This is the escape case
+      case PatStackLPair(v2, p2) :: ps => {
+        patternStack = PatStackRPair(bind) :: ps
+        matchingTarget = Against(p2, v2)
+      }
+      case PatStackRPair(m1) :: ps if ((m1.keySet & bind.keySet).isEmpty) => {
+        patternStack = ps
+        matchingTarget = Binding(m1 ++ bind)
+      }
+      case PatStackRPair(m1) :: ps => throw new Exception("Patterns cannot have repeated variables") //genuine error; as of now, no way to check
+    }
   }
 
   def evalDefn(d : Defn, m : Map[String, Value]) : Map[String, Value] = m + (d.name -> eval(Eval(d.body), List(m), Nil))
