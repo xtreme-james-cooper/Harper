@@ -89,15 +89,17 @@ object Evaluator {
   }
 
   def matchPattern : (Pattern, Value, List[PatStack], List[Rule], Value, Env, List[Stack], Expr) => Value = {
-    case (WildPat, _, ps, rs, v0, m, s, b)                       => matchStack(ps, Map(), rs, v0, m, s, b)
-    case (VarPat(x), v, ps, rs, v0, m, s, b)                     => matchStack(ps, Map(x -> v), rs, v0, m, s, b)
-    case (ZPat, ZVal, ps, rs, v0, m, s, b)                       => matchStack(ps, Map(), rs, v0, m, s, b)
-    case (SPat(p), SVal(v), ps, rs, v0, m, s, b)                 => matchPattern(p, v, ps, rs, v0, m, s, b)
-    case (TrivPat, TrivVal, ps, rs, v0, m, s, b)                 => matchStack(ps, Map(), rs, v0, m, s, b)
-    case (InLPat(p), InLVal(v), ps, rs, v0, m, s, b)             => matchPattern(p, v, ps, rs, v0, m, s, b)
-    case (InRPat(p), InRVal(v), ps, rs, v0, m, s, b)             => matchPattern(p, v, ps, rs, v0, m, s, b)
-    case (PairPat(p1, p2), PairVal(v1, v2), ps, rs, v0, m, s, b) => matchPattern(p1, v1, PatStackLPair(v2, p2) :: ps, rs, v0, m, s, b)
-    case (_, _, ps, rs, v0, m, s, b)                             => matchRules(rs, v0, m, s) //Match failed; move on to the next pattern
+    case (p, v, ps, rs, v0, m, s, b) => (p, v) match {
+      case (WildPat, _)                       => matchStack(ps, Map(), rs, v0, m, s, b)
+      case (VarPat(x), v)                     => matchStack(ps, Map(x -> v), rs, v0, m, s, b)
+      case (ZPat, ZVal)                       => matchStack(ps, Map(), rs, v0, m, s, b)
+      case (SPat(p), SVal(v))                 => matchPattern(p, v, ps, rs, v0, m, s, b)
+      case (TrivPat, TrivVal)                 => matchStack(ps, Map(), rs, v0, m, s, b)
+      case (InLPat(p), InLVal(v))             => matchPattern(p, v, ps, rs, v0, m, s, b)
+      case (InRPat(p), InRVal(v))             => matchPattern(p, v, ps, rs, v0, m, s, b)
+      case (PairPat(p1, p2), PairVal(v1, v2)) => matchPattern(p1, v1, PatStackLPair(v2, p2) :: ps, rs, v0, m, s, b)
+      case _                                  => matchRules(rs, v0, m, s) //Match failed; move on to the next pattern
+    }
   }
 
   def matchStack : (List[PatStack], Map[String, Value], List[Rule], Value, Env, List[Stack], Expr) => Value = {
