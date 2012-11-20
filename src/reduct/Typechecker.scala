@@ -34,6 +34,9 @@ import model.TyVar
 import model.Fold
 import model.Inductive
 import model.Unfold
+import model.TypeLam
+import model.ForAll
+import model.TypeApp
 
 object Typechecker {
 
@@ -91,6 +94,16 @@ object Typechecker {
       for {
         Inductive(mu, t) <- typecheck(e)(env)
       } yield typeSwap(mu, Inductive(mu, t))(t)
+    case TypeLam(t, e) => {
+      for {
+        t1 <- typecheck(e)(env)
+      } yield ForAll(t, t1)
+    }
+    case TypeApp(e, t) => {
+      for {
+        ForAll(x, t1) <- typecheck(e)(env)
+      } yield typeSwap(x, t)(t1)
+    }
   }
 
   //t is the type that the pattern is expected to have; under that assumption, it produces some type
@@ -131,6 +144,8 @@ object Typechecker {
     case TyVar(y)                    => TyVar(y)
     case Inductive(y, t1) if y == mu => Inductive(y, t1)
     case Inductive(y, t1)            => Inductive(y, typeSwap(mu, x)(t1))
+    case ForAll(y, t1) if y == mu    => ForAll(y, t1)
+    case ForAll(y, t1)               => ForAll(y, typeSwap(mu, x)(t1))
   }
 
   def typecheck(d : Defn)(env : Env) : Env = d match { case Defn(n, b) => env + (n -> typecheck(b)(env).get) }

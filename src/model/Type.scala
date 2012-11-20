@@ -11,3 +11,4 @@ case class Product(t1 : Type, t2 : Type) extends Type("(" + t1 + ", " + t2 + ")"
 case class Sum(t1 : Type, t2 : Type) extends Type("(" + t1 + " + " + t2 + ")")
 case class TyVar(t : String) extends Type(t)
 case class Inductive(x : String, t : Type) extends Type("mu " + x + "." + t)
+case class ForAll(x : String, t : Type) extends Type("forall " + x + "." + t)

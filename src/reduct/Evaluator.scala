@@ -37,6 +37,9 @@ import model.RecursiveLamVal
 import model.Fold
 import model.Unfold
 import model.FoldVal
+import model.TypeLam
+import model.TypeApp
+import model.TypeLam
 
 object Evaluator {
 
@@ -115,6 +118,8 @@ object Evaluator {
         target = Eval(e)
         stack = StackUnfold :: stack
       }
+      case TypeLam(t, e) => target = Eval(e) //Ignore types
+      case TypeApp(e, t) => target = Eval(e) //Ignore types
     }
     case Return(v) => stack match {
       case Nil => throw new Exception("Should have aborted the eval driver loop!") //This is the escape case

@@ -42,6 +42,9 @@ import model.TyVar
 import model.Inductive
 import model.Unfold
 import model.Fold
+import model.ForAll
+import model.TypeLam
+import model.TypeApp
 
 object Parserizer {
 
@@ -62,8 +65,9 @@ object Parserizer {
   val natParser : Parser[Type] = pLit("Nat") appl (_ => Nat)
   val unitParser : Parser[Type] = pLit("Unit") appl (_ => UnitTy)
   val inductiveParser : Parser[Type] = pLit("mu") thenJ pIdent thenK pLit(".") thenS typeParser appl ({ case (x, t) => Inductive(x, t) })
+  val forallParser : Parser[Type] = pLit("forall") thenJ pIdent thenK pLit(".") thenS typeParser appl ({ case (x, t) => ForAll(x, t) })
   val varTyParser : Parser[Type] = pIdent appl (x => TyVar(x))
-  val typeParser : Parser[Type] = arrowParser or productParser or sumParser or natParser or unitParser or inductiveParser or varTyParser
+  val typeParser : Parser[Type] = arrowParser or productParser or sumParser or natParser or unitParser or inductiveParser or forallParser or varTyParser
 
   val wildPatParser : Parser[Pattern] = pLit("_") appl (_ => WildPat)
   val varPatParser : Parser[Pattern] = pIdent appl (s => VarPat(s))
@@ -108,10 +112,15 @@ object Parserizer {
     pLit("fold") thenJ pIdent thenK pLit(".") thenS typeParser thenS exprParser appl ({
       case ((mu, t), e) => Fold(mu, t, e)
     })
-
-  val exprParser : Parser[Expr] =
+  val typeLamParser : Parser[Expr] =
+    pLit("/") thenJ pLit("\\") thenJ pIdent thenK pLit(".") thenS exprParser appl ({
+      case (t, e) => TypeLam(t, e)
+    })
+  val typeAppParser : Parser[Expr] =
+    pLit("[") thenJ exprParser thenS typeParser thenK pLit("]") appl ({ case (e, t) => TypeApp(e, t) })
+  val exprParser : Parser[Expr] = 
     zParser or sParser or numParser or matchParser or lamParser or appParser or varParser or
-      trivParser or pairParser or inlParser or inrParser or recurseParser or foldParser
+      trivParser or pairParser or inlParser or inrParser or recurseParser or foldParser or typeLamParser or typeAppParser
 
   val paramListParser : Parser[List[(String, Type)]] =
     (pLit("(") thenJ (pIdent thenK pLit(":") thenS typeParser).intersperse(pLit(",")) thenK pLit(")")) or
