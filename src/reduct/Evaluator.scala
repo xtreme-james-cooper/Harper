@@ -50,6 +50,7 @@ object Evaluator {
   case class Return(v : Value) extends Target
 
   //All these are init'd to null, because they are manually set in each pass
+  //Conceptually, this is a tail-recursive state-machine; for efficiency reasons we actually modify vars, but it's not strictly necessary
   var target : Target = null //The expression being evaluated or the value being returned
   var stack : List[Stack] = null //TODO use for all parts The parts of the expression whose evaluation has been deferred
   var env : List[Map[String, Value]] = null //The stack of variable-binding frames

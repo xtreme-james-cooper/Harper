@@ -39,18 +39,27 @@ import model.TypeLam
 import model.ForAll
 import model.TypeApp
 import model.TypeDefn
+import model.NewUnknown
+import model.Unknown
 
 object Typechecker {
 
   type Constraint = (Type, Type)
 
-  def assembleConstraints(e : Expr)(env : Env) : (Type, List[Constraint]) = e match {
+  def assembleConstraints(e : Expr)(env : Env) : (Type, List[Constraint]) = {
+//    println(e + " in " + env)
+    val (t, cs) = assembleConstraints_(e)(env)
+//    println(t + " and " + cs)
+    (t, cs)
+  }
+
+  def assembleConstraints_(e : Expr)(env : Env) : (Type, List[Constraint]) = e match {
     case Var(x) => (env(x), Nil)
     case Z      => (Nat, Nil)
     case Triv   => (UnitTy, Nil)
     case S(n) => {
-      val (Nat, cs) = assembleConstraints(n)(env)
-      (Nat, cs)
+      val (t, cs) = assembleConstraints(n)(env)
+      (t, (t, Nat) :: cs)
     }
     case Lam(v, t, e) => {
       val (t2, cs) = assembleConstraints(e)(env + (v -> t))
@@ -105,38 +114,64 @@ object Typechecker {
 
   //t is the type that the pattern is expected to have; under that assumption, it produces some type
   def typeverify(rs : List[Rule])(t : Type)(env : Env) : (Type, List[Constraint]) =
-    rs.map(r => typeverify(r)(t)(env)).reduce[(Type, List[Constraint])]({
+    rs.map(r => typeverify(r, t, env)).reduce[(Type, List[Constraint])]({
       case ((t1, cs1), (t2, cs2)) => (t1, (t1, t2) :: cs1 ++ cs2)
     })
 
-  def typeverify(r : Rule)(t : Type)(env : Env) : (Type, List[Constraint]) = assembleConstraints(r.b)(env ++ typeverify(r.p)(t)(env))
+  def typeverify(r : Rule, t : Type, env : Env) : (Type, List[Constraint]) = {
+    val (bind, cs1) = typeverify(r.p, t, env);
+    val (t0, cs2) = assembleConstraints(r.b)(env ++ bind)
+    (t0, cs1 ++ cs2)
+  }
 
   //Trying to match against t, it produces a list of variable-type bindings
-  def typeverify(p : Pattern)(t : Type)(env : Env) : Map[String, Type] = (p, t) match {
-    case (WildPat, t)      => Map()
-    case (VarPat(x), t)    => Map(x -> t)
-    case (TrivPat, UnitTy) => Map()
-    case (ZPat, Nat)       => Map()
-    case (SPat(p), Nat)    => typeverify(p)(Nat)(env)
-    case (PairPat(p1, p2), Product(t1, t2)) => {
-      val p1binds = typeverify(p1)(t1)(env)
-      val p2binds = typeverify(p2)(t2)(env)
-      if ((p1binds.keySet & p2binds.keySet).isEmpty) p1binds ++ p2binds
+  def typeverify(p : Pattern, t : Type, env : Env) : (Map[String, Type], List[Constraint]) = p match {
+    case WildPat   => (Map(), Nil)
+    case VarPat(x) => (Map(x -> t), Nil)
+    case TrivPat   => (Map(), (t, UnitTy) :: Nil)
+    case ZPat      => (Map(), (t, Nat) :: Nil)
+    case SPat(p) => {
+      val (bind, cs) = typeverify(p, Nat, env)
+      (bind, (t, Nat) :: cs)
+    }
+    case PairPat(p1, p2) => {
+      val t1 = NewUnknown()
+      val t2 = NewUnknown()
+      val (p1binds, cs1) = typeverify(p1, t1, env)
+      val (p2binds, cs2) = typeverify(p2, t2, env)
+      if ((p1binds.keySet & p2binds.keySet).isEmpty) (p1binds ++ p2binds, (t, Product(t1, t2)) :: cs1 ++ cs2)
       else throw new Exception("Overlapping pattern variables")
     }
-    case (InLPat(p), Sum(t1, t2)) => typeverify(p)(t1)(env)
-    case (InRPat(p), Sum(t1, t2)) => typeverify(p)(t2)(env)
-    case (p, t)                   => throw new Exception("Pattern " + p + " cannot match type " + t)
+    case InLPat(p) => {
+      val t1 = NewUnknown()
+      val t2 = NewUnknown()
+      val (bind, cs) = typeverify(p, t1, env)
+      (bind, (t, Sum(t1, t2)) :: cs)
+    }
+    case InRPat(p) => {
+      val t1 = NewUnknown()
+      val t2 = NewUnknown()
+      val (bind, cs) = typeverify(p, t2, env)
+      (bind, (t, Sum(t1, t2)) :: cs)
+    }
   }
-  
+
   def typecheck(e : Expr)(env : Env) : Type = {
     val (t, cs) = assembleConstraints(e)(env)
-    verifyConstraints(cs)
-    t
+    verifyConstraints(t, cs)
   }
-  
-  def verifyConstraints(cs : List[Constraint]) : Unit =
-    cs.foreach({ case (t1, t2) => if (! (t1 ~=~ t2)) throw new Exception("Constraint failure: " + t1 + " != " + t2) })
+
+  def verifyConstraints(t : Type, cs : List[Constraint]) : Type = cs.flatMap({ case (t1, t2) => t1 ~=~ t2 }) match {
+    case Nil                           => t
+    case (Unknown(i), b) :: cs         => verifyConstraints(t.swap(i, b), cs.map({ case (x, y) => (x.swap(i, b), y.swap(i, b)) }))
+    case (a, Unknown(i)) :: cs         => verifyConstraints(t.swap(i, a), cs.map({ case (x, y) => (x.swap(i, a), y.swap(i, a)) }))
+    case (t1, t2) :: cs if !(t1 == t2) => throw new Exception("Constraint failure: " + t1 + " != " + t2)
+    case (t1, t2) :: cs                => verifyConstraints(t, cs)
+  }
+
+  //Replace unknowns that we have information about
+  def updateConstraint(unkId : Int, t2 : Type)(cs : List[Constraint]) : List[Constraint] =
+    cs.map({ case (a, b) => (a.swap(unkId, t2), b.swap(unkId, t2)) })
 
   def typecheck(d : Defn)(env : Env, tyenv : Env) : (Env, Env) = d match {
     case ExprDefn(n, b) => (env + (n -> typecheck(b.typeExpand(tyenv))(env)), tyenv)
@@ -147,9 +182,9 @@ object Typechecker {
 
   def baseEnv : (Env, Env) = (Map(), Map())
 
-  def typecheck(p : Prog) : Type = {
+  def typecheck(p : Prog) : Map[String, Type] = {
     val (finalEnv, finalTyenv) = p.defs.foldLeft(baseEnv)({ case ((env, tyenv), defn) => typecheck(defn)(env, tyenv) })
-    typecheck(p.e.typeExpand(finalTyenv))(finalEnv)
+    finalEnv + ("main" -> typecheck(p.e.typeExpand(finalTyenv))(finalEnv))
   }
 
 }
