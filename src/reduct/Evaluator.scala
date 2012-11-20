@@ -34,6 +34,9 @@ import model.InLVal
 import model.InRVal
 import model.PairVal
 import model.RecursiveLamVal
+import model.Fold
+import model.Unfold
+import model.FoldVal
 
 object Evaluator {
 
@@ -62,6 +65,7 @@ object Evaluator {
     stack = Nil
 
     while (!(target.isInstanceOf[Return] && stack.isEmpty)) {
+//      println(env + " |= " + stack + " > " + target)
       eval
     }
     target.asInstanceOf[Return].v
@@ -102,6 +106,14 @@ object Evaluator {
       case Match(e, rs) => {
         target = Eval(e)
         stack = StackCase(rs) :: stack
+      }
+      case Fold(mu, t, e) => {
+        target = Eval(e)
+        stack = StackFold :: stack
+      }
+      case Unfold(e) => {
+        target = Eval(e)
+        stack = StackUnfold :: stack
       }
     }
     case Return(v) => stack match {
@@ -151,6 +163,17 @@ object Evaluator {
         env = matchingTarget.asInstanceOf[Binding].b :: env
         target = Eval(body)
         stack = PopFrame :: stack
+      }
+      case StackFold :: s => {
+        target = Return(FoldVal(v))
+        stack = s
+      }
+      case StackUnfold :: s => v match {
+        case FoldVal(v) => {
+          target = Return(v)
+          stack = s
+        }
+        case v => throw new Exception("Attempt to unfold a non-recursive value " + v) //typechecker should catch
       }
       case PopFrame :: s => {
         env = env.tail //'tail' should be safe, pops are added only with a frame
@@ -204,8 +227,8 @@ object Evaluator {
     }
   }
 
-  def evalDefn(d : Defn, m : Map[String, Value]) : Map[String, Value] = m + (d.name -> runEval(Eval(d.body), List(m)))
+  def evalDefn(m : Map[String, Value], d : Defn) : Map[String, Value] = m + (d.name -> runEval(Eval(d.body), List(m)))
 
-  def evaluate(p : Prog) : Value = runEval(Eval(p.e), List(p.defs.foldRight(Map[String, Value]())(evalDefn)))
+  def evaluate(p : Prog) : Value = runEval(Eval(p.e), List(p.defs.foldLeft(Map[String, Value]())(evalDefn)))
 
 }

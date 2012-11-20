@@ -32,12 +32,24 @@ object Main {
       + "inr inl () -> 2 |"
       + "inr inr x -> S(S(S(x))) }")
 
+    test("fold t.(Unit + (Nat, t)) inl () : (Unit + (Nat, mu t.(Unit + (Nat, t))))")
+      
+    test("nil : mu t.(Unit + (Nat, t)) = fold t.(Unit + (Nat, t)) inl () : (Unit + (Nat, mu t.(Unit + (Nat, t))));"
+      + "cons(n : Nat, l : mu t.(Unit + (Nat, t))) : mu t.(Unit + (Nat, t)) = fold t.(Unit + (Nat, t)) inr(n, l) : (Unit + (Nat, mu t.(Unit + (Nat, t))));"
+      + "((cons 2) ((cons 3) nil))")
+      
+    test("nil : mu t.(Unit + (Nat, t)) = fold t.(Unit + (Nat, t)) inl () : (Unit + (Nat, mu t.(Unit + (Nat, t))));"
+      + "cons(n : Nat, l : mu t.(Unit + (Nat, t))) : mu t.(Unit + (Nat, t)) = fold t.(Unit + (Nat, t)) inr(n, l) : (Unit + (Nat, mu t.(Unit + (Nat, t))));"
+      + "listItem : mu t.(Unit + (Nat, t)) = ((cons 2) ((cons 3) nil));"
+      + "length(l : mu t.(Unit + (Nat, t))) : Nat = case unfold l of { inl _ -> 0 | inr (_, l2) -> S((length l2)) };"
+      + "(length listItem)")
+
     //Test stack depth!
     test("id(x : Nat) : Nat = x;"
       + "plus(a : Nat, b : Nat) : Nat = case a of {Z -> b | S(n) -> S(((plus n) b))};"
       + "times(a : Nat, b : Nat) : Nat = case a of {Z -> Z | S(n) -> ((plus b) ((times n) b))};"
       + "fact(n : Nat) : Nat = case n of {Z -> 1 | S(n) -> ((times S(n)) (fact n))};"
-      + "(fact 5)")
+      + "(fact 6)")
 
   }
 
@@ -46,7 +58,7 @@ object Main {
     println(value.toString)
     println
   }
-  
+
   def test(progs : String) {
     printTest("prog", progs)
     val prog = Parserizer.parse(progs)

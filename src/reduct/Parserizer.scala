@@ -39,6 +39,9 @@ import model.PairPat
 import model.InLPat
 import model.InRPat
 import model.TyVar
+import model.Inductive
+import model.Unfold
+import model.Fold
 
 object Parserizer {
 
@@ -58,9 +61,9 @@ object Parserizer {
     pLit("(") thenJ typeParser thenK pLit("+") thenS typeParser thenK pLit(")") appl ({ case (t1, t2) => Sum(t1, t2) })
   val natParser : Parser[Type] = pLit("Nat") appl (_ => Nat)
   val unitParser : Parser[Type] = pLit("Unit") appl (_ => UnitTy)
-//  val inductiveParser : Parser[Type] = pIdent thenK pLit(".") thenS typeParser appl ({ case (x, t) => Inductive(x, t) })
+  val inductiveParser : Parser[Type] = pLit("mu") thenJ pIdent thenK pLit(".") thenS typeParser appl ({ case (x, t) => Inductive(x, t) })
   val varTyParser : Parser[Type] = pIdent appl (x => TyVar(x))
-  val typeParser : Parser[Type] = arrowParser or productParser or sumParser or natParser or unitParser or varTyParser //or inductiveParser 
+  val typeParser : Parser[Type] = arrowParser or productParser or sumParser or natParser or unitParser or inductiveParser or varTyParser
 
   val wildPatParser : Parser[Pattern] = pLit("_") appl (_ => WildPat)
   val varPatParser : Parser[Pattern] = pIdent appl (s => VarPat(s))
@@ -100,20 +103,15 @@ object Parserizer {
     pLit("inl") thenJ exprParser thenK pLit(":") thenS typeParser appl ({ case (e, t) => InL(e, t) })
   val inrParser : Parser[Expr] =
     pLit("inr") thenJ exprParser thenK pLit(":") thenS typeParser appl ({ case (e, t) => InR(e, t) })
-
-//  val recurseParser : Parser[Expr] =
-//    pLit("rec") thenJ pIdent thenK pLit(":") thenS typeParser thenK pLit(".") thenS exprParser thenK pLit("over???") thenS exprParser thenK
-//      pLit(":") thenS pIdent thenK pLit(".") thenS typeParser appl ({
-//        case (((((x, t1), e1), e2), mu), t2) => Recurse(mu, t2, x, t1, e1, e2)
-//      })
-//  val foldParser : Parser[Expr] =
-//    pLit("fold") thenJ pIdent thenK pLit(".") thenS typeParser thenS exprParser appl ({
-//      case ((mu, t), e) => Fold(mu, t, e)
-//    })
+  val recurseParser : Parser[Expr] = pLit("unfold") thenJ exprParser appl ({ case (e) => Unfold(e) })
+  val foldParser : Parser[Expr] =
+    pLit("fold") thenJ pIdent thenK pLit(".") thenS typeParser thenS exprParser appl ({
+      case ((mu, t), e) => Fold(mu, t, e)
+    })
 
   val exprParser : Parser[Expr] =
     zParser or sParser or numParser or matchParser or lamParser or appParser or varParser or
-      trivParser or pairParser or inlParser or inrParser // or recurseParser or foldParser
+      trivParser or pairParser or inlParser or inrParser or recurseParser or foldParser
 
   val paramListParser : Parser[List[(String, Type)]] =
     (pLit("(") thenJ (pIdent thenK pLit(":") thenS typeParser).intersperse(pLit(",")) thenK pLit(")")) or

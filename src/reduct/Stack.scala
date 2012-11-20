@@ -15,8 +15,10 @@ case class StackArg(v1 : Value) extends Stack("(" + v1 + ", (-))")
 case class StackLPair(e2 : Expr) extends Stack("((-), " + e2 + ")")
 case class StackRPair(v1 : Value) extends Stack("(" + v1 + ", (_))")
 case object StackInL extends Stack("inl (-)")
-case object StackInR extends Stack("inr (_)")
+case object StackInR extends Stack("inr (-)")
 case class StackCase(rs : List[Rule]) extends Stack("case (-) of { " + rs.foldRight("")({ case (r1, r2) => r1 + " | " + r2 }) + "}")
+case object StackUnfold extends Stack("unfold (-)")
+case object StackFold extends Stack("fold (-)")
 case object PopFrame extends Stack(" ! ")
 
 sealed abstract class PatStack(name : String) {

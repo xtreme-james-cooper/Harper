@@ -31,6 +31,9 @@ import model.ZPat
 import model.InLPat
 import model.InRPat
 import model.TyVar
+import model.Fold
+import model.Inductive
+import model.Unfold
 
 object Typechecker {
 
@@ -79,16 +82,15 @@ object Typechecker {
         t1 <- typecheck(e)(env)
         t2 <- typeverify(rs)(t1)(env)
       } yield t2
-//    case Recurse(mu, t1, x, t2, e1, e2) =>
-//      for {
-//        te1 <- typecheck(e1)(env + (x -> typeSwap(mu, te1)(t1)))
-//        Inductive(mu, t1) <- typecheck(e2)(env)
-//      } yield te1
-//    case Fold(mu, t, e) =>
-//      for {
-//        t2 <- typecheck(e)(env)
-//        if t2 == typeSwap(mu, Inductive(mu, t))(t)
-//      } yield Inductive(mu, t)
+    case Fold(mu, t, e) =>
+      for {
+        t2 <- typecheck(e)(env)
+        if t2 == typeSwap(mu, Inductive(mu, t))(t)
+      } yield Inductive(mu, t)
+    case Unfold(e) =>
+      for {
+        Inductive(mu, t) <- typecheck(e)(env)
+      } yield typeSwap(mu, Inductive(mu, t))(t)
   }
 
   //t is the type that the pattern is expected to have; under that assumption, it produces some type
@@ -120,13 +122,15 @@ object Typechecker {
 
   //replace all type variables mu with x
   def typeSwap(mu : String, x : Type) : Type => Type = {
-    case Nat                 => Nat
-    case Arrow(t1, t2)       => Arrow(typeSwap(mu, x)(t1), typeSwap(mu, x)(t2))
-    case UnitTy              => UnitTy
-    case Product(t1, t2)     => Product(typeSwap(mu, x)(t1), typeSwap(mu, x)(t2))
-    case Sum(t1, t2)         => Sum(typeSwap(mu, x)(t1), typeSwap(mu, x)(t2))
-    case TyVar(y) if y == mu => x
-    case TyVar(y)            => TyVar(y)
+    case Nat                         => Nat
+    case Arrow(t1, t2)               => Arrow(typeSwap(mu, x)(t1), typeSwap(mu, x)(t2))
+    case UnitTy                      => UnitTy
+    case Product(t1, t2)             => Product(typeSwap(mu, x)(t1), typeSwap(mu, x)(t2))
+    case Sum(t1, t2)                 => Sum(typeSwap(mu, x)(t1), typeSwap(mu, x)(t2))
+    case TyVar(y) if y == mu         => x
+    case TyVar(y)                    => TyVar(y)
+    case Inductive(y, t1) if y == mu => Inductive(y, t1)
+    case Inductive(y, t1)            => Inductive(y, typeSwap(mu, x)(t1))
   }
 
   def typecheck(d : Defn)(env : Env) : Env = d match { case Defn(n, b) => env + (n -> typecheck(b)(env).get) }
