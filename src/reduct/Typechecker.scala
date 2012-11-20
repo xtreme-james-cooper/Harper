@@ -30,7 +30,6 @@ import model.PairPat
 import model.ZPat
 import model.InLPat
 import model.InRPat
-import model.GenericMap
 import model.TyVar
 
 object Typechecker {
@@ -80,12 +79,6 @@ object Typechecker {
         t1 <- typecheck(e)(env)
         t2 <- typeverify(rs)(t1)(env)
       } yield t2
-    case GenericMap(mu, t1, x, t2, e1, e2) =>
-      for {
-        te1 <- typecheck(e1)(env + (x -> t2))
-        te2 <- typecheck(e2)(env)
-        if te2 == typeSwap(mu, t2)(t1)
-      } yield typeSwap(mu, te1)(t1)
 //    case Recurse(mu, t1, x, t2, e1, e2) =>
 //      for {
 //        te1 <- typecheck(e1)(env + (x -> typeSwap(mu, te1)(t1)))

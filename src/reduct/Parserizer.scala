@@ -39,7 +39,6 @@ import model.PairPat
 import model.InLPat
 import model.InRPat
 import model.TyVar
-import model.GenericMap
 
 object Parserizer {
 

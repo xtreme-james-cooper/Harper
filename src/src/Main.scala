@@ -37,17 +37,24 @@ object Main {
       + "plus(a : Nat, b : Nat) : Nat = case a of {Z -> b | S(n) -> S(((plus n) b))};"
       + "times(a : Nat, b : Nat) : Nat = case a of {Z -> Z | S(n) -> ((plus b) ((times n) b))};"
       + "fact(n : Nat) : Nat = case n of {Z -> 1 | S(n) -> ((times S(n)) (fact n))};"
-      + "(fact 6)")
+      + "(fact 5)")
 
   }
 
+  def printTest(name : String, value : Any) : Unit = {
+    println(name)
+    println(value.toString)
+    println
+  }
+  
   def test(progs : String) {
-    println("prog\n" + progs + "\n")
+    printTest("prog", progs)
     val prog = Parserizer.parse(progs)
-    println("parse\n" + prog + "\n")
-    println("type\n" + Typechecker.typecheck(prog).get + "\n")
-    println("value\n" + Evaluator.evaluate(prog) + "\n")
+    printTest("parse", prog)
+    printTest("type", Typechecker.typecheck(prog).get)
+    printTest("value", Evaluator.evaluate(prog))
     println("-----------------------------")
+
   }
 
 }
