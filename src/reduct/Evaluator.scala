@@ -99,12 +99,12 @@ object Evaluator {
         target = Eval(e1)
         push(StackLam(e2))
       }
-      case Fix(v, t, Lam(x, t2, e)) => {
+      case Fix(v, Lam(x, t2, e)) => {
         env = Map(v -> RecursiveLamVal(v, x, e, flattenEnv)) :: env
         target = Eval(Lam(x, t2, e))
         push(PopFrame)
       }
-      case Fix(v, t, e) => target = Eval(e) //this will explode on CAFs (eg, recursive non-functions) so don't write them
+      case Fix(v, e) => target = Eval(e) //this will explode on CAFs (eg, recursive non-functions) so don't write them
       case Triv         => target = Return(TrivVal)
       case PairEx(e1, e2) => {
         target = Eval(e1)
@@ -222,7 +222,7 @@ object Evaluator {
   }
 
   def evalDefn(m : Map[String, Value], d : Defn) : Map[String, Value] = d match {
-    case ExprDefn(n, b) => m + (n -> runEval(Eval(b), List(m)))
+    case ExprDefn(n, b, args) => m + (n -> runEval(Eval(b), List(m)))
     case TypeDefn(n, t) => m
   }
 
