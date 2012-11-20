@@ -13,6 +13,7 @@ import model.Type
 import model.Var
 import model.Prog
 import model.Defn
+import model.ExprDefn
 import model.Fix
 import model.S
 import model.Z
@@ -45,6 +46,7 @@ import model.Fold
 import model.ForAll
 import model.TypeLam
 import model.TypeApp
+import model.TypeDefn
 
 object Parserizer {
 
@@ -62,12 +64,12 @@ object Parserizer {
     pLit("(") thenJ typeParser thenK pLit(",") thenS typeParser thenK pLit(")") appl ({ case (t1, t2) => Product(t1, t2) })
   val sumParser : Parser[Type] =
     pLit("(") thenJ typeParser thenK pLit("+") thenS typeParser thenK pLit(")") appl ({ case (t1, t2) => Sum(t1, t2) })
-  val natParser : Parser[Type] = pLit("Nat") appl (_ => Nat)
-  val unitParser : Parser[Type] = pLit("Unit") appl (_ => UnitTy)
   val inductiveParser : Parser[Type] = pLit("mu") thenJ pIdent thenK pLit(".") thenS typeParser appl ({ case (x, t) => Inductive(x, t) })
   val forallParser : Parser[Type] = pLit("forall") thenJ pIdent thenK pLit(".") thenS typeParser appl ({ case (x, t) => ForAll(x, t) })
   val varTyParser : Parser[Type] = pIdent appl (x => TyVar(x))
-  val typeParser : Parser[Type] = arrowParser or productParser or sumParser or natParser or unitParser or inductiveParser or forallParser or varTyParser
+  val synonymParser : Parser[Type] = pUpperIdent appl (x => TyVar(x)) //separate so if we ever want to distinguish TyVars and TySynonyms
+  val typeParser : Parser[Type] = 
+    arrowParser or productParser or sumParser or inductiveParser or forallParser or varTyParser or synonymParser
 
   val wildPatParser : Parser[Pattern] = pLit("_") appl (_ => WildPat)
   val varPatParser : Parser[Pattern] = pIdent appl (s => VarPat(s))
@@ -126,9 +128,15 @@ object Parserizer {
     (pLit("(") thenJ (pIdent thenK pLit(":") thenS typeParser).intersperse(pLit(",")) thenK pLit(")")) or
       (pEmpty appl (_ => Nil))
   val nameParser : Parser[((String, List[(String, Type)]), Type)] = pIdent thenS paramListParser thenK pLit(":") thenS typeParser
-  val defnParser : Parser[Defn] =
-    nameParser thenK pLit("=") thenS exprParser thenK pLit(";") appl ({ case (((n, args), t), e) => new Defn(n, args, t, e) })
-  val progParser : Parser[Prog] = defnParser.star thenS exprParser thenK pEnd appl ({ case (defs, e) => new Prog(defs, e) })
+  val exprDefnParser : Parser[Defn] = 
+    nameParser thenK pLit("=") thenS exprParser thenK pLit(";") appl ({ case (((n, args), t), e) => new ExprDefn(n, args, t, e) })
+  val typeDefnParser : Parser[Defn] =
+    pLit("type") thenJ pUpperIdent thenK pLit("=") thenS typeParser thenK pLit(";") appl ({ case (n, t) => TypeDefn(n, t) })
+  val defnParser : Parser[Defn] = exprDefnParser or typeDefnParser
+    
+  val progParser : Parser[Prog] = defnParser.star thenS exprParser thenK pEnd appl ({ 
+    case (defs, e) => new Prog(TypeDefn("Unit", UnitTy) :: TypeDefn("Nat", Nat) :: defs, e) 
+  })
 
   def parse(s : String) : Prog = progParser.run(tokenize(s)).head._1
 

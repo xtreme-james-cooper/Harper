@@ -25,6 +25,7 @@ import model.InLPat
 import model.InRPat
 import model.PairPat
 import model.Defn
+import model.ExprDefn
 import model.Value
 import model.LamVal
 import model.ZVal
@@ -40,6 +41,7 @@ import model.FoldVal
 import model.TypeLam
 import model.TypeApp
 import model.TypeLam
+import model.TypeDefn
 
 object Evaluator {
 
@@ -232,7 +234,10 @@ object Evaluator {
     }
   }
 
-  def evalDefn(m : Map[String, Value], d : Defn) : Map[String, Value] = m + (d.name -> runEval(Eval(d.body), List(m)))
+  def evalDefn(m : Map[String, Value], d : Defn) : Map[String, Value] = d match {
+    case ExprDefn(n, b) => m + (n -> runEval(Eval(b), List(m)))
+    case TypeDefn(n, t) => m
+  }
 
   def evaluate(p : Prog) : Value = runEval(Eval(p.e), List(p.defs.foldLeft(Map[String, Value]())(evalDefn)))
 

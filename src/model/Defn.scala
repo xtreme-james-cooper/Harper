@@ -1,8 +1,10 @@
 package model
 
-case class Defn(name : String, body : Expr) {
+sealed abstract class Defn(name : String) {
+  override def toString : String = name
+}
 
-  override def toString : String = name + " = " + body + "\n"
+case class ExprDefn(name : String, body : Expr) extends Defn(name + " = " + body + "\n") {
 
   def this(name : String, args : List[(String, Type)], t : Type, e : Expr) =
     this(name,
@@ -11,6 +13,8 @@ case class Defn(name : String, body : Expr) {
         args.foldRight(e)({ case ((v, ty), ex) => Lam(v, ty, ex) })))
 
 }
+
+case class TypeDefn(name : String, body : Type) extends Defn("type " + name + " = " + body + "\n")
 
 class Prog(val defs : List[Defn], val e : Expr) {
   override def toString : String = defs.foldLeft("")({ case (s, defn) => s + defn }) + e

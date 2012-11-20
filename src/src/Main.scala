@@ -18,6 +18,11 @@ object Main {
       + "null : Unit = ();"
       + "(swap (null, S(Z)))")
 
+    test("type UnNat = (Unit, Nat);"
+      + "swap(p : UnNat) : (Nat, Unit) = case p of {(a, b) -> (b, a)};"
+      + "null : Unit = ();"
+      + "(swap (null, S(Z)))")
+
     test("swap(p : ((Unit, Nat), Nat)) : (Unit, (Nat, Nat)) = case p of {((a, b), c) -> (a, (b, c))};"
       + "null : Unit = ();"
       + "(swap ((null, S(Z)), 2))")
@@ -56,6 +61,14 @@ object Main {
 
     test("snd : forall a. forall b. ((a, b) -> b) = /\\ a. /\\b. \\x : (a, b) . case x of { (a, b) -> b };"
       + "([[snd Unit] Nat] ((), 2))")
+
+    test(
+      "type List = mu t.(Unit + (Nat, t));"
+        + "nil : List = fold k.(Unit + (Nat, k)) inl () : (Unit + (Nat, List));"
+        + "cons(n : Nat, l : List) : List = fold b.(Unit + (Nat, b)) inr(n, l) : (Unit + (Nat, List));"
+        + "listItem : List = ((cons 2) ((cons 3) nil));"
+        + "length(l : List) : Nat = case unfold l of { inl _ -> 0 | inr (_, l2) -> S((length l2)) };"
+        + "(length listItem)")
 
   }
 
