@@ -55,6 +55,16 @@ object Evaluator {
   var stack : List[Stack] = null //TODO use for all parts The parts of the expression whose evaluation has been deferred
   var env : List[Map[String, Value]] = null //The stack of variable-binding frames
 
+  def push(s : Stack) : Unit = stack = s :: stack
+  
+  def pop : Stack = stack match {
+    case Nil => throw new Exception("Should have aborted the eval driver loop!") //This is the escape case
+    case s :: stk => {
+      stack = stk
+      s
+    }
+  }
+  
   def getBinding(x : String) : Value = innerGetBinding(env, x)
   def innerGetBinding(e : List[Map[String, Value]], x : String) : Value = e match {
     case Nil                     => throw new Exception("Unbound identifier : " + x) //Typechecker should blow up on this first
@@ -71,7 +81,6 @@ object Evaluator {
     stack = Nil
 
     while (!(target.isInstanceOf[Return] && stack.isEmpty)) {
-//      println(env + " |= " + stack + " > " + target)
       eval
     }
     target.asInstanceOf[Return].v
@@ -83,84 +92,70 @@ object Evaluator {
       case Z      => target = Return(ZVal)
       case S(n) => {
         target = Eval(n)
-        stack = StackS :: stack
+        push(StackS)
       }
       case Lam(v, t, e) => target = Return(LamVal(v, e, flattenEnv))
       case App(e1, e2) => {
         target = Eval(e1)
-        stack = StackLam(e2) :: stack
+        push(StackLam(e2))
       }
       case Fix(v, t, Lam(x, t2, e)) => {
         env = Map(v -> RecursiveLamVal(v, x, e, flattenEnv)) :: env
         target = Eval(Lam(x, t2, e))
-        stack = PopFrame :: stack
+        push(PopFrame)
       }
       case Fix(v, t, e) => target = Eval(e) //this will explode on CAFs (eg, recursive non-functions) so don't write them
       case Triv         => target = Return(TrivVal)
       case PairEx(e1, e2) => {
         target = Eval(e1)
-        stack = StackLPair(e2) :: stack
+        push(StackLPair(e2))
       }
       case InL(e) => {
         target = Eval(e)
-        stack = StackInL :: stack
+        push(StackInL)
       }
       case InR(e) => {
         target = Eval(e)
-        stack = StackInR :: stack
+        push(StackInR)
       }
       case Match(e, rs) => {
         target = Eval(e)
-        stack = StackCase(rs) :: stack
+        push(StackCase(rs))
       }
       case Fold(mu, t, e) => {
         target = Eval(e)
-        stack = StackFold :: stack
+        push(StackFold)
       }
       case Unfold(e) => {
         target = Eval(e)
-        stack = StackUnfold :: stack
+        push(StackUnfold)
       }
       case TypeLam(t, e) => target = Eval(e) //Ignore types
       case TypeApp(e, t) => target = Eval(e) //Ignore types
     }
-    case Return(v) => stack match {
-      case Nil => throw new Exception("Should have aborted the eval driver loop!") //This is the escape case
-      case StackS :: s => {
-        target = Return(SVal(v))
-        stack = s
-      }
-      case StackLam(e2) :: s => {
+    case Return(v) => pop match {
+      case StackS => target = Return(SVal(v))
+      case StackLam(e2) => {
         target = Eval(e2)
-        stack = StackArg(v) :: s
+        push(StackArg(v))
       }
-      case StackArg(LamVal(x, e, clos)) :: s => {
+      case StackArg(LamVal(x, e, clos)) => {
         env = clos + (x -> v) :: env
         target = Eval(e)
-        stack = PopFrame :: s
+        push(PopFrame)
       }
-      case StackArg(v1) :: s => throw new Exception("Application of a non-function : " + v1) //Typechecker should have caught this
-      case StackLPair(e2) :: s => {
+      case StackArg(v1) => throw new Exception("Application of a non-function : " + v1) //Typechecker should have caught this
+      case StackLPair(e2) => {
         target = Eval(e2)
-        stack = StackRPair(v) :: s
+        push(StackRPair(v))
       }
-      case StackRPair(v1) :: s => {
-        target = Return(PairVal(v1, v))
-        stack = s
-      }
-      case StackInL :: s => {
-        target = Return(InLVal(v))
-        stack = s
-      }
-      case StackInR :: s => {
-        target = Return(InRVal(v))
-        stack = s
-      }
-      case StackCase(Nil) :: s => throw new Exception("Empty set of rules?")
-      case StackCase(Rule(p, b) :: rs) :: s => {
+      case StackRPair(v1) => target = Return(PairVal(v1, v))
+      case StackInL => target = Return(InLVal(v))
+      case StackInR => target = Return(InRVal(v))
+      case StackCase(Nil) => throw new Exception("Empty set of rules?")
+      case StackCase(Rule(p, b) :: rs) => {
         rules = rs
         matchVal = v
-        stack = s
         body = b
         patternStack = Nil
         matchingTarget = Against(p, matchVal)
@@ -170,23 +165,14 @@ object Evaluator {
         }
         env = matchingTarget.asInstanceOf[Binding].b :: env
         target = Eval(body)
-        stack = PopFrame :: stack
+        push(PopFrame)
       }
-      case StackFold :: s => {
-        target = Return(FoldVal(v))
-        stack = s
-      }
-      case StackUnfold :: s => v match {
-        case FoldVal(v) => {
-          target = Return(v)
-          stack = s
-        }
+      case StackFold => target = Return(FoldVal(v))
+      case StackUnfold => v match {
+        case FoldVal(v) => target = Return(v)
         case v => throw new Exception("Attempt to unfold a non-recursive value " + v) //typechecker should catch
       }
-      case PopFrame :: s => {
-        env = env.tail //'tail' should be safe, pops are added only with a frame
-        stack = s
-      }
+      case PopFrame => env = env.tail //'tail' should be safe, pops are added only with a frame
     }
   }
 
