@@ -82,7 +82,7 @@ object Main {
     printTest("prog", progs)
     val prog = Parserizer.parse(progs)
     printTest("parse", prog)
-    printTest("type", Typechecker.typecheck(prog).get)
+    printTest("type", Typechecker.typecheck(prog))
     printTest("value", Evaluator.evaluate(prog))
     println("-----------------------------")
 

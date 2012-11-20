@@ -2,6 +2,27 @@ package model
 
 sealed abstract class Expr(name : String) {
   override def toString : String = name
+
+  //expand type synonyms in tyenv
+  def typeExpand(tyenv : Map[String, Type]) : Expr = this match {
+    //Safe to ignore bindings in Fold and TyLam because TySyns must be uppercase strings and TyVars must be lowercase
+    case Var(x)         => Var(x)
+    case Z              => Z
+    case S(n)           => S(n.typeExpand(tyenv))
+    case Lam(v, t, e)   => Lam(v, t.swap(tyenv), e.typeExpand(tyenv))
+    case App(e1, e2)    => App(e1.typeExpand(tyenv), e2.typeExpand(tyenv))
+    case Fix(v, t, e)   => Fix(v, t.swap(tyenv), e.typeExpand(tyenv))
+    case Triv           => Triv
+    case PairEx(e1, e2) => PairEx(e1.typeExpand(tyenv), e2.typeExpand(tyenv))
+    case InL(e, t)      => InL(e.typeExpand(tyenv), t.swap(tyenv))
+    case InR(e, t)      => InR(e.typeExpand(tyenv), t.swap(tyenv))
+    case Match(e, rs)   => Match(e.typeExpand(tyenv), rs.map({ case Rule(p, b) => Rule(p, b.typeExpand(tyenv)) }))
+    case Fold(mu, t, e) => Fold(mu, t.swap(tyenv), e.typeExpand(tyenv))
+    case Unfold(e)      => Unfold(e.typeExpand(tyenv))
+    case TypeLam(t, e)  => TypeLam(t, e.typeExpand(tyenv))
+    case TypeApp(e, t)  => TypeApp(e.typeExpand(tyenv), t.swap(tyenv))
+  }
+
 }
 
 case class Var(v : String) extends Expr(v)

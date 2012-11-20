@@ -2,6 +2,37 @@ package model
 
 sealed abstract class Type(name : String) {
   override def toString : String = name
+  
+  //replace all type variables mu with x
+  def swap(mu : String, x : Type) : Type = this match {
+    case Nat                         => Nat
+    case Arrow(t1, t2)               => Arrow(t1.swap(mu, x), t2.swap(mu, x))
+    case UnitTy                      => UnitTy
+    case Product(t1, t2)             => Product(t1.swap(mu, x), t2.swap(mu, x))
+    case Sum(t1, t2)                 => Sum(t1.swap(mu, x), t2.swap(mu, x))
+    case TyVar(y) if y == mu         => x
+    case TyVar(y)                    => TyVar(y)
+    case Inductive(y, t1) if y == mu => Inductive(y, t1)
+    case Inductive(y, t1)            => Inductive(y, t1.swap(mu, x))
+    case ForAll(y, t1) if y == mu    => ForAll(y, t1)
+    case ForAll(y, t1)               => ForAll(y, t1.swap(mu, x))
+  }
+  
+  def swap(tyenv : Map[String, Type]) : Type = tyenv.foldLeft(this)({ case (t, (syn, x)) => t.swap(syn, x) })
+
+  //More precise version of == that allows for alpha-renaming
+  def ~=~(t2 : Type) : Boolean = (this, t2) match {
+    case (Inductive(x, st1), Inductive(y, st2)) => st1 ~=~ st2.swap(y, TyVar(x))
+    case (ForAll(x, st1), ForAll(y, st2))       => st1 ~=~ st2.swap(y, TyVar(x))
+    case (Nat, Nat)                             => true
+    case (Arrow(t1, t2), Arrow(t3, t4))         => t1 ~=~ t3 && t2 ~=~ t4
+    case (UnitTy, UnitTy)                       => true
+    case (Product(t1, t2), Product(t3, t4))     => t1 ~=~ t3 && t2 ~=~ t4
+    case (Sum(t1, t2), Sum(t3, t4))             => t1 ~=~ t3 && t2 ~=~ t4
+    case (TyVar(x), TyVar(y))                   => x == y
+    case (_, _)                                 => false
+  }
+
 }
 
 case object Nat extends Type("Nat")
