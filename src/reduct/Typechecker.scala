@@ -50,18 +50,18 @@ object Typechecker {
 
   def newUnknown : Type = {
     typeVarCounter = typeVarCounter + 1
-    Unknown(typeVarCounter, Map())
+    Unknown(typeVarCounter)
   }
-
+  
   def newBindingName : String = {
     typeVarCounter = typeVarCounter + 1
     "#" + typeVarCounter //safe because #2 is unparseable as a var
   }
-
+  
   def assembleConstraints(e : Expr)(env : Env) : (Type, List[Constraint]) = {
-    //    println(e + " in " + env)
+//    println(e + " in " + env)
     val (t, cs) = assembleConstraints_(e)(env)
-    //    println(t + " and " + cs)
+//    println(t + " and " + cs)
     (t, cs)
   }
 
@@ -177,8 +177,8 @@ object Typechecker {
 
   def verifyConstraints(t : Type, cs : List[Constraint]) : Type = cs.flatMap({ case (t1, t2) => t1 ~=~ t2 }) match {
     case Nil                           => t
-    case (Unknown(i, pS), b) :: cs     => verifyConstraints(t.swap(i, b.swap(pS)), cs.map({ case (x, y) => (x.swap(i, b.swap(pS)), y.swap(i, b.swap(pS))) }))
-    case (a, Unknown(i, pS)) :: cs     => verifyConstraints(t.swap(i, a.swap(pS)), cs.map({ case (x, y) => (x.swap(i, a.swap(pS)), y.swap(i, a.swap(pS))) }))
+    case (Unknown(i), b) :: cs         => verifyConstraints(t.swap(i, b), cs.map({ case (x, y) => (x.swap(i, b), y.swap(i, b)) }))
+    case (a, Unknown(i)) :: cs         => verifyConstraints(t.swap(i, a), cs.map({ case (x, y) => (x.swap(i, a), y.swap(i, a)) }))
     case (t1, t2) :: cs if !(t1 == t2) => throw new Exception("Constraint failure: " + t1 + " != " + t2)
     case (t1, t2) :: cs                => verifyConstraints(t, cs)
   }
