@@ -101,11 +101,11 @@ object Evaluator {
         target = Eval(e1)
         stack = StackLPair(e2) :: stack
       }
-      case InL(e, t) => {
+      case InL(e) => {
         target = Eval(e)
         stack = StackInL :: stack
       }
-      case InR(e, t) => {
+      case InR(e) => {
         target = Eval(e)
         stack = StackInR :: stack
       }

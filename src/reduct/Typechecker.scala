@@ -39,13 +39,25 @@ import model.TypeLam
 import model.ForAll
 import model.TypeApp
 import model.TypeDefn
-import model.NewUnknown
 import model.Unknown
 
 object Typechecker {
 
   type Constraint = (Type, Type)
 
+  //not semantically a var; done this way to save the effort of piping it around
+  var typeVarCounter : Int = 0
+
+  def newUnknown : Type = {
+    typeVarCounter = typeVarCounter + 1
+    Unknown(typeVarCounter)
+  }
+  
+  def newBindingName : String = {
+    typeVarCounter = typeVarCounter + 1
+    "#" + typeVarCounter //safe because #2 is unparseable as a var
+  }
+  
   def assembleConstraints(e : Expr)(env : Env) : (Type, List[Constraint]) = {
 //    println(e + " in " + env)
     val (t, cs) = assembleConstraints_(e)(env)
@@ -79,15 +91,15 @@ object Typechecker {
       val (t2, cs2) = assembleConstraints(e2)(env)
       (Product(t1, t2), cs1 ++ cs2)
     }
-    case InL(i, t) => {
+    case InL(i) => {
+      val hole = newUnknown
       val (t3, cs) = assembleConstraints(i)(env)
-      val Sum(t1, t2) = t
-      (t, (t3, t1) :: cs)
+      (Sum(t3, hole), cs)
     }
-    case InR(i, t) => {
+    case InR(i) => {
+      val hole = newUnknown
       val (t3, cs) = assembleConstraints(i)(env)
-      val Sum(t1, t2) = t
-      (t, (t3, t2) :: cs)
+      (Sum(hole, t3), cs)
     }
     case Match(e, rs) => {
       val (t1, cs1) = assembleConstraints(e)(env)
@@ -99,6 +111,8 @@ object Typechecker {
       (Inductive(mu, t), (t2, t.swap(mu, Inductive(mu, t))) :: cs)
     }
     case Unfold(e) => {
+      val hole = newUnknown
+      val bind = newBindingName
       val (Inductive(mu, t), cs) = assembleConstraints(e)(env)
       (t.swap(mu, Inductive(mu, t)), cs)
     }
@@ -135,22 +149,22 @@ object Typechecker {
       (bind, (t, Nat) :: cs)
     }
     case PairPat(p1, p2) => {
-      val t1 = NewUnknown()
-      val t2 = NewUnknown()
+      val t1 = newUnknown
+      val t2 = newUnknown
       val (p1binds, cs1) = typeverify(p1, t1, env)
       val (p2binds, cs2) = typeverify(p2, t2, env)
       if ((p1binds.keySet & p2binds.keySet).isEmpty) (p1binds ++ p2binds, (t, Product(t1, t2)) :: cs1 ++ cs2)
       else throw new Exception("Overlapping pattern variables")
     }
     case InLPat(p) => {
-      val t1 = NewUnknown()
-      val t2 = NewUnknown()
+      val t1 = newUnknown
+      val t2 = newUnknown
       val (bind, cs) = typeverify(p, t1, env)
       (bind, (t, Sum(t1, t2)) :: cs)
     }
     case InRPat(p) => {
-      val t1 = NewUnknown()
-      val t2 = NewUnknown()
+      val t1 = newUnknown
+      val t2 = newUnknown
       val (bind, cs) = typeverify(p, t2, env)
       (bind, (t, Sum(t1, t2)) :: cs)
     }

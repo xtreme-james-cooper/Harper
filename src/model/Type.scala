@@ -62,15 +62,4 @@ case class Inductive(x : String, t : Type) extends Type("mu " + x + "." + t)
 case class ForAll(x : String, t : Type) extends Type("forall " + x + "." + t)
 
 //Cannot be written and should not appear in the final result; just for type inference
-case class Unknown(id : Int) extends Type(throw new Exception("unknown " + id + " being used"))
-object NewUnknown {
-
-  //not semantically a var; done this way to save the effort of piping it around
-  var typeVarCounter : Int = 0
-
-  def apply() : Type = {
-    typeVarCounter = typeVarCounter + 1
-    Unknown(typeVarCounter)
-  }
-
-}
+case class Unknown(id : Int) extends Type("unknown " + id + " being used")

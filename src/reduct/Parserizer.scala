@@ -106,9 +106,9 @@ object Parserizer {
   val pairParser : Parser[Expr] =
     pLit("(") thenJ exprParser thenK pLit(",") thenS exprParser thenK pLit(")") appl ({ case (t1, t2) => PairEx(t1, t2) })
   val inlParser : Parser[Expr] =
-    pLit("inl") thenJ exprParser thenK pLit(":") thenS typeParser appl ({ case (e, t) => InL(e, t) })
+    pLit("inl") thenJ exprParser appl (e => InL(e))
   val inrParser : Parser[Expr] =
-    pLit("inr") thenJ exprParser thenK pLit(":") thenS typeParser appl ({ case (e, t) => InR(e, t) })
+    pLit("inr") thenJ exprParser appl (e => InR(e))
   val recurseParser : Parser[Expr] = pLit("unfold") thenJ exprParser appl ({ case (e) => Unfold(e) })
   val foldParser : Parser[Expr] =
     pLit("fold") thenJ pIdent thenK pLit(".") thenS typeParser thenS exprParser appl ({
