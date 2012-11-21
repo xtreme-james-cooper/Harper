@@ -215,18 +215,16 @@ object Evaluator {
   def executeCommand(c : CommandTarget, mem : List[Map[String, Value]],
                      envv : List[Map[String, Value]], stk : List[CmdStack]) : (Value, List[Map[String, Value]]) = c match {
     case Execute(c) => c match {
-      case Ret(e) => (runEval(e, envv), mem)
+      case Ret(e) => executeCommand(CommandReturn(runEval(e, envv)), mem, envv, stk)
       case Bind(x, e, m) => {
         val v = runEval(e, envv)
         v match {
-          case Action(m2, closure) => {
-            val (v2, mem2) = executeCommand(Execute(m2), mem, closure :: envv, stk) //TODO
-            executeCommand(Execute(m), mem2, Map(x -> v2) :: envv, stk) //TODO
-          }
+          case Action(m2, closure) => executeCommand(Execute(m2), mem, closure :: envv, CmdStackBind(x, m) :: stk)
           case _ => throw new Exception("Attempt to bind a non-action " + v)
         }
       }
-      case Get(x)          => (innerGetBinding(mem, x), mem) //TODO use something other than innerGetBinding //Guarenteed to be there by the typechecker
+      //Guarenteed to be there by the typechecker
+      case Get(x)          => executeCommand(CommandReturn(innerGetBinding(mem, x)), mem, envv, stk) //TODO use something other than innerGetBinding 
       case SetCmd(x, e, m) => executeCommand(Execute(m), updateMemory(x, runEval(e, envv), mem), envv, stk)
       case Decl(x, e, m)   => executeCommand(Execute(m), Map(x -> runEval(e, envv)) :: mem, envv, PopBlock :: stk)
     }
