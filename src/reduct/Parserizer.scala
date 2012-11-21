@@ -56,6 +56,7 @@ import model.Bind
 import model.Decl
 import model.Get
 import model.SetCmd
+import model.CommandTy
 
 object Parserizer {
 
@@ -163,7 +164,7 @@ object Parserizer {
   val typeDefnParser : Parser[Defn] =
     pLit("type") thenJ pUpperIdent thenK pLit("=") thenS typeParser thenK pLit(";") appl ({ case (n, t) => TypeDefn(n, t) })
   val procDefnParser : Parser[Defn] =
-    nameParser thenK pLit("=") thenS commandParser thenK pLit(";") appl ({ case (((n, args), t), c) => new ExprDefn(n, args, t, CommandExp(c)) })
+    nameParser thenK pLit("=") thenS commandParser thenK pLit(";") appl ({ case (((n, args), t), c) => new ExprDefn(n, args, CommandTy(t), CommandExp(c)) })
   val defnParser : Parser[Defn] = exprDefnParser or typeDefnParser or procDefnParser
 
   val progParser : Parser[Prog] = defnParser.star thenS commandParser thenK pEnd appl ({

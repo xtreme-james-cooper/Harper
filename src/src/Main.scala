@@ -8,24 +8,24 @@ object Main {
 
   def main(args : Array[String]) : Unit = {
 
-//    test("return ()")
-//
-//    test("null : Unit = (); return null")
+    test("return ()")
+
+    test("null : Unit = (); return null")
 
     test("plus(a : Nat, b : Nat) : Nat = case a of {Z -> b | S(n) -> S(((plus n) b))}; return ((plus 2) 3)")
 
-//    test("swap(p : (Unit, Nat)) : (Nat, Unit) = case p of {(a, b) -> (b, a)};"
-//      + "null : Unit = ();"
-//      + "return (swap (null, S(Z)))")
+    test("swap(p : (Unit, Nat)) : (Nat, Unit) = case p of {(a, b) -> (b, a)};"
+      + "null : Unit = ();"
+      + "return (swap (null, S(Z)))")
 
-//    test("type UnNat = (Unit, Nat);"
-//      + "swap(p : UnNat) : (Nat, Unit) = case p of {(a, b) -> (b, a)};"
-//      + "null : Unit = ();"
-//      + "return (swap (null, S(Z)))")
+    test("type UnNat = (Unit, Nat);"
+      + "swap(p : UnNat) : (Nat, Unit) = case p of {(a, b) -> (b, a)};"
+      + "null : Unit = ();"
+      + "return (swap (null, S(Z)))")
 
-//    test("swap(p : ((Unit, Nat), Nat)) : (Unit, (Nat, Nat)) = case p of {((a, b), c) -> (a, (b, c))};"
-//      + "null : Unit = ();"
-//      + "return (swap ((null, S(Z)), 2))")
+    test("swap(p : ((Unit, Nat), Nat)) : (Unit, (Nat, Nat)) = case p of {((a, b), c) -> (a, (b, c))};"
+      + "null : Unit = ();"
+      + "return (swap ((null, S(Z)), 2))")
 
     test("ifC(b : Bool, e1 : Nat, e2 : Nat) : Nat = case b of{inl x -> e1 | inr x -> e2};"
       + "plus(a : Nat, b : Nat) : Nat = case a of {Z -> b | S(n) -> S(((plus n) b))};"
@@ -37,10 +37,10 @@ object Main {
       + "inr inl () -> 2 |"
       + "inr inr x -> S(S(S(x))) }")
 
-//    test("nil : mu t.(Unit + (Nat, t)) = fold t.(Unit + (Nat, t)) inl ();"
-//      + "cons(n : Nat, l : mu t.(Unit + (Nat, t))) : mu t.(Unit + (Nat, t)) = fold t.(Unit + (Nat, t)) inr(n, l);"
-//      + "listItem : mu t.(Unit + (Nat, t)) = ((cons 2) ((cons 3) nil));"
-//      + "return listItem")
+    test("nil : mu t.(Unit + (Nat, t)) = fold t.(Unit + (Nat, t)) inl ();"
+      + "cons(n : Nat, l : mu t.(Unit + (Nat, t))) : mu t.(Unit + (Nat, t)) = fold t.(Unit + (Nat, t)) inr(n, l);"
+      + "listItem : mu t.(Unit + (Nat, t)) = ((cons 2) ((cons 3) nil));"
+      + "return listItem")
 
     test("nil : mu t.(Unit + (Nat, t)) = fold t.(Unit + (Nat, t)) inl ();"
       + "cons(n : Nat, l : mu t.(Unit + (Nat, t))) : mu t.(Unit + (Nat, t)) = fold t.(Unit + (Nat, t)) inr(n, l);"
@@ -55,8 +55,8 @@ object Main {
       + "fact(n : Nat) : Nat = case n of {Z -> 1 | S(n) -> ((times S(n)) (fact n))};"
       + "return (fact 6)")
 
-//    test("id : forall t.(t -> t) = /\\ t. \\x : t . x;"
-//      + "return (([id Nat] 5), ([id Unit] ()))")
+    test("id : forall t.(t -> t) = /\\ t. \\x : t . x;"
+      + "return (([id Nat] 5), ([id Unit] ()))")
 
     test("snd : forall a. forall b. ((a, b) -> b) = /\\ a. /\\b. \\x : (a, b) . case x of { (a, b) -> b };"
       + "return ([[snd Unit] Nat] ((), 2))")
@@ -81,12 +81,11 @@ object Main {
         + "return try (((ifC false) \\x:Nat . 3) \\x:Nat . throw bleh) catch 2")
 
     test("plus(a : Nat, b : Nat) : Nat = case a of {Z -> b | S(n) -> S(((plus n) b))};"
-      + "decl a := 0 in decl b := 3 in bind x <- command !b; a := ((plus x) 2); bind y <- command !a; return y")
+        + "decl a := 0 in decl b := 3 in bind x <- command !b; a := ((plus x) 2); bind y <- command !a; return y")
 
     test("plus(a : Nat, b : Nat) : Nat = case a of {Z -> b | S(n) -> S(((plus n) b))};"
       + "sum(x : Nat, y : Nat) : Nat = decl a := ((plus x) y) in bind b <- command !a; return b;"
       + "decl a := 2 in decl b := 3 in bind aa <- command !a; bind bb <- command !b; bind x <- ((sum aa) bb); a := ((plus x) 1); bind y <- command !a; return y")
-
   }
 
   def printTest(name : String, value : Any) : Unit = {
@@ -100,7 +99,7 @@ object Main {
     val prog = Parserizer.parse(progs)
     printTest("parse", prog)
     println("type")
-    for ((name, typ) <- Typechecker.typecheck(prog)) println(name + " : " + typ)
+    for ((name, typ) <- Typechecker.typeCheckProg(prog)) println(name + " : " + typ)
     println
     printTest("value", Evaluator.evaluate(prog))
     println("-----------------------------")
