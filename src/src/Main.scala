@@ -27,9 +27,9 @@ object Main {
       + "null : Unit = ();"
       + "(swap ((null, S(Z)), 2))")
 
-    test("ifC(b : (Unit + Unit), e1 : Nat, e2 : Nat) : Nat = case b of{inl x -> e1 | inr x -> e2};"
+    test("ifC(b : Bool, e1 : Nat, e2 : Nat) : Nat = case b of{inl x -> e1 | inr x -> e2};"
       + "plus(a : Nat, b : Nat) : Nat = case a of {Z -> b | S(n) -> S(((plus n) b))};"
-      + "((plus (((ifC inl ()) S(Z)) Z)) (((ifC inr ()) S(S(S(S(Z))))) S(S(Z))))")
+      + "((plus (((ifC true) S(Z)) Z)) (((ifC false) S(S(S(S(Z))))) S(S(Z))))")
 
     test("case inr inl () of {"
       + "inl (S(_), y) -> y |"
@@ -68,17 +68,17 @@ object Main {
         + "length(l : List) : Nat = case unfold l of { inl _ -> 0 | inr (_, l2) -> S((length l2)) };"
         + "(length listItem)")
 
-    test("ifC(b : (Unit + Unit), e1 : (Nat -> Nat), e2 : (Nat -> Nat)) : Nat = case b of{inl x -> (e1 0) | inr x -> (e2 0)};"
-        + "(((ifC inl ()) \\x:Nat . 3) \\x:Nat . throw bleh)")
+    test("ifC(b : Bool, e1 : (Nat -> Nat), e2 : (Nat -> Nat)) : Nat = case b of{inl x -> (e1 0) | inr x -> (e2 0)};"
+        + "(((ifC true) \\x:Nat . 3) \\x:Nat . throw bleh)")
   
-    test("ifC(b : (Unit + Unit), e1 : (Nat -> Nat), e2 : (Nat -> Nat)) : Nat = case b of{inl x -> (e1 0) | inr x -> (e2 0)};"
-        + "(((ifC inr ()) \\x:Nat . 3) \\x:Nat . throw bleh)")
+    test("ifC(b : Bool, e1 : (Nat -> Nat), e2 : (Nat -> Nat)) : Nat = case b of{inl x -> (e1 0) | inr x -> (e2 0)};"
+        + "(((ifC false) \\x:Nat . 3) \\x:Nat . throw bleh)")
     
-    test("ifC(b : (Unit + Unit), e1 : (Nat -> Nat), e2 : (Nat -> Nat)) : Nat = case b of{inl x -> (e1 0) | inr x -> (e2 0)};"
-        + "try (((ifC inl ()) \\x:Nat . 3) \\x:Nat . throw bleh) catch 2")
+    test("ifC(b : Bool, e1 : (Nat -> Nat), e2 : (Nat -> Nat)) : Nat = case b of{inl x -> (e1 0) | inr x -> (e2 0)};"
+        + "try (((ifC true) \\x:Nat . 3) \\x:Nat . throw bleh) catch 2")
   
-    test("ifC(b : (Unit + Unit), e1 : (Nat -> Nat), e2 : (Nat -> Nat)) : Nat = case b of{inl x -> (e1 0) | inr x -> (e2 0)};"
-        + "try (((ifC inr ()) \\x:Nat . 3) \\x:Nat . throw bleh) catch 2")
+    test("ifC(b : Bool, e1 : (Nat -> Nat), e2 : (Nat -> Nat)) : Nat = case b of{inl x -> (e1 0) | inr x -> (e2 0)};"
+        + "try (((ifC false) \\x:Nat . 3) \\x:Nat . throw bleh) catch 2")
 
   }
 

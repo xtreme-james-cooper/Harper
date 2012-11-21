@@ -70,7 +70,7 @@ object Parserizer {
   val forallParser : Parser[Type] = pLit("forall") thenJ pIdent thenK pLit(".") thenS typeParser appl ({ case (x, t) => ForAll(x, t) })
   val varTyParser : Parser[Type] = pIdent appl (x => TyVar(x))
   val synonymParser : Parser[Type] = pUpperIdent appl (x => TyVar(x)) //separate so if we ever want to distinguish TyVars and TySynonyms
-  val typeParser : Parser[Type] = 
+  val typeParser : Parser[Type] =
     arrowParser or productParser or sumParser or inductiveParser or forallParser or varTyParser or synonymParser
 
   val wildPatParser : Parser[Pattern] = pLit("_") appl (_ => WildPat)
@@ -123,27 +123,31 @@ object Parserizer {
   val typeAppParser : Parser[Expr] =
     pLit("[") thenJ exprParser thenS typeParser thenK pLit("]") appl ({ case (e, t) => TypeApp(e, t) })
   val throwParser : Parser[Expr] = pLit("throw") thenJ pIdent appl ({ s => ThrowEx(s) })
-  val catchParser : Parser[Expr] = 
+  val catchParser : Parser[Expr] =
     pLit("try") thenJ exprParser thenK pLit("catch") thenS exprParser appl ({ case (e1, e2) => TryCatch(e1, e2) })
-  val exprParser : Parser[Expr] = 
+  val exprParser : Parser[Expr] =
     zParser or sParser or numParser or matchParser or lamParser or appParser or varParser or
-      trivParser or pairParser or inlParser or inrParser or recurseParser or foldParser or typeLamParser or 
+      trivParser or pairParser or inlParser or inrParser or recurseParser or foldParser or typeLamParser or
       typeAppParser or throwParser or catchParser
 
   val paramListParser : Parser[List[(String, Type)]] =
     (pLit("(") thenJ (pIdent thenK pLit(":") thenS typeParser).intersperse(pLit(",")) thenK pLit(")")) or
       (pEmpty appl (_ => Nil))
   val nameParser : Parser[((String, List[(String, Type)]), Type)] = pIdent thenS paramListParser thenK pLit(":") thenS typeParser
-  val exprDefnParser : Parser[Defn] = 
+  val exprDefnParser : Parser[Defn] =
     nameParser thenK pLit("=") thenS exprParser thenK pLit(";") appl ({ case (((n, args), t), e) => new ExprDefn(n, args, t, e) })
   val typeDefnParser : Parser[Defn] =
     pLit("type") thenJ pUpperIdent thenK pLit("=") thenS typeParser thenK pLit(";") appl ({ case (n, t) => TypeDefn(n, t) })
   val defnParser : Parser[Defn] = exprDefnParser or typeDefnParser
-    
-  val progParser : Parser[Prog] = defnParser.star thenS exprParser thenK pEnd appl ({ 
-    case (defs, e) => new Prog(TypeDefn("Unit", UnitTy) :: TypeDefn("Nat", Nat) :: defs, e) 
+
+  val progParser : Parser[Prog] = defnParser.star thenS exprParser thenK pEnd appl ({
+    case (defs, e) => new Prog(builtinDefs ++ defs, e)
   })
 
   def parse(s : String) : Prog = progParser.run(tokenize(s)).head._1
+
+  val builtinDefs : List[Defn] = List(
+    TypeDefn("Unit", UnitTy), TypeDefn("Nat", Nat), TypeDefn("Bool", Sum(UnitTy, UnitTy)), new ExprDefn("true", Nil, TyVar("Bool"), InL(Triv)),
+    new ExprDefn("false", Nil, TyVar("Bool"), InR(Triv)))
 
 }
