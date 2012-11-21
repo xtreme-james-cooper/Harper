@@ -19,11 +19,17 @@ object ExprEvaluator {
   private def push(s : Stack) : Unit = stack = s :: stack
 
   private def pop : Stack = stack match {
-    case Nil => throw new Exception("Should have aborted the eval driver loop!") //This is the escape case
+    case Nil => throw new Exception("Should have aborted the expr driver loop!") //This is the escape case
     case s :: stk => {
       stack = stk
       s
     }
+  }
+  
+  //Ensure that all pushes are matched with pops
+  private def pushEnv(e : Map[String, Value]) : Unit = {
+    env = e :: env
+    push(PopFrame)
   }
 
   private def getBinding(x : String) : Value = innerGetBinding(env, x)
@@ -65,9 +71,8 @@ object ExprEvaluator {
         push(StackLam(e2))
       }
       case Fix(v, Lam(x, t2, e)) => {
-        env = Map(v -> RecursiveLamVal(v, x, e, flattenEnv)) :: env
+        pushEnv(Map(v -> RecursiveLamVal(v, x, e, flattenEnv)))
         target = Eval(Lam(x, t2, e))
-        push(PopFrame)
       }
       case Fix(v, e) => target = Eval(e) //this will explode on CAFs (eg, recursive non-functions) so don't write them
       case Triv      => target = Return(TrivVal)
@@ -111,9 +116,8 @@ object ExprEvaluator {
         push(StackArg(v))
       }
       case StackArg(LamVal(x, e, clos)) => {
-        env = clos + (x -> v) :: env
+        pushEnv(clos + (x -> v))
         target = Eval(e)
-        push(PopFrame)
       }
       case StackArg(v1) => throw new Exception("Application of a non-function : " + v1) //Typechecker should have caught this
       case StackLPair(e2) => {
@@ -126,9 +130,8 @@ object ExprEvaluator {
       case StackCase(Nil) => throw new Exception("Empty set of rules?")
       case StackCase(Rule(p, b) :: rs) => {
         val (e, bind) = PatternEvaluator.run(v, p, b, rs)
-        env = bind :: env
+        pushEnv(bind)
         target = Eval(e)
-        push(PopFrame)
       }
       case StackFold => target = Return(FoldVal(v))
       case StackUnfold => v match {
@@ -136,7 +139,7 @@ object ExprEvaluator {
         case v          => throw new Exception("Attempt to unfold a non-recursive value " + v) //typechecker should catch
       }
       case StackHandler(e2) => () //if a value is returned, skip the handler
-      case PopFrame         => env = env.tail //'tail' should be safe, pops are added only with a frame
+      case PopFrame         => env = env.tail //'tail' is safe, pops are added only with a frame
     }
     case Throw(e) => pop match {
       case StackHandler(e2) => target = Eval(e2)

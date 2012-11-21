@@ -8,6 +8,8 @@ object PatternEvaluator {
   case class Against(p : Pattern, v : Value) extends MatchingTarget
   case class Return(b : Map[String, Value]) extends MatchingTarget
 
+  //All these are init'd to null, because they are manually set in each pass
+  //Conceptually, this is a tail-recursive state-machine; for efficiency reasons we actually modify vars, but it's not strictly necessary
   private var rules : List[Rule] = null //Rules as yet untried
   private var matchVal : Value = null //Value being matched against
   private var body : Expr = null //The body to be evaluated if the match succeeds
