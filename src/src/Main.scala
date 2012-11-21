@@ -1,8 +1,7 @@
 package src
 
-import reduct.Parserizer
 import reduct.Typechecker
-import reduct.Evaluator
+import reduct.ProgEvaluator
 
 object Main {
 
@@ -101,7 +100,7 @@ object Main {
     println("type")
     for ((name, typ) <- Typechecker.typeCheckProg(prog)) println(name + " : " + typ)
     println
-    printTest("value", Evaluator.evaluate(prog))
+    printTest("value", ProgEvaluator.run(prog))
     println("-----------------------------")
 
   }

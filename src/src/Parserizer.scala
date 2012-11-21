@@ -1,62 +1,9 @@
-package reduct
+package src
 
-import src.Parser
-import src.Parser.pLit
-import src.Parser.pEnd
-import src.Parser.pIdent
-import src.Parser.pUpperIdent
-import src.Parser.pLit
-import src.Parser.pEmpty
-import src.Parser.pNum
-import model.Expr
-import model.Type
-import model.Var
-import model.Prog
-import model.Defn
-import model.ExprDefn
-import model.Fix
-import model.S
-import model.Z
-import model.Nat
-import model.Arrow
-import model.UnitTy
-import model.Product
-import model.App
-import model.Lam
-import model.Triv
-import model.PairEx
-import model.Sum
-import model.InR
-import model.InL
-import model.Match
-import model.Rule
-import model.WildPat
-import model.Pattern
-import model.VarPat
-import model.ZPat
-import model.SPat
-import model.TrivPat
-import model.PairPat
-import model.InLPat
-import model.InRPat
-import model.TyVar
-import model.Inductive
-import model.Unfold
-import model.Fold
-import model.ForAll
-import model.TypeLam
-import model.TypeApp
-import model.TypeDefn
-import model.ThrowEx
-import model.TryCatch
-import model.Command
-import model.CommandExp
-import model.Ret
-import model.Bind
-import model.Decl
-import model.Get
-import model.SetCmd
-import model.CommandTy
+import model.{ZPat, Z, WildPat, VarPat, Var, UnitTy, Unfold, TypeLam, TypeDefn, TypeApp, Type, TyVar, TryCatch, TrivPat, Triv, ThrowEx, Sum, SetCmd, SPat,
+  S, Rule, Ret, Prog, Product, Pattern, PairPat, PairEx, Nat, Match, Lam, Inductive, InRPat, InR, InLPat, InL, Get, ForAll, Fold, ExprDefn, Expr, Defn, Decl,
+  CommandTy, CommandExp, Command, Bind, Arrow, App}
+import src.Parser.{pUpperIdent, pNum, pLit, pIdent, pEnd, pEmpty}
 
 object Parserizer {
 
