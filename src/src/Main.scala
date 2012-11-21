@@ -1,6 +1,6 @@
 package src
 
-import typechecker.Typechecker
+import typechecker.ProgChecker
 import reduct.ProgEvaluator
 
 object Main {
@@ -98,7 +98,7 @@ object Main {
     val prog = Parserizer.parse(progs)
     printTest("parse", prog)
     println("type")
-    for ((name, typ) <- Typechecker.typeCheckProg(prog)) println(name + " : " + typ)
+    for ((name, typ) <- ProgChecker.typeCheck(prog)) println(name + " : " + typ)
     println
     printTest("value", ProgEvaluator.run(prog))
     println("-----------------------------")
