@@ -53,6 +53,9 @@ import model.Get
 import model.SetCmd
 import model.Action
 import model.Command
+import model.Process
+import model.Stop
+import model.Atomic
 
 object Evaluator {
 
@@ -60,6 +63,20 @@ object Evaluator {
   case class Eval(e : Expr) extends Target
   case class Return(v : Value) extends Target
   case class Throw(s : String) extends Target
+
+  def getBinding(x : String) : Value = innerGetBinding(env, x)
+  def innerGetBinding(e : List[Map[String, Value]], x : String) : Value = e match {
+    case Nil                     => throw new Exception("Unbound identifier : " + x) //Typechecker should blow up on this first
+    case m :: e if m.contains(x) => m(x)
+    case m :: e                  => innerGetBinding(e, x)
+  }
+
+  //Crush the env down into a single stack frame for use as a closure
+  def flattenEnv : Map[String, Value] = env.foldRight(Map[String, Value]())({ case (m1, m2) => m2 ++ m1 })
+
+  /*
+   * Expr evaluation
+   */
 
   //All these are init'd to null, because they are manually set in each pass
   //Conceptually, this is a tail-recursive state-machine; for efficiency reasons we actually modify vars, but it's not strictly necessary
@@ -77,16 +94,6 @@ object Evaluator {
     }
   }
 
-  def getBinding(x : String) : Value = innerGetBinding(env, x)
-  def innerGetBinding(e : List[Map[String, Value]], x : String) : Value = e match {
-    case Nil                     => throw new Exception("Unbound identifier : " + x) //Typechecker should blow up on this first
-    case m :: e if m.contains(x) => m(x)
-    case m :: e                  => innerGetBinding(e, x)
-  }
-
-  //Crush the env down into a single stack frame for use as a closure
-  def flattenEnv : Map[String, Value] = env.foldRight(Map[String, Value]())({ case (m1, m2) => m2 ++ m1 })
-
   def runEval(e : Expr, m : List[Map[String, Value]]) : Value = {
     target = Eval(e)
     env = m
@@ -102,11 +109,6 @@ object Evaluator {
     }
   }
 
-//  def eval : Unit = {
-//    println(target + " " + env)
-//    eval_
-//  }
-//  
   def eval : Unit = target match {
     case Eval(e) => e match {
       case Var(x) => target = Return(getBinding(x))
@@ -208,13 +210,10 @@ object Evaluator {
     }
   }
 
-//  def executeCommand(c : Command, mem : List[Map[String, Value]], env : List[Map[String, Value]]) : (Value, List[Map[String, Value]]) = {
-//    println(c + " " + mem + " " + env)
-//    val (v, mem2) = executeCommand_(c, mem, env)
-//    println(v + " " + mem2)
-//    (v, mem2)
-//  }
-//  
+  /*
+   * Command evaluation
+   */
+
   def executeCommand(c : Command, mem : List[Map[String, Value]], env : List[Map[String, Value]]) : (Value, List[Map[String, Value]]) = c match {
     case Ret(e) => (runEval(e, env), mem)
     case Bind(x, e, m) => {
@@ -245,7 +244,11 @@ object Evaluator {
     case m :: e if m.contains(x) => m + (x -> v) :: e
     case m :: e                  => m :: updateMemory(x, v, e)
   }
-  
+
+  /*
+   * PatternEvaluation
+   */
+
   sealed abstract class MatchingTarget
   case class Against(p : Pattern, v : Value) extends MatchingTarget
   case class Binding(b : Map[String, Value]) extends MatchingTarget
@@ -291,11 +294,24 @@ object Evaluator {
     }
   }
 
+  /*
+   * ProcessEvaluation
+   */
+  
+  def runProcess(p : Process, mem : List[Map[String, Value]], env : List[Map[String, Value]]) : Value = p match {
+    case Stop => TrivVal
+    case Atomic(m) => executeCommand(m, mem, env)._1
+  }
+  
+  /*
+   * Defn/Prog evaluation
+   */
+
   def evalDefn(m : Map[String, Value], d : Defn) : Map[String, Value] = d match {
     case ExprDefn(n, b, args) => m + (n -> runEval(b, List(m)))
     case TypeDefn(n, t)       => m
   }
 
-  def evaluate(p : Prog) : Value = executeCommand(p.e, Nil, List(p.defs.foldLeft(Map[String, Value]())(evalDefn)))._1
+  def evaluate(p : Prog) : Value = runProcess(p.e, Nil, List(p.defs.foldLeft(Map[String, Value]())(evalDefn)))
 
 }

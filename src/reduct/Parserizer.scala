@@ -57,6 +57,11 @@ import model.Decl
 import model.Get
 import model.SetCmd
 import model.CommandTy
+import model.Stop
+import model.Process
+import model.Atomic
+import model.Parallel
+import model.NewChannel
 
 object Parserizer {
 
@@ -154,7 +159,17 @@ object Parserizer {
       case ((x, e), m) => SetCmd(x, e, m)
     })
   val commandParser : Parser[Command] = returnParser or bindParser or declParser or getParser or setParser
-
+ 
+  val stopParser : Parser[Process] = pLit("stop") appl (_ => Stop)
+  val atomicParser : Parser[Process] = pLit("atomic") thenJ commandParser appl (m => Atomic(m))
+  val parallelParser : Parser[Process] = pLit("(") thenJ processParser thenK pLit("|") thenK pLit("|") thenS processParser thenK pLit(")") appl ({ 
+    case (p1, p2) => Parallel(p1, p2)
+  })
+  val newChannelParser : Parser[Process] = pLit("new") thenJ pIdent thenK pLit(":") thenS typeParser thenK pLit(".") thenS processParser appl ({ 
+    case ((a, t), p) => NewChannel(a, t, p)
+  })
+  val processParser : Parser[Process] = stopParser or atomicParser or parallelParser or newChannelParser
+  
   val paramListParser : Parser[List[(String, Type)]] =
     (pLit("(") thenJ (pIdent thenK pLit(":") thenS typeParser).intersperse(pLit(",")) thenK pLit(")")) or
       (pEmpty appl (_ => Nil))
@@ -167,7 +182,7 @@ object Parserizer {
     nameParser thenK pLit("=") thenS commandParser thenK pLit(";") appl ({ case (((n, args), t), c) => new ExprDefn(n, args, CommandTy(t), CommandExp(c)) })
   val defnParser : Parser[Defn] = exprDefnParser or typeDefnParser or procDefnParser
 
-  val progParser : Parser[Prog] = defnParser.star thenS commandParser thenK pEnd appl ({
+  val progParser : Parser[Prog] = defnParser.star thenS processParser thenK pEnd appl ({
     case (defs, e) => new Prog(builtinDefs ++ defs, e)
   })
 
