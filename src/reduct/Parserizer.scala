@@ -47,6 +47,8 @@ import model.ForAll
 import model.TypeLam
 import model.TypeApp
 import model.TypeDefn
+import model.ThrowEx
+import model.TryCatch
 
 object Parserizer {
 
@@ -120,9 +122,13 @@ object Parserizer {
     })
   val typeAppParser : Parser[Expr] =
     pLit("[") thenJ exprParser thenS typeParser thenK pLit("]") appl ({ case (e, t) => TypeApp(e, t) })
+  val throwParser : Parser[Expr] = pLit("throw") thenJ pIdent appl ({ s => ThrowEx(s) })
+  val catchParser : Parser[Expr] = 
+    pLit("try") thenJ exprParser thenK pLit("catch") thenS exprParser appl ({ case (e1, e2) => TryCatch(e1, e2) })
   val exprParser : Parser[Expr] = 
     zParser or sParser or numParser or matchParser or lamParser or appParser or varParser or
-      trivParser or pairParser or inlParser or inrParser or recurseParser or foldParser or typeLamParser or typeAppParser
+      trivParser or pairParser or inlParser or inrParser or recurseParser or foldParser or typeLamParser or 
+      typeAppParser or throwParser or catchParser
 
   val paramListParser : Parser[List[(String, Type)]] =
     (pLit("(") thenJ (pIdent thenK pLit(":") thenS typeParser).intersperse(pLit(",")) thenK pLit(")")) or

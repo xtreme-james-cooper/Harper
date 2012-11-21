@@ -19,6 +19,7 @@ case object StackInR extends Stack("inr (-)")
 case class StackCase(rs : List[Rule]) extends Stack("case (-) of { " + rs.foldRight("")({ case (r1, r2) => r1 + " | " + r2 }) + "}")
 case object StackUnfold extends Stack("unfold (-)")
 case object StackFold extends Stack("fold (-)")
+case class StackHandler(e2 : Expr) extends Stack("try (-) catch " + e2)
 case object PopFrame extends Stack(" ! ")
 
 sealed abstract class PatStack(name : String) {

@@ -40,6 +40,8 @@ import model.ForAll
 import model.TypeApp
 import model.TypeDefn
 import model.Unknown
+import model.ThrowEx
+import model.TryCatch
 
 object Typechecker {
 
@@ -122,6 +124,12 @@ object Typechecker {
     case TypeApp(e, t) => {
       val (ForAll(x, t1), cs) = assembleConstraints(e)(env)(tyenv)
       (t1.swap(x, t.swap(tyenv)), cs)
+    }
+    case ThrowEx(s) => (newUnknown, Nil)
+    case TryCatch(e1, e2) => {
+      val (t1, cs1) = assembleConstraints(e1)(env)(tyenv)
+      val (t2, cs2) = assembleConstraints(e2)(env)(tyenv)
+      (t1, (t1, t2) :: cs1 ++ cs2)
     }
   }
   

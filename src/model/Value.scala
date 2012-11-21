@@ -29,3 +29,4 @@ case class PairVal(e1 : Value, e2 : Value) extends Value("(" + e1 + ", " + e2 + 
 case class InLVal(i : Value) extends Value("inl " + i, InL(i.toExpr))
 case class InRVal(i : Value) extends Value("inr " + i, InR(i.toExpr))
 case class FoldVal(v : Value) extends Value("fold " + v, Fold("", UnitTy, v.toExpr)) 
+case class ExceptionValue(s : String) extends Value("!" + s + "!", ThrowEx(s))

@@ -42,16 +42,20 @@ import model.TypeLam
 import model.TypeApp
 import model.TypeLam
 import model.TypeDefn
+import model.ExceptionValue
+import model.ThrowEx
+import model.TryCatch
 
 object Evaluator {
 
   sealed abstract class Target
   case class Eval(e : Expr) extends Target
   case class Return(v : Value) extends Target
-
+  case class Throw(s : String) extends Target
+  
   //All these are init'd to null, because they are manually set in each pass
   //Conceptually, this is a tail-recursive state-machine; for efficiency reasons we actually modify vars, but it's not strictly necessary
-  var target : Target = null //The expression being evaluated or the value being returned
+  var target : Target = null //The expression being evaluated, the value being returned, or and Excpetion being thrown
   var stack : List[Stack] = null //TODO use for all parts The parts of the expression whose evaluation has been deferred
   var env : List[Map[String, Value]] = null //The stack of variable-binding frames
 
@@ -80,10 +84,14 @@ object Evaluator {
     env = m
     stack = Nil
 
-    while (!(target.isInstanceOf[Return] && stack.isEmpty)) {
+    while (target.isInstanceOf[Eval] || ! stack.isEmpty) {
       eval
     }
-    target.asInstanceOf[Return].v
+    target match {
+      case Return(v) => v
+      case Throw(s) => ExceptionValue(s)
+      case Eval(e) => throw new Exception("returning with evaluation still to be done?")
+    }
   }
 
   def eval : Unit = target match {
@@ -132,6 +140,11 @@ object Evaluator {
       }
       case TypeLam(t, e) => target = Eval(e) //Ignore types
       case TypeApp(e, t) => target = Eval(e) //Ignore types
+      case ThrowEx(s) => target = Throw(s)
+      case TryCatch(e1, e2) => {
+        target = Eval(e1)
+        push(StackHandler(e2))
+      }
     }
     case Return(v) => pop match {
       case StackS => target = Return(SVal(v))
@@ -172,7 +185,12 @@ object Evaluator {
         case FoldVal(v) => target = Return(v)
         case v => throw new Exception("Attempt to unfold a non-recursive value " + v) //typechecker should catch
       }
+      case StackHandler(e2) => () //if a value is returned, skip the handler
       case PopFrame => env = env.tail //'tail' should be safe, pops are added only with a frame
+    }
+    case Throw(e) => pop match {
+      case StackHandler(e2) => target = Eval(e2)
+      case _ => () //if an exception is being thrown, pop stack
     }
   }
 
