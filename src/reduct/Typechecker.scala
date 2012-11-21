@@ -58,90 +58,85 @@ object Typechecker {
     Unknown(typeVarCounter)
   }
 
-  def assembleConstraints(e : Expr)(env : Env)(tyenv : Env) : (Type, List[Constraint]) = {
-    //    println(e + " in " + env)
-    val (t, cs) = assembleConstraints_(e)(env)(tyenv)
-    //    println(t + " and " + cs)
-    (t, cs)
-  }
-
-  def assembleConstraints_(e : Expr)(env : Env)(tyenv : Env) : (Type, List[Constraint]) = e match {
+  def assembleConstraints(e : Expr, env : Env, tyenv : Env) : (Type, List[Constraint]) = e match {
     case Var(x) => (env(x), Nil)
     case Z      => (Nat, Nil)
     case Triv   => (UnitTy, Nil)
     case S(n) => {
-      val (t, cs) = assembleConstraints(n)(env)(tyenv)
+      val (t, cs) = assembleConstraints(n, env, tyenv)
       (t, (t, Nat) :: cs)
     }
     case Lam(v, t, e) => {
       val t1 = t.swap(tyenv)
-      val (t2, cs) = assembleConstraints(e)(env + (v -> t1))(tyenv)
+      val (t2, cs) = assembleConstraints(e, env + (v -> t1), tyenv)
       (Arrow(t1, t2), cs)
     }
     case App(e1, e2) => {
-      val (Arrow(t1, t2), cs1) = assembleConstraints(e1)(env)(tyenv)
-      val (t3, cs2) = assembleConstraints(e2)(env)(tyenv)
-      (t2, (t1, t3) :: cs1 ++ cs2)
+      val hole1 = newUnknown
+      val hole2 = newUnknown
+      val (t1, cs1) = assembleConstraints(e1, env, tyenv)
+      val (t2, cs2) = assembleConstraints(e2, env, tyenv)
+      (hole2, (t1, Arrow(hole1, hole2)) :: (hole1, t2) :: cs1 ++ cs2)
     }
     case Fix(v, e) => {
       val t = env(v) //Guarenteed to be there by construction, since Fixes are only built by defs, which enhance the environment 
-      val (t2, cs) = assembleConstraints(e)(env + (v -> t))(tyenv)
+      val (t2, cs) = assembleConstraints(e, env + (v -> t), tyenv)
       (t, (t, t2) :: cs)
     }
     case PairEx(e1, e2) => {
-      val (t1, cs1) = assembleConstraints(e1)(env)(tyenv)
-      val (t2, cs2) = assembleConstraints(e2)(env)(tyenv)
+      val (t1, cs1) = assembleConstraints(e1, env, tyenv)
+      val (t2, cs2) = assembleConstraints(e2, env, tyenv)
       (Product(t1, t2), cs1 ++ cs2)
     }
     case InL(i) => {
       val hole = newUnknown
-      val (t3, cs) = assembleConstraints(i)(env)(tyenv)
+      val (t3, cs) = assembleConstraints(i, env, tyenv)
       (Sum(t3, hole), cs)
     }
     case InR(i) => {
       val hole = newUnknown
-      val (t3, cs) = assembleConstraints(i)(env)(tyenv)
+      val (t3, cs) = assembleConstraints(i, env, tyenv)
       (Sum(hole, t3), cs)
     }
     case Match(e, rs) => {
-      val (t1, cs1) = assembleConstraints(e)(env)(tyenv)
-      val (t2, cs2) = typeverify(rs)(t1)(env)(tyenv)
+      val (t1, cs1) = assembleConstraints(e, env, tyenv)
+      val (t2, cs2) = typeverify(rs, t1, env, tyenv)
       (t2, cs1 ++ cs2)
     }
     case Fold(mu, t, e) => {
       val t1 = t.swap(tyenv)
-      val (t2, cs) = assembleConstraints(e)(env)(tyenv)
+      val (t2, cs) = assembleConstraints(e, env, tyenv)
       (Inductive(mu, t1), (t2, t1.swap(mu, Inductive(mu, t1))) :: cs)
     }
     case Unfold(e) => {
-      val (Inductive(mu, t), cs) = assembleConstraints(e)(env)(tyenv)
+      val (Inductive(mu, t), cs) = assembleConstraints(e, env, tyenv) //TODO
       (t.swap(mu, Inductive(mu, t)), cs)
     }
     case TypeLam(t, e) => {
-      val (t1, cs) = assembleConstraints(e)(env)(tyenv)
+      val (t1, cs) = assembleConstraints(e, env, tyenv)
       (ForAll(t, t1), cs)
     }
     case TypeApp(e, t) => {
-      val (ForAll(x, t1), cs) = assembleConstraints(e)(env)(tyenv)
+      val (ForAll(x, t1), cs) = assembleConstraints(e, env, tyenv) //TODO
       (t1.swap(x, t.swap(tyenv)), cs)
     }
     case ThrowEx(s) => (newUnknown, Nil)
     case TryCatch(e1, e2) => {
-      val (t1, cs1) = assembleConstraints(e1)(env)(tyenv)
-      val (t2, cs2) = assembleConstraints(e2)(env)(tyenv)
+      val (t1, cs1) = assembleConstraints(e1, env, tyenv)
+      val (t2, cs2) = assembleConstraints(e2, env, tyenv)
       (t1, (t1, t2) :: cs1 ++ cs2)
     }
   }
   
   //t is the type that the pattern is expected to have; under that assumption, it produces some type
-  def typeverify(rs : List[Rule])(t : Type)(env : Env)(tyenv : Env) : (Type, List[Constraint]) =
+  def typeverify(rs : List[Rule], t : Type, env : Env, tyenv : Env) : (Type, List[Constraint]) =
     rs.map(r => typeverify(r, t, env, tyenv)).reduce[(Type, List[Constraint])]({
       case ((t1, cs1), (t2, cs2)) => (t1, (t1, t2) :: cs1 ++ cs2)
     })
 
   def typeverify(r : Rule, t : Type, env : Env, tyenv : Env) : (Type, List[Constraint]) = {
     val (bind, cs1) = typeverify(r.p, t, env, tyenv);
-    val (t0, cs2) = assembleConstraints(r.b)(env ++ bind)(tyenv)
+    val (t0, cs2) = assembleConstraints(r.b, env ++ bind, tyenv)
     (t0, cs1 ++ cs2)
   }
 
@@ -177,8 +172,8 @@ object Typechecker {
     }
   }
 
-  def typecheck(e : Expr)(env : Env)(tyenv : Env) : Type = {
-    val (t, cs) = assembleConstraints(e)(env)(tyenv)
+  def typecheck(e : Expr, env : Env, tyenv : Env) : Type = {
+    val (t, cs) = assembleConstraints(e, env, tyenv)
     verifyConstraints(t, cs)
   }
 
@@ -194,14 +189,14 @@ object Typechecker {
   def updateConstraint(unkId : Int, t2 : Type)(cs : List[Constraint]) : List[Constraint] =
     cs.map({ case (a, b) => (a.swap(unkId, t2), b.swap(unkId, t2)) })
 
-  def typecheck(d : Defn)(env : Env, tyenv : Env) : (Env, Env) = d match {
-    case ExprDefn(n, b, args) => (env + (n -> typecheck(b)(env ++ args.map({ case (v, t) => (v, t.swap(tyenv)) }))(tyenv)), tyenv)
+  def typecheck(d : Defn, env : Env, tyenv : Env) : (Env, Env) = d match {
+    case ExprDefn(n, b, args) => (env + (n -> typecheck(b, env ++ args.map({ case (v, t) => (v, t.swap(tyenv)) }), tyenv)), tyenv)
     case TypeDefn(n, t)       => (env, tyenv + (n -> t.swap(tyenv)))
   }
 
   def typecheck(p : Prog) : Map[String, Type] = {
-    val (finalEnv, finalTyenv) = p.defs.foldLeft(baseEnv)({ case ((env, tyenv), defn) => typecheck(defn)(env, tyenv) })
-    finalEnv + ("main" -> typecheck(p.e)(finalEnv)(finalTyenv))
+    val (finalEnv, finalTyenv) = p.defs.foldLeft(baseEnv)({ case ((env, tyenv), defn) => typecheck(defn, env, tyenv) })
+    finalEnv + ("main" -> typecheck(p.e, finalEnv, finalTyenv))
   }
 
 }
