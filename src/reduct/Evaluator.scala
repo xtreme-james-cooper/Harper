@@ -45,6 +45,14 @@ import model.TypeDefn
 import model.ExceptionValue
 import model.ThrowEx
 import model.TryCatch
+import model.CommandExp
+import model.Ret
+import model.Bind
+import model.Decl
+import model.Get
+import model.SetCmd
+import model.Action
+import model.Command
 
 object Evaluator {
 
@@ -52,15 +60,15 @@ object Evaluator {
   case class Eval(e : Expr) extends Target
   case class Return(v : Value) extends Target
   case class Throw(s : String) extends Target
-  
+
   //All these are init'd to null, because they are manually set in each pass
   //Conceptually, this is a tail-recursive state-machine; for efficiency reasons we actually modify vars, but it's not strictly necessary
   var target : Target = null //The expression being evaluated, the value being returned, or and Excpetion being thrown
-  var stack : List[Stack] = null //TODO use for all parts The parts of the expression whose evaluation has been deferred
+  var stack : List[Stack] = null //The parts of the expression whose evaluation has been deferred
   var env : List[Map[String, Value]] = null //The stack of variable-binding frames
 
   def push(s : Stack) : Unit = stack = s :: stack
-  
+
   def pop : Stack = stack match {
     case Nil => throw new Exception("Should have aborted the eval driver loop!") //This is the escape case
     case s :: stk => {
@@ -68,7 +76,7 @@ object Evaluator {
       s
     }
   }
-  
+
   def getBinding(x : String) : Value = innerGetBinding(env, x)
   def innerGetBinding(e : List[Map[String, Value]], x : String) : Value = e match {
     case Nil                     => throw new Exception("Unbound identifier : " + x) //Typechecker should blow up on this first
@@ -79,18 +87,18 @@ object Evaluator {
   //Crush the env down into a single stack frame for use as a closure
   def flattenEnv : Map[String, Value] = env.foldRight(Map[String, Value]())({ case (m1, m2) => m2 ++ m1 })
 
-  def runEval(t : Target, m : List[Map[String, Value]]) : Value = {
-    target = t
+  def runEval(e : Expr, m : List[Map[String, Value]]) : Value = {
+    target = Eval(e)
     env = m
     stack = Nil
 
-    while (target.isInstanceOf[Eval] || ! stack.isEmpty) {
+    while (target.isInstanceOf[Eval] || !stack.isEmpty) {
       eval
     }
     target match {
       case Return(v) => v
-      case Throw(s) => ExceptionValue(s)
-      case Eval(e) => throw new Exception("returning with evaluation still to be done?")
+      case Throw(s)  => ExceptionValue(s)
+      case Eval(e)   => throw new Exception("returning with evaluation still to be done?")
     }
   }
 
@@ -113,7 +121,7 @@ object Evaluator {
         push(PopFrame)
       }
       case Fix(v, e) => target = Eval(e) //this will explode on CAFs (eg, recursive non-functions) so don't write them
-      case Triv         => target = Return(TrivVal)
+      case Triv      => target = Return(TrivVal)
       case PairEx(e1, e2) => {
         target = Eval(e1)
         push(StackLPair(e2))
@@ -140,11 +148,12 @@ object Evaluator {
       }
       case TypeLam(t, e) => target = Eval(e) //Ignore types
       case TypeApp(e, t) => target = Eval(e) //Ignore types
-      case ThrowEx(s) => target = Throw(s)
+      case ThrowEx(s)    => target = Throw(s)
       case TryCatch(e1, e2) => {
         target = Eval(e1)
         push(StackHandler(e2))
       }
+      case CommandExp(c) => target = Return(Action(c))
     }
     case Return(v) => pop match {
       case StackS => target = Return(SVal(v))
@@ -163,8 +172,8 @@ object Evaluator {
         push(StackRPair(v))
       }
       case StackRPair(v1) => target = Return(PairVal(v1, v))
-      case StackInL => target = Return(InLVal(v))
-      case StackInR => target = Return(InRVal(v))
+      case StackInL       => target = Return(InLVal(v))
+      case StackInR       => target = Return(InRVal(v))
       case StackCase(Nil) => throw new Exception("Empty set of rules?")
       case StackCase(Rule(p, b) :: rs) => {
         rules = rs
@@ -183,14 +192,37 @@ object Evaluator {
       case StackFold => target = Return(FoldVal(v))
       case StackUnfold => v match {
         case FoldVal(v) => target = Return(v)
-        case v => throw new Exception("Attempt to unfold a non-recursive value " + v) //typechecker should catch
+        case v          => throw new Exception("Attempt to unfold a non-recursive value " + v) //typechecker should catch
       }
       case StackHandler(e2) => () //if a value is returned, skip the handler
-      case PopFrame => env = env.tail //'tail' should be safe, pops are added only with a frame
+      case PopFrame         => env = env.tail //'tail' should be safe, pops are added only with a frame
     }
     case Throw(e) => pop match {
       case StackHandler(e2) => target = Eval(e2)
-      case _ => () //if an exception is being thrown, pop stack
+      case _                => () //if an exception is being thrown, pop stack
+    }
+  }
+
+  def executeCommand(c : Command, mem : Map[String, Value], env : List[Map[String, Value]]) : (Value, Map[String, Value]) = c match {
+    case Ret(e) => (runEval(e, env), mem)
+    case Bind(x, e, m) => {
+      val v = runEval(e, env)
+      v match {
+        case Action(m) => {
+          val (v2, mem2) = executeCommand(m, mem, env)
+          executeCommand(m, mem, Map(x -> v2) :: env)
+        }
+        case _ => throw new Exception("Attempt to bind a non-action" + v)
+      }
+    }
+    case Get(x) => (mem(x), mem) //Guarenteed to be there by the typechecker
+    case SetCmd(x, e, m) => {
+      val v = runEval(e, env)
+      executeCommand(m, mem + (x -> v), env)
+    }
+    case Decl(x, e, m) => {
+      val v = runEval(e, env)
+      executeCommand(m, mem + (x -> v), env)
     }
   }
 
@@ -240,10 +272,10 @@ object Evaluator {
   }
 
   def evalDefn(m : Map[String, Value], d : Defn) : Map[String, Value] = d match {
-    case ExprDefn(n, b, args) => m + (n -> runEval(Eval(b), List(m)))
-    case TypeDefn(n, t) => m
+    case ExprDefn(n, b, args) => m + (n -> runEval(b, List(m)))
+    case TypeDefn(n, t)       => m
   }
 
-  def evaluate(p : Prog) : Value = runEval(Eval(p.e), List(p.defs.foldLeft(Map[String, Value]())(evalDefn)))
+  def evaluate(p : Prog) : Value = runEval(p.e, List(p.defs.foldLeft(Map[String, Value]())(evalDefn)))
 
 }

@@ -21,3 +21,4 @@ case class TypeLam(t : String, e : Expr) extends Expr("/\\" + t + " . " + e)
 case class TypeApp(e : Expr, t : Type) extends Expr("[" + e + " " + t + "]")
 case class ThrowEx(s : String) extends Expr("throw " + s) //TODO make exceptions more complicated than just strings
 case class TryCatch(e1 : Expr, e2 : Expr) extends Expr("try " + e1 + " catch " + e2)
+case class CommandExp(c : Command) extends Expr("command " + c)

@@ -42,6 +42,14 @@ import model.TypeDefn
 import model.Unknown
 import model.ThrowEx
 import model.TryCatch
+import model.Command
+import model.CommandExp
+import model.Ret
+import model.Bind
+import model.CommandType
+import model.Decl
+import model.Get
+import model.SetCmd
 
 object Typechecker {
 
@@ -124,8 +132,8 @@ object Typechecker {
       val (t1, cs) = assembleConstraints(e, env, tyenv)
       t1 match {
         case ForAll(x, t2) => (t2.swap(x, t.swap(tyenv)), cs)
-        case Unknown(i)       => throw new Exception("unfolding of bad type " + t1) //TODO
-        case _                => throw new Exception("unfolding of bad type " + t1)
+        case Unknown(i)    => throw new Exception("unfolding of bad type " + t1) //TODO
+        case _             => throw new Exception("unfolding of bad type " + t1)
       }
     }
     case ThrowEx(s) => (newUnknown, Nil)
@@ -134,6 +142,35 @@ object Typechecker {
       val (t2, cs2) = assembleConstraints(e2, env, tyenv)
       (t1, (t1, t2) :: cs1 ++ cs2)
     }
+    case CommandExp(m) => {
+      (Nat, checkCommand(m, env, tyenv, Set()))
+    }
+  }
+
+  //determines if a command has only well-typed expressions in it, and returns any constraints appropriate
+  def checkCommand(c : Command, env : Env, tyenv : Env, assignables : Set[String]) : List[Constraint] = c match {
+    case Ret(e) => {
+      val (t, cs) = assembleConstraints(e, env, tyenv)
+      (t, Nat) :: cs
+    }
+    case Bind(x, e, m) => {
+      val (t, cs1) = assembleConstraints(e, env, tyenv)
+      val cs2 = checkCommand(m, env + (x -> Nat), tyenv, assignables)
+      (t, CommandType) :: cs1 ++ cs2
+    }
+    case Decl(x, e, m) => {
+      val (t, cs1) = assembleConstraints(e, env, tyenv)
+      val cs2 = checkCommand(m, env, tyenv, assignables + x)
+      (t, Nat) :: cs1 ++ cs2
+    }
+    case Get(x) if assignables.contains(x) => Nil
+    case Get(x)                            => throw new Exception("Undeclared assignable " + x)
+    case SetCmd(x, e, m) if assignables.contains(x) => {
+      val (t, cs1) = assembleConstraints(e, env, tyenv)
+      val cs2 = checkCommand(m, env, tyenv, assignables)
+      (t, Nat) :: cs1 ++ cs2
+    }
+    case SetCmd(x, e, m) => throw new Exception("Undeclared assignable " + x)
   }
 
   //t is the type that the pattern is expected to have; under that assumption, it produces some type

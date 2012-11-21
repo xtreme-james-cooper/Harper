@@ -49,6 +49,14 @@ import model.TypeApp
 import model.TypeDefn
 import model.ThrowEx
 import model.TryCatch
+import model.CommandType
+import model.Command
+import model.CommandExp
+import model.Ret
+import model.Bind
+import model.Decl
+import model.Get
+import model.SetCmd
 
 object Parserizer {
 
@@ -125,10 +133,27 @@ object Parserizer {
   val throwParser : Parser[Expr] = pLit("throw") thenJ pIdent appl ({ s => ThrowEx(s) })
   val catchParser : Parser[Expr] =
     pLit("try") thenJ exprParser thenK pLit("catch") thenS exprParser appl ({ case (e1, e2) => TryCatch(e1, e2) })
+  val cmdExprParser : Parser[Expr] = pLit("command") thenJ commandParser appl (c => CommandExp(c))
   val exprParser : Parser[Expr] =
     zParser or sParser or numParser or matchParser or lamParser or appParser or varParser or
       trivParser or pairParser or inlParser or inrParser or recurseParser or foldParser or typeLamParser or
-      typeAppParser or throwParser or catchParser
+      typeAppParser or throwParser or catchParser or cmdExprParser
+
+  val returnParser : Parser[Command] = pLit("return") thenJ exprParser appl (e => Ret(e))
+  val bindParser : Parser[Command] =
+    pLit("bind") thenJ pIdent thenK pLit("<") thenK pLit("-") thenS exprParser thenK pLit(";") thenS commandParser appl ({
+      case ((x, e), m) => Bind(x, e, m)
+    })
+  val declParser : Parser[Command] =
+    pLit("decl") thenJ pIdent thenK pLit(":") thenK pLit("=") thenS exprParser thenK pLit("in") thenS commandParser appl ({
+      case ((x, e), m) => Decl(x, e, m)
+    })
+  val getParser : Parser[Command] = pLit("!") thenJ pIdent appl (x => Get(x))
+  val setParser : Parser[Command] = 
+    pIdent thenK pLit(":") thenK pLit("=") thenS exprParser thenK pLit(";") thenS commandParser appl ({
+      case ((x, e), m) => SetCmd(x, e, m)
+    })
+  val commandParser : Parser[Command] = returnParser or bindParser or declParser or getParser or setParser
 
   val paramListParser : Parser[List[(String, Type)]] =
     (pLit("(") thenJ (pIdent thenK pLit(":") thenS typeParser).intersperse(pLit(",")) thenK pLit(")")) or
@@ -147,7 +172,11 @@ object Parserizer {
   def parse(s : String) : Prog = progParser.run(tokenize(s)).head._1
 
   val builtinDefs : List[Defn] = List(
-    TypeDefn("Unit", UnitTy), TypeDefn("Nat", Nat), TypeDefn("Bool", Sum(UnitTy, UnitTy)), new ExprDefn("true", Nil, TyVar("Bool"), InL(Triv)),
+    TypeDefn("Unit", UnitTy),
+    TypeDefn("Nat", Nat),
+    TypeDefn("Command", CommandType),
+    TypeDefn("Bool", Sum(UnitTy, UnitTy)),
+    new ExprDefn("true", Nil, TyVar("Bool"), InL(Triv)),
     new ExprDefn("false", Nil, TyVar("Bool"), InR(Triv)))
 
 }
