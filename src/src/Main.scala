@@ -83,7 +83,10 @@ object Main {
     test("plus(a : Nat, b : Nat) : Nat = case a of {Z -> b | S(n) -> S(((plus n) b))};"
       + "decl a := 0 in decl b := 3 in bind x <- command !b; a := ((plus x) 2); bind y <- command !a; return y")
 
-        
+    test("plus(a : Nat, b : Nat) : Nat = case a of {Z -> b | S(n) -> S(((plus n) b))};"
+      + "sum(x : Nat, y : Nat) : Nat = decl a := ((plus x) y) in bind b <- command !a; return b;"
+      + "decl a := 2 in decl b := 3 in bind aa <- command !a; bind bb <- command !b; bind x <- ((sum aa) bb); a := ((plus x) 1); bind y <- command !a; return y")
+
   }
 
   def printTest(name : String, value : Any) : Unit = {
@@ -99,8 +102,7 @@ object Main {
     println("type")
     for ((name, typ) <- Typechecker.typecheck(prog)) println(name + " : " + typ)
     println
-    val (v, mem) = Evaluator.evaluate(prog)
-    printTest("value", v)
+    printTest("value", Evaluator.evaluate(prog))
     println("-----------------------------")
 
   }

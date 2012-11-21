@@ -162,7 +162,9 @@ object Parserizer {
     nameParser thenK pLit("=") thenS exprParser thenK pLit(";") appl ({ case (((n, args), t), e) => new ExprDefn(n, args, t, e) })
   val typeDefnParser : Parser[Defn] =
     pLit("type") thenJ pUpperIdent thenK pLit("=") thenS typeParser thenK pLit(";") appl ({ case (n, t) => TypeDefn(n, t) })
-  val defnParser : Parser[Defn] = exprDefnParser or typeDefnParser
+  val procDefnParser : Parser[Defn] =
+    nameParser thenK pLit("=") thenS commandParser thenK pLit(";") appl ({ case (((n, args), t), c) => new ExprDefn(n, args, t, CommandExp(c)) })
+  val defnParser : Parser[Defn] = exprDefnParser or typeDefnParser or procDefnParser
 
   val progParser : Parser[Prog] = defnParser.star thenS commandParser thenK pEnd appl ({
     case (defs, e) => new Prog(builtinDefs ++ defs, e)

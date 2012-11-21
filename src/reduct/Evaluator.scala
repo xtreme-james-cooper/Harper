@@ -102,6 +102,11 @@ object Evaluator {
     }
   }
 
+//  def eval : Unit = {
+//    println(target + " " + env)
+//    eval_
+//  }
+//  
   def eval : Unit = target match {
     case Eval(e) => e match {
       case Var(x) => target = Return(getBinding(x))
@@ -153,7 +158,7 @@ object Evaluator {
         target = Eval(e1)
         push(StackHandler(e2))
       }
-      case CommandExp(c) => target = Return(Action(c))
+      case CommandExp(c) => target = Return(Action(c, flattenEnv))
     }
     case Return(v) => pop match {
       case StackS => target = Return(SVal(v))
@@ -203,16 +208,23 @@ object Evaluator {
     }
   }
 
+//  def executeCommand(c : Command, mem : List[Map[String, Value]], env : List[Map[String, Value]]) : (Value, List[Map[String, Value]]) = {
+//    println(c + " " + mem + " " + env)
+//    val (v, mem2) = executeCommand_(c, mem, env)
+//    println(v + " " + mem2)
+//    (v, mem2)
+//  }
+//  
   def executeCommand(c : Command, mem : List[Map[String, Value]], env : List[Map[String, Value]]) : (Value, List[Map[String, Value]]) = c match {
     case Ret(e) => (runEval(e, env), mem)
     case Bind(x, e, m) => {
       val v = runEval(e, env)
       v match {
-        case Action(m2) => {
-          val (v2, mem2) = executeCommand(m2, mem, env)
+        case Action(m2, closure) => {
+          val (v2, mem2) = executeCommand(m2, mem, closure :: env)
           executeCommand(m, mem2, Map(x -> v2) :: env)
         }
-        case _ => throw new Exception("Attempt to bind a non-action" + v)
+        case _ => throw new Exception("Attempt to bind a non-action " + v)
       }
     }
     case Get(x) => (innerGetBinding(mem, x), mem) //TODO use something other than innerGetBinding Guarenteed to be there by the typechecker
@@ -284,6 +296,6 @@ object Evaluator {
     case TypeDefn(n, t)       => m
   }
 
-  def evaluate(p : Prog) : (Value, List[Map[String, Value]]) = executeCommand(p.e, Nil, List(p.defs.foldLeft(Map[String, Value]())(evalDefn)))
+  def evaluate(p : Prog) : Value = executeCommand(p.e, Nil, List(p.defs.foldLeft(Map[String, Value]())(evalDefn)))._1
 
 }
