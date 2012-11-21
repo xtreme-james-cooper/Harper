@@ -4,6 +4,7 @@ import model.Expr
 import model.Rule
 import model.Pattern
 import model.Value
+import model.Command
 
 sealed abstract class Stack(name : String) {
   override def toString : String = name
@@ -28,3 +29,11 @@ sealed abstract class PatStack(name : String) {
 
 case class PatStackLPair(v2 : Value, p2 : Pattern) extends PatStack("((-), " + v2 + ") ~ ((-), " + p2 + ")")
 case class PatStackRPair(m : Map[String, Value]) extends PatStack("(" + m + ", (-))")
+
+sealed abstract class CmdStack(name : String) {
+  override def toString : String = name
+}
+
+case class CmdStackBind(x : String, m : Command) extends CmdStack(x + " <- (-); " + m)
+case object PopBlock extends CmdStack(" ! ")
+

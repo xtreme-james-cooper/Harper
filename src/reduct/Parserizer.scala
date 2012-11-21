@@ -68,6 +68,10 @@ object Parserizer {
     case Some(c)                   => c.toString :: tokenize(s.tail)
   }
 
+  /*
+   * Types
+   */
+  
   val arrowParser : Parser[Type] =
     pLit("(") thenJ typeParser thenK pLit("-") thenK pLit(">") thenS typeParser thenK pLit(")") appl ({ case (t1, t2) => Arrow(t1, t2) })
   val productParser : Parser[Type] =
@@ -81,6 +85,10 @@ object Parserizer {
   val typeParser : Parser[Type] =
     arrowParser or productParser or sumParser or inductiveParser or forallParser or varTyParser or synonymParser
 
+  /*
+   * Patterns
+   */
+    
   val wildPatParser : Parser[Pattern] = pLit("_") appl (_ => WildPat)
   val varPatParser : Parser[Pattern] = pIdent appl (s => VarPat(s))
   val zPatParser : Parser[Pattern] = pLit("Z") appl (_ => ZPat)
@@ -97,6 +105,10 @@ object Parserizer {
 
   val rulesParser : Parser[List[Rule]] = ruleParser thenS (pLit("|") thenJ ruleParser).star appl ({ case (r, rs) => r :: rs })
 
+  /*
+   * Exprs
+   */
+  
   val varParser : Parser[Expr] = pIdent appl (s => Var(s))
   val zParser : Parser[Expr] = pLit("Z") appl (s => Z)
   val sParser : Parser[Expr] = pLit("S") thenJ pLit("(") thenJ exprParser thenK pLit(")") appl (e => S(e))
@@ -139,6 +151,10 @@ object Parserizer {
       trivParser or pairParser or inlParser or inrParser or recurseParser or foldParser or typeLamParser or
       typeAppParser or throwParser or catchParser or cmdExprParser
 
+  /*
+   * Commands
+   */
+      
   val returnParser : Parser[Command] = pLit("return") thenJ exprParser appl (e => Ret(e))
   val bindParser : Parser[Command] =
     pLit("bind") thenJ pIdent thenK pLit("<") thenK pLit("-") thenS exprParser thenK pLit(";") thenS commandParser appl ({
@@ -155,6 +171,10 @@ object Parserizer {
     })
   val commandParser : Parser[Command] = returnParser or bindParser or declParser or getParser or setParser
 
+  /*
+   * Decls
+   */
+  
   val paramListParser : Parser[List[(String, Type)]] =
     (pLit("(") thenJ (pIdent thenK pLit(":") thenS typeParser).intersperse(pLit(",")) thenK pLit(")")) or
       (pEmpty appl (_ => Nil))

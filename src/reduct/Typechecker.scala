@@ -66,6 +66,27 @@ object Typechecker {
     Unknown(typeVarCounter)
   }
 
+  def verifyConstraints(t : Type, cs : List[Constraint]) : Type = cs.flatMap({ case (t1, t2) => t1 ~=~ t2 }) match {
+    case Nil                           => t
+    case (Unknown(i), b) :: cs         => verifyConstraints(t.swap(i, b), cs.map({ case (x, y) => (x.swap(i, b), y.swap(i, b)) }))
+    case (a, Unknown(i)) :: cs         => verifyConstraints(t.swap(i, a), cs.map({ case (x, y) => (x.swap(i, a), y.swap(i, a)) }))
+    case (t1, t2) :: cs if !(t1 == t2) => throw new Exception("Constraint failure: " + t1 + " != " + t2)
+    case (t1, t2) :: cs                => verifyConstraints(t, cs)
+  }
+
+  //Replace unknowns that we have information about
+  def updateConstraint(unkId : Int, t2 : Type)(cs : List[Constraint]) : List[Constraint] =
+    cs.map({ case (a, b) => (a.swap(unkId, t2), b.swap(unkId, t2)) })
+
+  /*
+   * Expr
+   */
+
+  def typeCheckExpr(e : Expr, env : Env, tyenv : Env, as : Env) : Type = {
+    val (t, cs) = typeExpr(e, env, tyenv, as)
+    verifyConstraints(t, cs)
+  }
+
   def typeExpr(e : Expr, env : Env, tyenv : Env, as : Env) : (Type, List[Constraint]) = e match {
     case Var(x) => (env(x), Nil)
     case Z      => (Nat, Nil)
@@ -145,6 +166,10 @@ object Typechecker {
     case CommandExp(m) => typeCommand(m, env, tyenv, as)
   }
 
+  /*
+   * Command
+   */
+
   def typeCheckCommand(c : Command, env : Env, tyenv : Env) : Type = {
     val (t, cs) = typeCommand(c, env, tyenv, Map())
     verifyConstraints(t, cs)
@@ -175,6 +200,10 @@ object Typechecker {
     }
     case SetCmd(x, e, m) => throw new Exception("Undeclared assignable " + x + " " + assignables)
   }
+
+  /*
+   * Patterns
+   */
 
   //t is the type that the pattern is expected to have; under that assumption, it produces some type
   def typeRules(rs : List[Rule], t : Type, env : Env, tyenv : Env, as : Env) : (Type, List[Constraint]) =
@@ -220,22 +249,9 @@ object Typechecker {
     }
   }
 
-  def typeCheckExpr(e : Expr, env : Env, tyenv : Env, as : Env) : Type = {
-    val (t, cs) = typeExpr(e, env, tyenv, as)
-    verifyConstraints(t, cs)
-  }
-
-  def verifyConstraints(t : Type, cs : List[Constraint]) : Type = cs.flatMap({ case (t1, t2) => t1 ~=~ t2 }) match {
-    case Nil                           => t
-    case (Unknown(i), b) :: cs         => verifyConstraints(t.swap(i, b), cs.map({ case (x, y) => (x.swap(i, b), y.swap(i, b)) }))
-    case (a, Unknown(i)) :: cs         => verifyConstraints(t.swap(i, a), cs.map({ case (x, y) => (x.swap(i, a), y.swap(i, a)) }))
-    case (t1, t2) :: cs if !(t1 == t2) => throw new Exception("Constraint failure: " + t1 + " != " + t2)
-    case (t1, t2) :: cs                => verifyConstraints(t, cs)
-  }
-
-  //Replace unknowns that we have information about
-  def updateConstraint(unkId : Int, t2 : Type)(cs : List[Constraint]) : List[Constraint] =
-    cs.map({ case (a, b) => (a.swap(unkId, t2), b.swap(unkId, t2)) })
+  /*
+   * Defn/Prog
+   */
 
   def typeCheckDefn(d : Defn, env : Env, tyenv : Env) : (Env, Env) = d match {
     case ExprDefn(n, b, args) => (env + (n -> typeCheckExpr(b, env ++ args.map({ case (v, t) => (v, t.swap(tyenv)) }), tyenv, Map())), tyenv)
