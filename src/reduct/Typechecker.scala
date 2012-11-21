@@ -109,16 +109,24 @@ object Typechecker {
       (Inductive(mu, t1), (t2, t1.swap(mu, Inductive(mu, t1))) :: cs)
     }
     case Unfold(e) => {
-      val (Inductive(mu, t), cs) = assembleConstraints(e, env, tyenv) //TODO
-      (t.swap(mu, Inductive(mu, t)), cs)
+      val (t1, cs) = assembleConstraints(e, env, tyenv)
+      t1 match {
+        case Inductive(mu, t) => (t.swap(mu, Inductive(mu, t)), cs)
+        case Unknown(i)       => throw new Exception("unfolding of bad type " + t1) //TODO
+        case _                => throw new Exception("unfolding of bad type " + t1)
+      }
     }
     case TypeLam(t, e) => {
       val (t1, cs) = assembleConstraints(e, env, tyenv)
       (ForAll(t, t1), cs)
     }
     case TypeApp(e, t) => {
-      val (ForAll(x, t1), cs) = assembleConstraints(e, env, tyenv) //TODO
-      (t1.swap(x, t.swap(tyenv)), cs)
+      val (t1, cs) = assembleConstraints(e, env, tyenv)
+      t1 match {
+        case ForAll(x, t2) => (t2.swap(x, t.swap(tyenv)), cs)
+        case Unknown(i)       => throw new Exception("unfolding of bad type " + t1) //TODO
+        case _                => throw new Exception("unfolding of bad type " + t1)
+      }
     }
     case ThrowEx(s) => (newUnknown, Nil)
     case TryCatch(e1, e2) => {
@@ -127,7 +135,7 @@ object Typechecker {
       (t1, (t1, t2) :: cs1 ++ cs2)
     }
   }
-  
+
   //t is the type that the pattern is expected to have; under that assumption, it produces some type
   def typeverify(rs : List[Rule], t : Type, env : Env, tyenv : Env) : (Type, List[Constraint]) =
     rs.map(r => typeverify(r, t, env, tyenv)).reduce[(Type, List[Constraint])]({
