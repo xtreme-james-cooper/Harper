@@ -50,11 +50,6 @@ import model.Decl
 import model.Get
 import model.SetCmd
 import model.CommandTy
-import model.Process
-import model.Stop
-import model.Atomic
-import model.Parallel
-import model.NewChannel
 
 object Typechecker {
 
@@ -69,27 +64,6 @@ object Typechecker {
   def newUnknown : Type = {
     typeVarCounter = typeVarCounter + 1
     Unknown(typeVarCounter)
-  }
-
-  def verifyConstraints(t : Type, cs : List[Constraint]) : Type = cs.flatMap({ case (t1, t2) => t1 ~=~ t2 }) match {
-    case Nil                           => t
-    case (Unknown(i), b) :: cs         => verifyConstraints(t.swap(i, b), cs.map({ case (x, y) => (x.swap(i, b), y.swap(i, b)) }))
-    case (a, Unknown(i)) :: cs         => verifyConstraints(t.swap(i, a), cs.map({ case (x, y) => (x.swap(i, a), y.swap(i, a)) }))
-    case (t1, t2) :: cs if !(t1 == t2) => throw new Exception("Constraint failure: " + t1 + " != " + t2)
-    case (t1, t2) :: cs                => verifyConstraints(t, cs)
-  }
-
-  //Replace unknowns that we have information about
-  def updateConstraint(unkId : Int, t2 : Type)(cs : List[Constraint]) : List[Constraint] =
-    cs.map({ case (a, b) => (a.swap(unkId, t2), b.swap(unkId, t2)) })
-
-  /*
-   * Typing rules for Exprs
-   */
-
-  def typeCheckExpr(e : Expr, env : Env, tyenv : Env, as : Env) : Type = {
-    val (t, cs) = typeExpr(e, env, tyenv, as)
-    verifyConstraints(t, cs)
   }
 
   def typeExpr(e : Expr, env : Env, tyenv : Env, as : Env) : (Type, List[Constraint]) = e match {
@@ -171,10 +145,6 @@ object Typechecker {
     case CommandExp(m) => typeCommand(m, env, tyenv, as)
   }
 
-  /*
-   * Typing rules for Commands
-   */
-
   def typeCheckCommand(c : Command, env : Env, tyenv : Env) : Type = {
     val (t, cs) = typeCommand(c, env, tyenv, Map())
     verifyConstraints(t, cs)
@@ -204,22 +174,6 @@ object Typechecker {
       (t2, cs1 ++ cs2)
     }
     case SetCmd(x, e, m) => throw new Exception("Undeclared assignable " + x + " " + assignables)
-  }
-
-  /*
-   * Typing rules for Patterns
-   */
-  
-  def typeCheckProcess(p : Process, env : Env, tyenv : Env) : Type = {
-    val cs = typeProcess(p, env, tyenv, Map())
-    verifyConstraints(UnitTy, cs)
-  }
-  
-  def typeProcess(p : Process, env : Env, tyenv : Env, channels : Env) : List[Constraint] = p match {
-    case Stop => Nil
-    case Atomic(m) => typeCommand(m, env, tyenv, Map())._2
-    case Parallel(p1, p2) => typeProcess(p1, env, tyenv, channels) ++ typeProcess(p2, env, tyenv, channels)
-    case NewChannel(a, t, p) => typeProcess(p, env, tyenv, channels + (a -> t))
   }
 
   //t is the type that the pattern is expected to have; under that assumption, it produces some type
@@ -266,13 +220,22 @@ object Typechecker {
     }
   }
 
-  /*
-   * Typing rules Processes
-   */
-  
-  /*
-   * Typing rules for Defns/Progs
-   */
+  def typeCheckExpr(e : Expr, env : Env, tyenv : Env, as : Env) : Type = {
+    val (t, cs) = typeExpr(e, env, tyenv, as)
+    verifyConstraints(t, cs)
+  }
+
+  def verifyConstraints(t : Type, cs : List[Constraint]) : Type = cs.flatMap({ case (t1, t2) => t1 ~=~ t2 }) match {
+    case Nil                           => t
+    case (Unknown(i), b) :: cs         => verifyConstraints(t.swap(i, b), cs.map({ case (x, y) => (x.swap(i, b), y.swap(i, b)) }))
+    case (a, Unknown(i)) :: cs         => verifyConstraints(t.swap(i, a), cs.map({ case (x, y) => (x.swap(i, a), y.swap(i, a)) }))
+    case (t1, t2) :: cs if !(t1 == t2) => throw new Exception("Constraint failure: " + t1 + " != " + t2)
+    case (t1, t2) :: cs                => verifyConstraints(t, cs)
+  }
+
+  //Replace unknowns that we have information about
+  def updateConstraint(unkId : Int, t2 : Type)(cs : List[Constraint]) : List[Constraint] =
+    cs.map({ case (a, b) => (a.swap(unkId, t2), b.swap(unkId, t2)) })
 
   def typeCheckDefn(d : Defn, env : Env, tyenv : Env) : (Env, Env) = d match {
     case ExprDefn(n, b, args) => (env + (n -> typeCheckExpr(b, env ++ args.map({ case (v, t) => (v, t.swap(tyenv)) }), tyenv, Map())), tyenv)
@@ -281,7 +244,7 @@ object Typechecker {
 
   def typeCheckProg(p : Prog) : Map[String, Type] = {
     val (finalEnv, finalTyenv) = p.defs.foldLeft(baseEnv)({ case ((env, tyenv), defn) => typeCheckDefn(defn, env, tyenv) })
-    finalEnv + ("main" -> typeCheckProcess(p.e, finalEnv, finalTyenv))
+    finalEnv + ("main" -> typeCheckCommand(p.e, finalEnv, finalTyenv))
   }
 
 }

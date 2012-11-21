@@ -15,6 +15,6 @@ case class ExprDefn(name : String, body : Expr, args : List[(String, Type)]) ext
 
 case class TypeDefn(name : String, body : Type) extends Defn("type " + name + " = " + body + "\n")
 
-class Prog(val defs : List[Defn], val e : Process) {
+class Prog(val defs : List[Defn], val e : Command) {
   override def toString : String = defs.foldLeft("")({ case (s, defn) => s + defn }) + e
 }
