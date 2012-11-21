@@ -203,7 +203,7 @@ object Evaluator {
     }
   }
 
-  def executeCommand(c : Command, mem : Map[String, Value], env : List[Map[String, Value]]) : (Value, Map[String, Value]) = c match {
+  def executeCommand(c : Command, mem : List[Map[String, Value]], env : List[Map[String, Value]]) : (Value, List[Map[String, Value]]) = c match {
     case Ret(e) => (runEval(e, env), mem)
     case Bind(x, e, m) => {
       val v = runEval(e, env)
@@ -215,17 +215,25 @@ object Evaluator {
         case _ => throw new Exception("Attempt to bind a non-action" + v)
       }
     }
-    case Get(x) => (mem(x), mem) //Guarenteed to be there by the typechecker
+    case Get(x) => (innerGetBinding(mem, x), mem) //TODO use something other than innerGetBinding Guarenteed to be there by the typechecker
     case SetCmd(x, e, m) => {
       val v = runEval(e, env)
-      executeCommand(m, mem + (x -> v), env)
+      executeCommand(m, updateMemory(x, v, mem), env)
     }
     case Decl(x, e, m) => {
       val v = runEval(e, env)
-      executeCommand(m, mem + (x -> v), env)
+      val (v2, mem2) = executeCommand(m, Map(x -> v) :: mem, env)
+      (v2, mem2.tail) //Safe to pull out tail because the only change to mem's blocks-discipline is right above
     }
   }
 
+  //Update the outermost stack-bound
+  def updateMemory(x : String, v : Value, mem : List[Map[String, Value]]) : List[Map[String, Value]] = mem match {
+    case Nil                     => throw new Exception("Unbound identifier : " + x) //Typechecker should blow up on this first
+    case m :: e if m.contains(x) => m + (x -> v) :: e
+    case m :: e                  => m :: updateMemory(x, v, e)
+  }
+  
   sealed abstract class MatchingTarget
   case class Against(p : Pattern, v : Value) extends MatchingTarget
   case class Binding(b : Map[String, Value]) extends MatchingTarget
@@ -276,6 +284,6 @@ object Evaluator {
     case TypeDefn(n, t)       => m
   }
 
-  def evaluate(p : Prog) : Value = runEval(p.e, List(p.defs.foldLeft(Map[String, Value]())(evalDefn)))
+  def evaluate(p : Prog) : (Value, List[Map[String, Value]]) = executeCommand(p.e, Nil, List(p.defs.foldLeft(Map[String, Value]())(evalDefn)))
 
 }

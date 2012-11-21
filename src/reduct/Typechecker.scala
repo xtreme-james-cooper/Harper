@@ -147,6 +147,8 @@ object Typechecker {
     }
   }
 
+  def checkCommand(c : Command, env : Env, tyenv : Env) : Type = verifyConstraints(Nat, checkCommand(c, env, tyenv, Set()))
+  
   //determines if a command has only well-typed expressions in it, and returns any constraints appropriate
   def checkCommand(c : Command, env : Env, tyenv : Env, assignables : Set[String]) : List[Constraint] = c match {
     case Ret(e) => {
@@ -241,7 +243,7 @@ object Typechecker {
 
   def typecheck(p : Prog) : Map[String, Type] = {
     val (finalEnv, finalTyenv) = p.defs.foldLeft(baseEnv)({ case ((env, tyenv), defn) => typecheck(defn, env, tyenv) })
-    finalEnv + ("main" -> typecheck(p.e, finalEnv, finalTyenv))
+    finalEnv + ("main" -> checkCommand(p.e, finalEnv, finalTyenv))
   }
 
 }

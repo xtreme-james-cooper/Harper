@@ -165,7 +165,7 @@ object Parserizer {
     pLit("type") thenJ pUpperIdent thenK pLit("=") thenS typeParser thenK pLit(";") appl ({ case (n, t) => TypeDefn(n, t) })
   val defnParser : Parser[Defn] = exprDefnParser or typeDefnParser
 
-  val progParser : Parser[Prog] = defnParser.star thenS exprParser thenK pEnd appl ({
+  val progParser : Parser[Prog] = defnParser.star thenS commandParser thenK pEnd appl ({
     case (defs, e) => new Prog(builtinDefs ++ defs, e)
   })
 
