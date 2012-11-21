@@ -1,4 +1,4 @@
-package reduct
+package reduction
 
 sealed abstract class Target[E, V]
 case class Eval[E, V](e : E) extends Target[E, V]

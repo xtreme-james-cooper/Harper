@@ -15,6 +15,20 @@ case class ExprDefn(name : String, body : Expr, args : List[(String, Type)]) ext
 
 case class TypeDefn(name : String, body : Type) extends Defn("type " + name + " = " + body + "\n")
 
-class Prog(val defs : List[Defn], val e : Command) {
+object Prog {
+
+  val builtinDefs : List[Defn] = List(
+    TypeDefn("Unit", UnitTy),
+    TypeDefn("Nat", Nat),
+    TypeDefn("Bool", Sum(UnitTy, UnitTy)),
+    new ExprDefn("true", Nil, TyVar("Bool"), InL(Triv)),
+    new ExprDefn("false", Nil, TyVar("Bool"), InR(Triv)))
+
+}
+
+class Prog(newDefs : List[Defn], val e : Command) {
+
+  val defs = Prog.builtinDefs ++ newDefs
+
   override def toString : String = defs.foldLeft("")({ case (s, defn) => s + defn }) + e
 }
