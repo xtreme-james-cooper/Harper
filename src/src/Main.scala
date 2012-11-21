@@ -1,6 +1,6 @@
 package src
 
-import reduct.Typechecker
+import typechecker.Typechecker
 import reduct.ProgEvaluator
 
 object Main {

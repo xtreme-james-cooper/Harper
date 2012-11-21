@@ -1,55 +1,8 @@
-package reduct
+package typechecker
 
-import model.Type
-import model.Var
-import model.Expr
-import model.S
-import model.Z
-import model.Nat
-import model.App
-import model.Lam
-import model.Prog
-import model.Defn
-import model.ExprDefn
-import model.Fix
-import model.Arrow
-import model.Triv
-import model.UnitTy
-import model.PairEx
-import model.Product
-import model.InL
-import model.InR
-import model.Sum
-import model.Match
-import model.Rule
-import model.Pattern
-import model.WildPat
-import model.VarPat
-import model.TrivPat
-import model.SPat
-import model.PairPat
-import model.ZPat
-import model.InLPat
-import model.InRPat
-import model.TyVar
-import model.Fold
-import model.Inductive
-import model.Unfold
-import model.TypeLam
-import model.ForAll
-import model.TypeApp
-import model.TypeDefn
-import model.Unknown
-import model.ThrowEx
-import model.TryCatch
-import model.Command
-import model.CommandExp
-import model.Ret
-import model.Bind
-import model.Decl
-import model.Get
-import model.SetCmd
-import model.CommandTy
+import model.{ZPat, Z, WildPat, VarPat, Var, Unknown, UnitTy, Unfold, TypeLam, TypeDefn, TypeApp, Type, TryCatch, TrivPat, Triv, ThrowEx, Sum,
+  SetCmd, SPat, S, Rule, Ret, Prog, Product, Pattern, PairPat, PairEx, Nat, Match, Lam, Inductive, InRPat, InR, InLPat, InL, Get, ForAll, Fold, 
+  Fix, ExprDefn, Expr, Defn, Decl, CommandTy, CommandExp, Command, Bind, Arrow, App}
 
 object Typechecker {
 
