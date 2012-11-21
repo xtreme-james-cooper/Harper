@@ -46,7 +46,6 @@ import model.Command
 import model.CommandExp
 import model.Ret
 import model.Bind
-import model.CommandType
 import model.Decl
 import model.Get
 import model.SetCmd
@@ -66,58 +65,58 @@ object Typechecker {
     Unknown(typeVarCounter)
   }
 
-  def assembleConstraints(e : Expr, env : Env, tyenv : Env) : (Type, List[Constraint]) = e match {
+  def assembleConstraints(e : Expr, env : Env, tyenv : Env, as : Set[String]) : (Type, List[Constraint]) = e match {
     case Var(x) => (env(x), Nil)
     case Z      => (Nat, Nil)
     case Triv   => (UnitTy, Nil)
     case S(n) => {
-      val (t, cs) = assembleConstraints(n, env, tyenv)
+      val (t, cs) = assembleConstraints(n, env, tyenv, as)
       (t, (t, Nat) :: cs)
     }
     case Lam(v, t, e) => {
       val t1 = t.swap(tyenv)
-      val (t2, cs) = assembleConstraints(e, env + (v -> t1), tyenv)
+      val (t2, cs) = assembleConstraints(e, env + (v -> t1), tyenv, as)
       (Arrow(t1, t2), cs)
     }
     case App(e1, e2) => {
       val hole1 = newUnknown
       val hole2 = newUnknown
-      val (t1, cs1) = assembleConstraints(e1, env, tyenv)
-      val (t2, cs2) = assembleConstraints(e2, env, tyenv)
+      val (t1, cs1) = assembleConstraints(e1, env, tyenv, as)
+      val (t2, cs2) = assembleConstraints(e2, env, tyenv, as)
       (hole2, (t1, Arrow(hole1, hole2)) :: (hole1, t2) :: cs1 ++ cs2)
     }
     case Fix(v, e) => {
       val t = env(v) //Guarenteed to be there by construction, since Fixes are only built by defs, which enhance the environment 
-      val (t2, cs) = assembleConstraints(e, env + (v -> t), tyenv)
+      val (t2, cs) = assembleConstraints(e, env + (v -> t), tyenv, as)
       (t, (t, t2) :: cs)
     }
     case PairEx(e1, e2) => {
-      val (t1, cs1) = assembleConstraints(e1, env, tyenv)
-      val (t2, cs2) = assembleConstraints(e2, env, tyenv)
+      val (t1, cs1) = assembleConstraints(e1, env, tyenv, as)
+      val (t2, cs2) = assembleConstraints(e2, env, tyenv, as)
       (Product(t1, t2), cs1 ++ cs2)
     }
     case InL(i) => {
       val hole = newUnknown
-      val (t3, cs) = assembleConstraints(i, env, tyenv)
+      val (t3, cs) = assembleConstraints(i, env, tyenv, as)
       (Sum(t3, hole), cs)
     }
     case InR(i) => {
       val hole = newUnknown
-      val (t3, cs) = assembleConstraints(i, env, tyenv)
+      val (t3, cs) = assembleConstraints(i, env, tyenv, as)
       (Sum(hole, t3), cs)
     }
     case Match(e, rs) => {
-      val (t1, cs1) = assembleConstraints(e, env, tyenv)
-      val (t2, cs2) = typeverify(rs, t1, env, tyenv)
+      val (t1, cs1) = assembleConstraints(e, env, tyenv, as)
+      val (t2, cs2) = typeverify(rs, t1, env, tyenv, as)
       (t2, cs1 ++ cs2)
     }
     case Fold(mu, t, e) => {
       val t1 = t.swap(tyenv)
-      val (t2, cs) = assembleConstraints(e, env, tyenv)
+      val (t2, cs) = assembleConstraints(e, env, tyenv, as)
       (Inductive(mu, t1), (t2, t1.swap(mu, Inductive(mu, t1))) :: cs)
     }
     case Unfold(e) => {
-      val (t1, cs) = assembleConstraints(e, env, tyenv)
+      val (t1, cs) = assembleConstraints(e, env, tyenv, as)
       t1 match {
         case Inductive(mu, t) => (t.swap(mu, Inductive(mu, t)), cs)
         case Unknown(i)       => throw new Exception("unfolding of bad type " + t1) //TODO
@@ -125,11 +124,11 @@ object Typechecker {
       }
     }
     case TypeLam(t, e) => {
-      val (t1, cs) = assembleConstraints(e, env, tyenv)
+      val (t1, cs) = assembleConstraints(e, env, tyenv, as)
       (ForAll(t, t1), cs)
     }
     case TypeApp(e, t) => {
-      val (t1, cs) = assembleConstraints(e, env, tyenv)
+      val (t1, cs) = assembleConstraints(e, env, tyenv, as)
       t1 match {
         case ForAll(x, t2) => (t2.swap(x, t.swap(tyenv)), cs)
         case Unknown(i)    => throw new Exception("unfolding of bad type " + t1) //TODO
@@ -138,37 +137,36 @@ object Typechecker {
     }
     case ThrowEx(s) => (newUnknown, Nil)
     case TryCatch(e1, e2) => {
-      val (t1, cs1) = assembleConstraints(e1, env, tyenv)
-      val (t2, cs2) = assembleConstraints(e2, env, tyenv)
+      val (t1, cs1) = assembleConstraints(e1, env, tyenv, as)
+      val (t2, cs2) = assembleConstraints(e2, env, tyenv, as)
       (t1, (t1, t2) :: cs1 ++ cs2)
     }
     case CommandExp(m) => {
-      (Nat, checkCommand(m, env, tyenv, Set()))
+      (Nat, checkCommand(m, env, tyenv, as))
     }
   }
 
   def checkCommand(c : Command, env : Env, tyenv : Env) : Type = verifyConstraints(Nat, checkCommand(c, env, tyenv, Set()))
-  
-  //determines if a command has only well-typed expressions in it, and returns any constraints appropriate
+
   def checkCommand(c : Command, env : Env, tyenv : Env, assignables : Set[String]) : List[Constraint] = c match {
     case Ret(e) => {
-      val (t, cs) = assembleConstraints(e, env, tyenv)
+      val (t, cs) = assembleConstraints(e, env, tyenv, assignables)
       (t, Nat) :: cs
     }
     case Bind(x, e, m) => {
-      val (t, cs1) = assembleConstraints(e, env, tyenv)
+      val (t, cs1) = assembleConstraints(e, env, tyenv, assignables)
       val cs2 = checkCommand(m, env + (x -> Nat), tyenv, assignables)
-      (t, CommandType) :: cs1 ++ cs2
+      (t, Nat) :: cs1 ++ cs2
     }
     case Decl(x, e, m) => {
-      val (t, cs1) = assembleConstraints(e, env, tyenv)
+      val (t, cs1) = assembleConstraints(e, env, tyenv, assignables)
       val cs2 = checkCommand(m, env, tyenv, assignables + x)
       (t, Nat) :: cs1 ++ cs2
     }
     case Get(x) if assignables.contains(x) => Nil
-    case Get(x)                            => throw new Exception("Undeclared assignable " + x)
+    case Get(x)                            => throw new Exception("Undeclared assignable " + x + " " + assignables)
     case SetCmd(x, e, m) if assignables.contains(x) => {
-      val (t, cs1) = assembleConstraints(e, env, tyenv)
+      val (t, cs1) = assembleConstraints(e, env, tyenv, assignables)
       val cs2 = checkCommand(m, env, tyenv, assignables)
       (t, Nat) :: cs1 ++ cs2
     }
@@ -176,14 +174,14 @@ object Typechecker {
   }
 
   //t is the type that the pattern is expected to have; under that assumption, it produces some type
-  def typeverify(rs : List[Rule], t : Type, env : Env, tyenv : Env) : (Type, List[Constraint]) =
-    rs.map(r => typeverify(r, t, env, tyenv)).reduce[(Type, List[Constraint])]({
+  def typeverify(rs : List[Rule], t : Type, env : Env, tyenv : Env, as : Set[String]) : (Type, List[Constraint]) =
+    rs.map(r => typeverify(r, t, env, tyenv, as)).reduce[(Type, List[Constraint])]({
       case ((t1, cs1), (t2, cs2)) => (t1, (t1, t2) :: cs1 ++ cs2)
     })
 
-  def typeverify(r : Rule, t : Type, env : Env, tyenv : Env) : (Type, List[Constraint]) = {
+  def typeverify(r : Rule, t : Type, env : Env, tyenv : Env, as : Set[String]) : (Type, List[Constraint]) = {
     val (bind, cs1) = typeverify(r.p, t, env, tyenv);
-    val (t0, cs2) = assembleConstraints(r.b, env ++ bind, tyenv)
+    val (t0, cs2) = assembleConstraints(r.b, env ++ bind, tyenv, as)
     (t0, cs1 ++ cs2)
   }
 
@@ -219,8 +217,8 @@ object Typechecker {
     }
   }
 
-  def typecheck(e : Expr, env : Env, tyenv : Env) : Type = {
-    val (t, cs) = assembleConstraints(e, env, tyenv)
+  def typecheck(e : Expr, env : Env, tyenv : Env, as : Set[String]) : Type = {
+    val (t, cs) = assembleConstraints(e, env, tyenv, as)
     verifyConstraints(t, cs)
   }
 
@@ -237,7 +235,7 @@ object Typechecker {
     cs.map({ case (a, b) => (a.swap(unkId, t2), b.swap(unkId, t2)) })
 
   def typecheck(d : Defn, env : Env, tyenv : Env) : (Env, Env) = d match {
-    case ExprDefn(n, b, args) => (env + (n -> typecheck(b, env ++ args.map({ case (v, t) => (v, t.swap(tyenv)) }), tyenv)), tyenv)
+    case ExprDefn(n, b, args) => (env + (n -> typecheck(b, env ++ args.map({ case (v, t) => (v, t.swap(tyenv)) }), tyenv, Set())), tyenv)
     case TypeDefn(n, t)       => (env, tyenv + (n -> t.swap(tyenv)))
   }
 

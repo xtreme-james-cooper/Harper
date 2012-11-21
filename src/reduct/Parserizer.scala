@@ -49,7 +49,6 @@ import model.TypeApp
 import model.TypeDefn
 import model.ThrowEx
 import model.TryCatch
-import model.CommandType
 import model.Command
 import model.CommandExp
 import model.Ret
@@ -174,7 +173,6 @@ object Parserizer {
   val builtinDefs : List[Defn] = List(
     TypeDefn("Unit", UnitTy),
     TypeDefn("Nat", Nat),
-    TypeDefn("Command", CommandType),
     TypeDefn("Bool", Sum(UnitTy, UnitTy)),
     new ExprDefn("true", Nil, TyVar("Bool"), InL(Triv)),
     new ExprDefn("false", Nil, TyVar("Bool"), InR(Triv)))

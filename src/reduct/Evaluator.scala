@@ -208,9 +208,9 @@ object Evaluator {
     case Bind(x, e, m) => {
       val v = runEval(e, env)
       v match {
-        case Action(m) => {
-          val (v2, mem2) = executeCommand(m, mem, env)
-          executeCommand(m, mem, Map(x -> v2) :: env)
+        case Action(m2) => {
+          val (v2, mem2) = executeCommand(m2, mem, env)
+          executeCommand(m, mem2, Map(x -> v2) :: env)
         }
         case _ => throw new Exception("Attempt to bind a non-action" + v)
       }

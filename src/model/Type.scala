@@ -17,7 +17,6 @@ sealed abstract class Type(name : => String) {
     case ForAll(y, t1) if y == mu    => ForAll(y, t1)
     case ForAll(y, t1)               => ForAll(y, t1.swap(mu, x))
     case Unknown(id)                 => Unknown(id)
-    case CommandType                 => CommandType
   }
 
   //replace unknown #i with x
@@ -32,7 +31,6 @@ sealed abstract class Type(name : => String) {
     case ForAll(y, t1)          => ForAll(y, t1.swap(i, x))
     case Unknown(id) if i == id => x
     case Unknown(id)            => Unknown(id)
-    case CommandType            => CommandType
   }
 
   def swap(tyenv : Map[String, Type]) : Type = tyenv.foldLeft(this)({ case (t, (syn, x)) => t.swap(syn, x) })
@@ -44,7 +42,6 @@ sealed abstract class Type(name : => String) {
     case (Inductive(x, st1), Inductive(y, st2)) => st1 ~=~ st2.swap(y, TyVar(x))
     case (ForAll(x, st1), ForAll(y, st2))       => st1 ~=~ st2.swap(y, TyVar(x))
     case (Nat, Nat)                             => Nil
-    case (CommandType, CommandType)             => Nil
     case (Arrow(t1, t2), Arrow(t3, t4))         => t1 ~=~ t3 ++ t2 ~=~ t4
     case (UnitTy, UnitTy)                       => Nil
     case (Product(t1, t2), Product(t3, t4))     => t1 ~=~ t3 ++ t2 ~=~ t4
@@ -63,8 +60,6 @@ case class Sum(t1 : Type, t2 : Type) extends Type("(" + t1 + " + " + t2 + ")")
 case class TyVar(t : String) extends Type(t)
 case class Inductive(x : String, t : Type) extends Type("mu " + x + "." + t)
 case class ForAll(x : String, t : Type) extends Type("forall " + x + "." + t)
-
-case object CommandType extends Type("Command")
 
 //Cannot be written and should not appear in the final result; just for type inference
 case class Unknown(id : Int) extends Type(throw new Exception("unknown " + id + " being used"))
