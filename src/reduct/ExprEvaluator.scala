@@ -1,45 +1,13 @@
 package reduct
 
-import model.{
-  ZVal,
-  Z,
-  Var,
-  Value,
-  Unfold,
-  TypeLam,
-  TypeApp,
-  TryCatch,
-  TrivVal,
-  Triv,
-  ThrowEx,
-  SVal,
-  S,
-  Rule,
-  RecursiveLamVal,
-  PairVal,
-  PairEx,
-  Match,
-  LamVal,
-  Lam,
-  InRVal,
-  InR,
-  InLVal,
-  InL,
-  FoldVal,
-  Fold,
-  Fix,
-  Expr,
-  ExceptionValue,
-  CommandExp,
-  App,
-  Action
-}
+import model.{ZVal, Z, Var, Value, Unfold, TypeLam, TypeApp, TryCatch, TrivVal, Triv, ThrowEx, SVal, S, Rule, RecursiveLamVal, 
+  PairVal, PairEx, Match, LamVal, Lam, InRVal, InR, InLVal, InL, FoldVal, Fold, Fix, Expr, ExceptionValue, CommandExp, App, Action}
 
-object ExprEvaluator extends Evaluator[Stack, Expr, Value] {
+object ExprEvaluator extends Evaluator[ExprStack, Expr, Value] {
 
   //All these are init'd to null, because they are manually set in each pass
   //Conceptually, this is a tail-recursive state-machine; for efficiency reasons we actually modify vars, but it's not strictly necessary
-  private var env : List[Map[String, Value]] = null //The stack of variable-binding frames
+  private var env : Env = null //The stack of variable-binding frames
 
   //Ensure that all pushes are matched with pops
   private def pushEnv(e : Map[String, Value]) : Unit = {
@@ -47,22 +15,13 @@ object ExprEvaluator extends Evaluator[Stack, Expr, Value] {
     push(PopFrame)
   }
 
-  private def getBinding(x : String) : Value = innerGetBinding(env, x)
-  private def innerGetBinding(e : List[Map[String, Value]], x : String) : Value = e match {
-    case Nil                     => throw new Exception("Unbound identifier : " + x) //Typechecker should blow up on this first
-    case m :: e if m.contains(x) => m(x)
-    case m :: e                  => innerGetBinding(e, x)
-  }
-
   //Crush the env down into a single stack frame for use as a closure
   private def flattenEnv : Map[String, Value] = env.foldRight(Map[String, Value]())({ case (m1, m2) => m2 ++ m1 })
 
   def run(e : Expr, m : List[Map[String, Value]]) : Value = {
-    target = Eval(e)
     env = m
-    stack = Nil
 
-    loop
+    loop(e)
     
     target match {
       case Return(v) => v
@@ -72,7 +31,7 @@ object ExprEvaluator extends Evaluator[Stack, Expr, Value] {
   }
 
   override def evalStep(e : Expr) : Unit = e match {
-    case Var(x) => target = Return(getBinding(x))
+    case Var(x) => target = Return(getBinding(env, x))
     case Z      => target = Return(ZVal)
     case S(n) => {
       target = Eval(n)
@@ -123,7 +82,7 @@ object ExprEvaluator extends Evaluator[Stack, Expr, Value] {
     case CommandExp(c) => target = Return(Action(c, flattenEnv))
   }
 
-  override def returnStep(v : Value, s : Stack) : Unit = s match {
+  override def returnStep(v : Value, s : ExprStack) : Unit = s match {
     case StackS => target = Return(SVal(v))
     case StackLam(e2) => {
       target = Eval(e2)

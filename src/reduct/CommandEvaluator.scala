@@ -6,14 +6,8 @@ object CommandEvaluator extends Evaluator[CmdStack, Command, Value] {
 
   //All these are init'd to null, because they are manually set in each pass
   //Conceptually, this is a tail-recursive state-machine; for efficiency reasons we actually modify vars, but it's not strictly necessary
-  private var env : List[Map[String, Value]] = null //The stack of variable-binding frames
-  private var mem : List[Map[String, Value]] = null //The block-structured "memory"
-
-  private def innerGetBinding(e : List[Map[String, Value]], x : String) : Value = e match {
-    case Nil                     => throw new Exception("Unbound identifier : " + x) //Typechecker should blow up on this first
-    case m :: e if m.contains(x) => m(x)
-    case m :: e                  => innerGetBinding(e, x)
-  }
+  private var env : Env = null //The stack of variable-binding frames
+  private var mem : Env = null //The block-structured "memory"
 
   //Update the outermost stack-bound x
   private def updateMemory(x : String, v : Value) = mem = innerUpdateMemory(x, v, mem)
@@ -31,30 +25,25 @@ object CommandEvaluator extends Evaluator[CmdStack, Command, Value] {
 
   def run(c : Command, e : List[Map[String, Value]]) : Value = {
     env = e
-    stack = Nil
     mem = Nil
-    target = Eval(c)
 
-    loop
-    
+    loop(c)
+
     target.asInstanceOf[Return[Command, Value]].v
   }
 
   override def evalStep(c : Command) : Unit = c match {
     case Ret(e) => target = Return(ExprEvaluator.run(e, env))
-    case Bind(x, e, m) => {
-      val v = ExprEvaluator.run(e, env)
-      v match {
-        case Action(m2, closure) => {
-          env = closure :: env
-          push(CmdStackBind(x, m))
-          target = Eval(m2)
-        }
-        case v => throw new Exception("Attempt to bind a non-action " + v)
+    case Bind(x, e, m) => ExprEvaluator.run(e, env) match {
+      case Action(m2, closure) => {
+        env = closure :: env
+        push(CmdStackBind(x, m))
+        target = Eval(m2)
       }
+      case v => throw new Exception("Attempt to bind a non-action " + v)
     }
     //Guarenteed to be there by the typechecker
-    case Get(x) => target = Return(innerGetBinding(mem, x))
+    case Get(x) => target = Return(getBinding(mem, x))
     case SetCmd(x, e, m) => {
       updateMemory(x, ExprEvaluator.run(e, env))
       target = Eval(m)

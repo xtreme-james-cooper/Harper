@@ -14,10 +14,8 @@ object PatternEvaluator extends Evaluator[PatStack, (Pattern, Value), Map[String
     rules = rs
     matchVal = v
     body = b
-    stack = Nil
-    target = Eval(p, matchVal)
 
-    loop
+    loop((p, v))
     
     (body, target.asInstanceOf[Return[(Pattern, Value), Map[String, Value]]].v)
   }
