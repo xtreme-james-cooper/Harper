@@ -101,7 +101,7 @@ object ExprCompiler extends Compiler[ExprStack, Expr, Value] {
     case StackInL       => target = Return(InLVal(v))
     case StackInR       => target = Return(InRVal(v))
     case StackCase(rs) => {
-      val (e, bind) = PatternCompiler.runRules(v, rs)
+      val (e, bind) = PatternCompiler.run(v, rs)
       pushEnv(bind)
       target = Eval(e)
     }
