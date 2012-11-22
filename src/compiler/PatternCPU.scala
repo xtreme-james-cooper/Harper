@@ -16,8 +16,10 @@ object PatternCPU {
   var prog : List[PatternOpcode] = null
 
   var valTag : Int = 0
-  var loadStack : List[Value] = Nil
-
+  
+  val valStack : Array[Value] = Array.ofDim(1000) //TODO large enough?
+  var valSP : Int = 0
+  
   var backup : Value = null
   
   var v : Value = null
@@ -25,7 +27,9 @@ object PatternCPU {
   var retval : Expr = null
   
   var matchRetval : Map[String, Value] = null
-  var matchRetvalStack : List[Map[String, Value]] = Nil
+  
+  val bindStack : Array[Map[String, Value]] = Array.ofDim(1000) //TODO large enough?
+  var bindSP : Int = 0
 
   def run(v1 : Value, pr : List[PatternOpcode]) : (Expr, Map[String, Value]) = {
     PC = 0
