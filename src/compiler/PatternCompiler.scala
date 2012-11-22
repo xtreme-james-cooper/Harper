@@ -20,15 +20,32 @@ object PatternCompiler {
   def compileRule(p : Pattern, b : Expr) : List[PatternOpcode] = p match {
     case WildPat         => List(SetMatchRetval(Map()), SetRetval(b), Jump("donePattern"))
     case TrivPat         => List(SetMatchRetval(Map()), SetRetval(b), Jump("donePattern"))
-    case VarPat(x)       => List(AddMatchRetval(x), SetRetval(b), Jump("donePattern"))
+    case VarPat(x)       => List(SetMatchRetval(Map()), AddMatchRetval(x), SetRetval(b), Jump("donePattern"))
     case ZPat            => {
       n = n + 1
-      List(JIfNZ("subpattern" + n), SetMatchRetval(Map()), SetRetval(b), Jump("donePattern"), Label("subpattern" + n)) //TODO
+      List(JIfValtagNEq(0, "subpattern" + n), SetMatchRetval(Map()), SetRetval(b), Jump("donePattern"), Label("subpattern" + n))
     }
-    case SPat(sp)        => List(RunMatch(p), SetRetval(b), JIfIsEvB("donePattern")) //TODO
-    case InLPat(sp)      => List(RunMatch(p), SetRetval(b), JIfIsEvB("donePattern")) //TODO
-    case InRPat(sp)      => List(RunMatch(p), SetRetval(b), JIfIsEvB("donePattern")) //TODO
-    case PairPat(p1, p2) => List(RunMatch(p), SetRetval(b), JIfIsEvB("donePattern")) //TODO
+    case SPat(sp)        => {
+      val innerCode = compileRule(sp, b)
+      n = n + 1
+      List(JIfValtagNEq(1, "subpattern" + n), PopLoadStack) ++ innerCode ++ List(Label("subpattern" + n))
+    }
+    case InLPat(sp)      => {
+      val innerCode = compileRule(sp, b)
+      n = n + 1
+      List(JIfValtagNEq(0, "subpattern" + n), PopLoadStack) ++ innerCode ++ List(Label("subpattern" + n))
+    }
+    case InRPat(sp)      => {
+      val innerCode = compileRule(sp, b)
+      n = n + 1
+      List(JIfValtagNEq(1, "subpattern" + n), PopLoadStack) ++ innerCode ++ List(Label("subpattern" + n))
+    }
+    case PairPat(p1, p2) => {
+      val innerCode1 = compileRule(p1, b)
+      val innerCode2 = compileRule(p2, b)
+      n = n + 1
+      List(RunMatch(p), SetRetval(b), JIfIsEvB("donePattern")) //TODO
+    }
   }
 
   def runMatch(p : Pattern, retval : Map[String, Value]) : (Boolean, Map[String, Value]) = p match {
