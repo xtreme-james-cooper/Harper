@@ -100,9 +100,8 @@ object ExprCompiler extends Compiler[ExprStack, Expr, Value] {
     case StackRPair(v1) => target = Return(PairVal(v1, v))
     case StackInL       => target = Return(InLVal(v))
     case StackInR       => target = Return(InRVal(v))
-    case StackCase(Nil) => throw new Exception("Empty set of rules?")
-    case StackCase(Rule(p, b) :: rs) => {
-      val (e, bind) = PatternCompiler.run(v, p, b, rs)
+    case StackCase(rs) => {
+      val (e, bind) = PatternCompiler.runRules(v, rs)
       pushEnv(bind)
       target = Eval(e)
     }
