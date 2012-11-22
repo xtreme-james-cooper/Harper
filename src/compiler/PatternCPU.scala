@@ -15,10 +15,13 @@ object PatternCPU {
   var PC : Int = 0
   var prog : List[PatternOpcode] = null
 
-  var valTag : Int = 0
+  val register : Array[Int] = Array.ofDim(32)
+  val TAG_REGISTER = 0
+  val VAL_SP_REGISTER = 1
+  val BIND_SP_REGISTER = 2
   
   val valStack : Array[Value] = Array.ofDim(1000) //TODO large enough?
-  var valSP : Int = 0
+  val bindStack : Array[List[(String, Value)]] = Array.ofDim(1000) //TODO large enough?
   
   var backup : Value = null
   
@@ -26,25 +29,21 @@ object PatternCPU {
 
   var retval : Expr = null
   
-  var matchRetval : Map[String, Value] = null
+  var matchRetval : List[(String, Value)] = null
   
-  val bindStack : Array[Map[String, Value]] = Array.ofDim(1000) //TODO large enough?
-  var bindSP : Int = 0
-
   def run(v1 : Value, pr : List[PatternOpcode]) : (Expr, Map[String, Value]) = {
     PC = 0
     backup = v1
     prog = pr
     
-//    prog.foreach(println)
+    prog.foreach(println)
     
     while (prog(PC) != Exit) {
       prog(PC).execute
       PC = PC + 1
-      
-//      println("At " + PC + "(" + prog(PC) + ") with value " + v + " loadstk " + loadStack + " matchretval " + matchRetval + " mrvstk" + matchRetvalStack)
     }
-    (retval, matchRetval)
+    
+    (retval, Map() ++ matchRetval)
   }
 
 }

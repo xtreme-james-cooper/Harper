@@ -1,16 +1,7 @@
 package compiler
 
-import model.Value
-import model.Rule
-import model.Pattern
-import model.Expr
-import model.ZVal
-import model.TrivVal
-import model.PairVal
-import model.InLVal
-import model.FoldVal
-import model.SVal
-import model.InRVal
+import model.{ZVal, Value, TrivVal, SVal, PairVal, InRVal, InLVal, FoldVal, Expr}
+import PatternCPU._
 
 sealed abstract class PatternOpcode(name : String) {
   override def toString : String = name
@@ -25,27 +16,22 @@ case class Thrw(s : String) extends PatternOpcode("thrw \"" + s + "\"") {
   override def execute : Unit = throw new Exception(s)
 }
 
-case class Label(l : String) extends PatternOpcode("   " + l + ":") {
+case class Label(l : String) extends PatternOpcode("   :" + l + "") {
   override def execute : Unit = throw new Exception("Executing label " + l)
 }
 
 case object ResetV extends PatternOpcode("rstv") {
   override def execute : Unit = {
-    PatternCPU.valStack(0) = PatternCPU.backup
-    PatternCPU.valSP = 1
+    valStack(0) = backup
+    register(VAL_SP_REGISTER) = 1
   }
 }
 
 case object ValPop extends PatternOpcode("popv") {
   override def execute : Unit = {
-    PatternCPU.valSP = PatternCPU.valSP - 1
-    PatternCPU.v = PatternCPU.valStack(PatternCPU.valSP)
-  }
-}
-
-case object VIntoReg extends PatternOpcode("??? poploadstack") {
-  override def execute : Unit = {
-    PatternCPU.valTag = PatternCPU.v match {
+    register(VAL_SP_REGISTER) = register(VAL_SP_REGISTER) - 1
+    v = valStack(register(VAL_SP_REGISTER))
+    register(TAG_REGISTER) = v match {
       case ZVal          => 0
       case SVal(_)       => 1
       case InLVal(_)     => 2
@@ -53,92 +39,85 @@ case object VIntoReg extends PatternOpcode("??? poploadstack") {
       case TrivVal       => 4
       case PairVal(_, _) => 5
       case FoldVal(_)    => 6
-      case _             => throw new Exception("not possible in pattern matching!" + PatternCPU.v)
+      case _             => throw new Exception("not possible in pattern matching!" + v)
     }
-    PatternCPU.v match {
+  }
+}
+
+case object VIntoReg extends PatternOpcode("??? pushloadstack") {
+  override def execute : Unit = {
+    v match {
       case PairVal(v2, v3) => {
-        PatternCPU.valStack(PatternCPU.valSP) = v3
-        PatternCPU.valStack(PatternCPU.valSP + 1) = v2
-        PatternCPU.valSP = PatternCPU.valSP + 2
+        valStack(register(VAL_SP_REGISTER)) = v3
+        valStack(register(VAL_SP_REGISTER) + 1) = v2
+        register(VAL_SP_REGISTER) = register(VAL_SP_REGISTER) + 2
       }
       case InLVal(v2) => {
-        PatternCPU.valStack(PatternCPU.valSP) = v2
-        PatternCPU.valSP = PatternCPU.valSP + 1
+        valStack(register(VAL_SP_REGISTER)) = v2
+        register(VAL_SP_REGISTER) = register(VAL_SP_REGISTER) + 1
       }
       case FoldVal(v2) => {
-        PatternCPU.valStack(PatternCPU.valSP) = v2
-        PatternCPU.valSP = PatternCPU.valSP + 1
+        valStack(register(VAL_SP_REGISTER)) = v2
+        register(VAL_SP_REGISTER) = register(VAL_SP_REGISTER) + 1
       }
       case SVal(v2) => {
-        PatternCPU.valStack(PatternCPU.valSP) = v2
-        PatternCPU.valSP = PatternCPU.valSP + 1
+        valStack(register(VAL_SP_REGISTER)) = v2
+        register(VAL_SP_REGISTER) = register(VAL_SP_REGISTER) + 1
       }
       case InRVal(v2) => {
-        PatternCPU.valStack(PatternCPU.valSP) = v2
-        PatternCPU.valSP = PatternCPU.valSP + 1
+        valStack(register(VAL_SP_REGISTER)) = v2
+        register(VAL_SP_REGISTER) = register(VAL_SP_REGISTER) + 1
       }
       case _ => ()
     }
   }
 }
 
-case object ClearRetStack extends PatternOpcode("??? clearretstack") {
-  override def execute : Unit = PatternCPU.bindSP = 0
+case object ClearRetStack extends PatternOpcode("rstr") {
+  override def execute : Unit = register(BIND_SP_REGISTER) = 0
 }
 
-case object PushRetStack extends PatternOpcode("??? pushretstack") {
+case object PushRetStack extends PatternOpcode("pshr") {
   override def execute : Unit = {
-    PatternCPU.bindStack(PatternCPU.bindSP) = PatternCPU.matchRetval
-    PatternCPU.bindSP = PatternCPU.bindSP + 1
+    bindStack(register(BIND_SP_REGISTER)) = matchRetval
+    register(BIND_SP_REGISTER) = register(BIND_SP_REGISTER) + 1
   }
 }
 
-case object PopRetStack extends PatternOpcode("??? popretstack") {
+case object PopRetStack extends PatternOpcode("popr") {
   override def execute : Unit = {
-    PatternCPU.bindSP = PatternCPU.bindSP - 1
-    PatternCPU.matchRetval = PatternCPU.matchRetval ++ PatternCPU.bindStack(PatternCPU.bindSP)
+    register(BIND_SP_REGISTER) = register(BIND_SP_REGISTER) - 1
+    matchRetval = matchRetval ++ bindStack(register(BIND_SP_REGISTER))
   }
 }
 
-case class SetRetval(x : Expr) extends PatternOpcode("??? setretval " + x) {
-  override def execute : Unit = PatternCPU.retval = x
+case class SetRetval(x : Expr) extends PatternOpcode("setr") {
+  override def execute : Unit = retval = x
 }
 
-case class SetMatchRetval(x : Map[String, Value]) extends PatternOpcode("??? setmatchretval " + x) {
-  override def execute : Unit = PatternCPU.matchRetval = x
+case class SetMatchRetval(x : List[(String, Value)]) extends PatternOpcode("setm") {
+  override def execute : Unit = matchRetval = x
 }
 
 case class AddMatchRetval(x : String) extends PatternOpcode("??? addmatchretval " + x) {
-  override def execute : Unit = {
-    //    val v : Value = PatternCPU.valTag match {
-    //      case 0 => ZVal
-    //      case 1 => SVal(PatternCPU.loadStack.head)
-    //      case 2 => InLVal(PatternCPU.loadStack.head)
-    //      case 3 => InRVal(PatternCPU.loadStack.head)
-    //      case 4 => TrivVal
-    //      case 5 => PairVal(PatternCPU.loadStack.head, PatternCPU.loadStack.tail.head)
-    //      case 6 => FoldVal(PatternCPU.loadStack.head)
-    //    }
-    //    if (v != PatternCPU.v) throw new Exception("huh?")
-    PatternCPU.matchRetval = Map(x -> PatternCPU.v)
-  }
+  override def execute : Unit = matchRetval = List(x -> v)
 }
 
-case class Jump(l : String) extends PatternOpcode("jump " + l) { //TODO do search better
+case class Jump(l : String) extends PatternOpcode("jump :" + l) { //TODO do search better
   override def execute : Unit = {
-    PatternCPU.PC = 0
-    while (PatternCPU.prog(PatternCPU.PC) != Label(l)) {
-      PatternCPU.PC = PatternCPU.PC + 1
+    PC = 0
+    while (prog(PC) != Label(l)) {
+      PC = PC + 1
     }
   }
 }
 
-case class JIfValtagNEq(v : Int, l : String) extends PatternOpcode("??? jifvaltagneq " + v + " " + l) { //TODO do search better
+case class JIfNEq(n : Int, v : Int, l : String) extends PatternOpcode("jine r" + n + " #" + v + " :" + l) { //TODO do search better
   override def execute : Unit =
-    if (PatternCPU.valTag != v) {
-      PatternCPU.PC = 0
-      while (PatternCPU.prog(PatternCPU.PC) != Label(l)) {
-        PatternCPU.PC = PatternCPU.PC + 1
+    if (register(n) != v) {
+      PC = 0
+      while (prog(PC) != Label(l)) {
+        PC = PC + 1
       }
     }
 }
