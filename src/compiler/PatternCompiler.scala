@@ -1,6 +1,6 @@
 package compiler
 
-import model.{ ZVal, ZPat, WildPat, VarPat, Value, TrivVal, TrivPat, SVal, SPat, Rule, Pattern, PairVal, PairPat, InRVal, InRPat, InLVal, InLPat, Expr }
+import model.{ ZPat, WildPat, VarPat, Value, TrivPat, SPat, Rule, Pattern, PairPat, InRPat, InLPat, Expr }
 
 object PatternCompiler {
 
@@ -17,7 +17,7 @@ object PatternCompiler {
     case Rule(p, b) :: rs => {
       val failtag = "failure" + n
       n = n + 1
-      List(SetReg(PatternCPU.BIND_SP_REGISTER, 0), ResetV, SetReg(PatternCPU.VAL_SP_REGISTER, 1)) ++
+      List(SetReg(PatternCPU.R_BIND_SP, 0), SetReg(PatternCPU.R_VAL_SP, 0), ValPush(null)) ++
         compileRule(p, b, "donePattern", failtag) ++ List(Label(failtag)) ++ compileRules(rs)
     }
   }
@@ -26,10 +26,10 @@ object PatternCompiler {
     case WildPat    => List(ValPop, SetRetval(b), Jump(succtag))
     case TrivPat    => List(ValPop, VIntoReg, SetRetval(b), Jump(succtag))
     case VarPat(x)  => List(ValPop, PushVRetStack(x), SetRetval(b), Jump(succtag))
-    case ZPat       => List(ValPop, VIntoReg, JIfNEq(PatternCPU.TAG_REGISTER, 0, failtag), SetRetval(b), Jump(succtag))
-    case SPat(sp)   => List(ValPop, VIntoReg, JIfNEq(PatternCPU.TAG_REGISTER, 1, failtag)) ++ compileRule(sp, b, succtag, failtag)
-    case InLPat(sp) => List(ValPop, VIntoReg, JIfNEq(PatternCPU.TAG_REGISTER, 2, failtag)) ++ compileRule(sp, b, succtag, failtag)
-    case InRPat(sp) => List(ValPop, VIntoReg, JIfNEq(PatternCPU.TAG_REGISTER, 3, failtag)) ++ compileRule(sp, b, succtag, failtag)
+    case ZPat       => List(ValPop, VIntoReg, JIfNEq(PatternCPU.R_TAG, PatternCPU.ZTAG, failtag), SetRetval(b), Jump(succtag))
+    case SPat(sp)   => List(ValPop, VIntoReg, JIfNEq(PatternCPU.R_TAG, PatternCPU.STAG, failtag)) ++ compileRule(sp, b, succtag, failtag)
+    case InLPat(sp) => List(ValPop, VIntoReg, JIfNEq(PatternCPU.R_TAG, PatternCPU.INLTAG, failtag)) ++ compileRule(sp, b, succtag, failtag)
+    case InRPat(sp) => List(ValPop, VIntoReg, JIfNEq(PatternCPU.R_TAG, PatternCPU.INRTAG, failtag)) ++ compileRule(sp, b, succtag, failtag)
     case PairPat(p1, p2) => {
       val subsucc1 = "success" + n
       n = n + 1

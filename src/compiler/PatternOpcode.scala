@@ -43,60 +43,42 @@ case class JIfNEq(n : Int, v : Int, l : String) extends PatternOpcode("jine r" +
     }
 }
 
-case object ResetV extends PatternOpcode("??? rstv") {
-  override def execute : Unit = valStack(0) = backup
+case class ValPush(v : Value) extends PatternOpcode("??? pshv " + v) {
+  override def execute : Unit = {
+    valStack(register(R_VAL_SP)) = backup //TODO not correct atm
+    register(R_VAL_SP) = register(R_VAL_SP) + 1
+  }
 }
 
 case object ValPop extends PatternOpcode("??? popv") {
   override def execute : Unit = {
-    register(VAL_SP_REGISTER) = register(VAL_SP_REGISTER) - 1
-    v = valStack(register(VAL_SP_REGISTER))
-    register(TAG_REGISTER) = v match {
-      case ZVal          => 0
-      case SVal(_)       => 1
-      case InLVal(_)     => 2
-      case InRVal(_)     => 3
-      case TrivVal       => 4
-      case PairVal(_, _) => 5
-      case FoldVal(_)    => 6
-      case _             => throw new Exception("not possible in pattern matching!" + v)
-    }
+    register(R_VAL_SP) = register(R_VAL_SP) - 1
+    v = valStack(register(R_VAL_SP))
+    register(R_TAG) = v.tag
   }
 }
 
 case object VIntoReg extends PatternOpcode("??? pushloadstack") {
   override def execute : Unit = {
-    v match {
-      case PairVal(v2, v3) => {
-        valStack(register(VAL_SP_REGISTER)) = v3
-        valStack(register(VAL_SP_REGISTER) + 1) = v2
-        register(VAL_SP_REGISTER) = register(VAL_SP_REGISTER) + 2
+    v.tag match {
+      case ZTAG | TRIVTAG => ()
+      case STAG | INLTAG | INRTAG | FOLDTAG => {
+        valStack(register(R_VAL_SP)) = v.a
+        register(R_VAL_SP) = register(R_VAL_SP) + 1
       }
-      case InLVal(v2) => {
-        valStack(register(VAL_SP_REGISTER)) = v2
-        register(VAL_SP_REGISTER) = register(VAL_SP_REGISTER) + 1
+      case PAIRTAG => {
+        valStack(register(R_VAL_SP)) = v.b
+        valStack(register(R_VAL_SP) + 1) = v.a
+        register(R_VAL_SP) = register(R_VAL_SP) + 2
       }
-      case FoldVal(v2) => {
-        valStack(register(VAL_SP_REGISTER)) = v2
-        register(VAL_SP_REGISTER) = register(VAL_SP_REGISTER) + 1
-      }
-      case SVal(v2) => {
-        valStack(register(VAL_SP_REGISTER)) = v2
-        register(VAL_SP_REGISTER) = register(VAL_SP_REGISTER) + 1
-      }
-      case InRVal(v2) => {
-        valStack(register(VAL_SP_REGISTER)) = v2
-        register(VAL_SP_REGISTER) = register(VAL_SP_REGISTER) + 1
-      }
-      case _ => ()
     }
   }
 }
 
 case class PushVRetStack(x : String) extends PatternOpcode("pshr " + x + " -> v") {
   override def execute : Unit = {
-    bindStack(register(BIND_SP_REGISTER)) = (x -> v)
-    register(BIND_SP_REGISTER) = register(BIND_SP_REGISTER) + 1
+    bindStack(register(R_BIND_SP)) = (x -> v)
+    register(R_BIND_SP) = register(R_BIND_SP) + 1
   }
 }
 
