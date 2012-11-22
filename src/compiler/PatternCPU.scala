@@ -19,20 +19,19 @@ object PatternCPU {
   val R_TAG = 0
   val R_VAL_SP = 1
   val R_BIND_SP = 2
+  val R_VAL_HP = 3
 
   val valStack : Array[HeapValue] = Array.ofDim(1000) //TODO large enough?
   val bindStack : Array[(String, HeapValue)] = Array.ofDim(1000) //TODO large enough?
-
-  var backup : HeapValue = null
-
+  val valHeap : Array[HeapValue] = Array.ofDim(100000) //TODO large enough?
+  
   var v : HeapValue = null
 
   var retval : Expr = null
 
   def run(v1 : Value, pr : List[PatternOpcode]) : (Expr, Map[String, Value]) = {
     PC = 0
-    backup = heapificate(v1)
-    prog = pr
+    prog = SetReg(R_VAL_HP, 0) :: HeapPush(heapificate(v1)) :: pr
 
     prog.foreach(println)
 
@@ -50,12 +49,12 @@ object PatternCPU {
   case class HeapValue(tag : Int, a : HeapValue, b : HeapValue)
 
   val ZTAG = 0
-  val STAG = 1
-  val INLTAG = 2
-  val INRTAG = 3
-  val TRIVTAG = 4
-  val PAIRTAG = 5
-  val FOLDTAG = 6
+  val TRIVTAG = 1
+  val STAG = 2
+  val INLTAG = 3
+  val INRTAG = 4
+  val FOLDTAG = 5
+  val PAIRTAG = 6
   
   def heapificate(v : Value) : HeapValue = v match {
     case ZVal          => HeapValue(ZTAG, null, null)

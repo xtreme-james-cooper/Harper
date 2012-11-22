@@ -33,10 +33,10 @@ object PatternCompiler {
     case PairPat(p1, p2) => {
       val subsucc1 = "success" + n
       n = n + 1
-      val subOps1 = compileRule(p1, b, subsucc1, failtag)
+      val subOps1 = compileRule(p2, b, subsucc1, failtag)
       val subsucc2 = "success" + n
       n = n + 1
-      val subOps2 = compileRule(p2, b, subsucc2, failtag)
+      val subOps2 = compileRule(p1, b, subsucc2, failtag)
       List(ValPop, VIntoReg) ++ subOps1 ++ List(Label(subsucc1)) ++ subOps2 ++ List(
         Label(subsucc2), SetRetval(b), Jump(succtag))
     }

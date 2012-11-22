@@ -20,7 +20,7 @@ case class Label(l : String) extends PatternOpcode("   :" + l + "") {
   override def execute : Unit = throw new Exception("Executing label " + l)
 }
 
-case class SetReg(n : Int, v : Int) extends PatternOpcode("set r" + n + " #" + v) {
+case class SetReg(n : Int, v : Int) extends PatternOpcode("setr r" + n + " #" + v) {
   override def execute : Unit = register(n) = v
 }
 
@@ -43,9 +43,16 @@ case class JIfNEq(n : Int, v : Int, l : String) extends PatternOpcode("jine r" +
     }
 }
 
-case class ValPush(v : Value) extends PatternOpcode("??? pshv " + v) {
+case class HeapPush(h : HeapValue) extends PatternOpcode("??? aloc " + h) {
   override def execute : Unit = {
-    valStack(register(R_VAL_SP)) = backup //TODO not correct atm
+    valHeap(register(R_VAL_HP)) = h
+    register(R_VAL_HP) = register(R_VAL_HP) + 1
+  }
+}
+
+case class ValPush(v : HeapValue) extends PatternOpcode("??? pshv " + v) {
+  override def execute : Unit = {
+    valStack(register(R_VAL_SP)) = valHeap(0) //TODO not correct atm
     register(R_VAL_SP) = register(R_VAL_SP) + 1
   }
 }
@@ -60,29 +67,25 @@ case object ValPop extends PatternOpcode("??? popv") {
 
 case object VIntoReg extends PatternOpcode("??? pushloadstack") {
   override def execute : Unit = {
-    v.tag match {
-      case ZTAG | TRIVTAG => ()
-      case STAG | INLTAG | INRTAG | FOLDTAG => {
-        valStack(register(R_VAL_SP)) = v.a
-        register(R_VAL_SP) = register(R_VAL_SP) + 1
-      }
-      case PAIRTAG => {
-        valStack(register(R_VAL_SP)) = v.b
-        valStack(register(R_VAL_SP) + 1) = v.a
-        register(R_VAL_SP) = register(R_VAL_SP) + 2
-      }
+    if (v.tag > TRIVTAG) {
+      valStack(register(R_VAL_SP)) = v.a
+      register(R_VAL_SP) = register(R_VAL_SP) + 1
+    }
+    if (v.tag > FOLDTAG) {
+      valStack(register(R_VAL_SP)) = v.b
+      register(R_VAL_SP) = register(R_VAL_SP) + 1
     }
   }
 }
 
-case class PushVRetStack(x : String) extends PatternOpcode("pshr " + x + " -> v") {
+case class PushVRetStack(x : String) extends PatternOpcode("??? pshe " + x + " -> v") {
   override def execute : Unit = {
     bindStack(register(R_BIND_SP)) = (x -> v)
     register(R_BIND_SP) = register(R_BIND_SP) + 1
   }
 }
 
-case class SetRetval(x : Expr) extends PatternOpcode("??? setr") {
+case class SetRetval(x : Expr) extends PatternOpcode("??? sete") {
   override def execute : Unit = retval = x
 }
   
