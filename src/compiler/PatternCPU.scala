@@ -13,49 +13,34 @@ import model.FoldVal
 object PatternCPU {
 
   var PC : Int = 0
-  var prog : Array[PatternOpcode] = null
+  var prog : List[PatternOpcode] = null
 
   var valTag : Int = 0
   var loadStack : List[Value] = Nil
 
+  var backup : Value = null
+  
   var v : Value = null
 
   var retval : Expr = null
-
-  var isEvaluated : Int = 0
-
+  
   var matchRetval : Map[String, Value] = null
+  var matchRetvalStack : List[Map[String, Value]] = Nil
 
-  def run(v1 : Value, pr : Array[PatternOpcode]) : (Expr, Map[String, Value]) = {
+  def run(v1 : Value, pr : List[PatternOpcode]) : (Expr, Map[String, Value]) = {
     PC = 0
+    backup = v1
     prog = pr
-    loadStack = Nil
     
-//    pr.foreach(println)
+//    prog.foreach(println)
     
-    valueToRegisters(v1)
     while (prog(PC) != Exit) {
       prog(PC).execute
       PC = PC + 1
+      
+//      println("At " + PC + "(" + prog(PC) + ") with value " + v + " loadstk " + loadStack + " matchretval " + matchRetval + " mrvstk" + matchRetvalStack)
     }
     (retval, matchRetval)
-  }
-
-  def valueToRegisters(v1 : Value) : Unit = {
-    v = v1
-    valTag = v1 match {
-      case ZVal | TrivVal | PairVal(_, _) | InLVal(_) | FoldVal(_) => 0
-      case SVal(_) | InRVal(_) => 1
-      case _ => throw new Exception("not possible in pattern matching!" + v1)
-    }
-    loadStack = v1 match {
-      case PairVal(v2, v3) => v2 :: v3 :: loadStack
-      case InLVal(v2) => v2 :: loadStack
-      case FoldVal(v2) => v2 :: loadStack
-      case SVal(v2) => v2 :: loadStack
-      case InRVal(v2) => v2 :: loadStack
-      case _ => loadStack
-    }
   }
 
 }

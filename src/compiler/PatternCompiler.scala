@@ -5,90 +5,38 @@ import model.{ ZVal, ZPat, WildPat, VarPat, Value, TrivVal, TrivPat, SVal, SPat,
 object PatternCompiler {
 
   var n : Int = 0
-  
+
   def run(v1 : Value, rs : List[Rule]) : (Expr, Map[String, Value]) = {
-    PatternCPU.run(v1, compileFullPattern(rs).toArray)
+    PatternCPU.run(v1, compileFullPattern(rs))
   }
 
   def compileFullPattern(rss : List[Rule]) : List[PatternOpcode] = compileRules(rss) ++ List(Label("donePattern"), Exit)
 
   def compileRules(rss : List[Rule]) : List[PatternOpcode] = rss match {
-    case Nil              => List(Thrw("No pattern match found"))
-    case Rule(p, b) :: rs => compileRule(p, b) ++ compileRules(rs)
+    case Nil => List(Thrw("No pattern match found"))
+    case Rule(p, b) :: rs => {
+      n = n + 1
+      val failtag = "failure" + n
+      List(ClearRetStack, ResetV) ++ compileRule(p, b, "donePattern", failtag) ++ List(Label(failtag)) ++ compileRules(rs)
+    }
   }
 
-  def compileRule(p : Pattern, b : Expr) : List[PatternOpcode] = p match {
-    case WildPat         => List(SetMatchRetval(Map()), SetRetval(b), Jump("donePattern"))
-    case TrivPat         => List(SetMatchRetval(Map()), SetRetval(b), Jump("donePattern"))
-    case VarPat(x)       => List(SetMatchRetval(Map()), AddMatchRetval(x), SetRetval(b), Jump("donePattern"))
-    case ZPat            => {
-      n = n + 1
-      List(JIfValtagNEq(0, "subpattern" + n), SetMatchRetval(Map()), SetRetval(b), Jump("donePattern"), Label("subpattern" + n))
-    }
-    case SPat(sp)        => {
-      val innerCode = compileRule(sp, b)
-      n = n + 1
-      List(JIfValtagNEq(1, "subpattern" + n), PopLoadStack) ++ innerCode ++ List(Label("subpattern" + n))
-    }
-    case InLPat(sp)      => {
-      val innerCode = compileRule(sp, b)
-      n = n + 1
-      List(JIfValtagNEq(0, "subpattern" + n), PopLoadStack) ++ innerCode ++ List(Label("subpattern" + n))
-    }
-    case InRPat(sp)      => {
-      val innerCode = compileRule(sp, b)
-      n = n + 1
-      List(JIfValtagNEq(1, "subpattern" + n), PopLoadStack) ++ innerCode ++ List(Label("subpattern" + n))
-    }
+  def compileRule(p : Pattern, b : Expr, succtag : String, failtag : String) : List[PatternOpcode] = p match {
+    case WildPat    => List(NoRegPop, SetMatchRetval(Map()), SetRetval(b), Jump(succtag))
+    case TrivPat    => List(PopLoadStack, SetMatchRetval(Map()), SetRetval(b), Jump(succtag))
+    case VarPat(x)  => List(NoRegPop, AddMatchRetval(x), SetRetval(b), Jump(succtag))
+    case ZPat       => List(PopLoadStack, JIfValtagNEq(0, failtag), SetMatchRetval(Map()), SetRetval(b), Jump(succtag))
+    case SPat(sp)   => List(PopLoadStack, JIfValtagNEq(1, failtag)) ++ compileRule(sp, b, succtag, failtag)
+    case InLPat(sp) => List(PopLoadStack, JIfValtagNEq(0, failtag)) ++ compileRule(sp, b, succtag, failtag)
+    case InRPat(sp) => List(PopLoadStack, JIfValtagNEq(1, failtag)) ++ compileRule(sp, b, succtag, failtag)
     case PairPat(p1, p2) => {
-      val innerCode1 = compileRule(p1, b)
-      val innerCode2 = compileRule(p2, b)
       n = n + 1
-      List(RunMatch(p), SetRetval(b), JIfIsEvB("donePattern")) //TODO
-    }
-  }
-
-  def runMatch(p : Pattern, retval : Map[String, Value]) : (Boolean, Map[String, Value]) = p match {
-    case WildPat   => (true, Map())
-    case TrivPat   => (true, Map())
-    case VarPat(x) => (true, Map(x -> PatternCPU.v))
-    case ZPat      => if (PatternCPU.v == ZVal) (true, Map()) else (false, null)
-    case SPat(p) => PatternCPU.v match {
-      case SVal(v1) => {
-        SetV(v1).execute
-        runMatch(p, null)
-      }
-      case _ => (false, null)
-    }
-    case InLPat(p) => PatternCPU.v match {
-      case InLVal(v1) => {
-        SetV(v1).execute
-        runMatch(p, null)
-      }
-      case _ => (false, null)
-    }
-    case InRPat(p) => PatternCPU.v match {
-      case InRVal(v1) => {
-        SetV(v1).execute
-        runMatch(p, null)
-      }
-      case _ => (false, null)
-    }
-    case PairPat(p1, p2) => PatternCPU.v match {
-      case PairVal(v1, v2) => {
-        SetV(v1).execute
-        val (iMat, retv) = runMatch(p1, null)
-        if (iMat) {
-          SetV(v2).execute
-          val (imat2, retv2) = runMatch(p2, null)
-          if (imat2)
-            (true, retv ++ retv2)
-          else
-            (false, null)
-        } else
-          (false, null)
-      }
-      case _ => throw new Exception("type error!")
+      val subsucc1 = "success" + n
+      val subOps1 = compileRule(p1, b, subsucc1, failtag)
+      n = n + 1
+      val subsucc2 = "success" + n
+      val subOps2 = compileRule(p2, b, subsucc2, failtag)
+      List(PopLoadStack) ++ subOps1 ++ List(Label(subsucc1), PushRetStack) ++ subOps2 ++ List(Label(subsucc2), PopRetStack, SetRetval(b), Jump(succtag))
     }
   }
 

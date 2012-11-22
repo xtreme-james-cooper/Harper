@@ -38,6 +38,12 @@ object Main {
       + "inr inl () -> 2 |"
       + "inr inr x -> S(S(S(x))) }")
 
+    test("return case inr inr 5 of {"
+      + "inl (S(_), y) -> y |"
+      + "inl (Z, y) -> S(y) |"
+      + "inr inl () -> 2 |"
+      + "inr inr x -> S(S(S(x))) }")
+      
     test("nil : mu t.(Unit + (Nat, t)) = fold t.(Unit + (Nat, t)) inl ();"
       + "cons(n : Nat, l : mu t.(Unit + (Nat, t))) : mu t.(Unit + (Nat, t)) = fold t.(Unit + (Nat, t)) inr(n, l);"
       + "listItem : mu t.(Unit + (Nat, t)) = ((cons 2) ((cons 3) nil));"
