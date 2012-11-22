@@ -55,14 +55,14 @@ case class JIfNEq(n : Int, v : Int, l : String) extends PatternOpcode("jine r" +
 
 case class HeapPush(h : HeapValue) extends PatternOpcode("??? aloc " + h) {
   override def execute : Unit = {
-    valHeap(register(R_VAL_HP)) = h
-    register(R_VAL_HP) = register(R_VAL_HP) + 1
+    valHeap(register(R_VAL_HP)) = heapificate(h)
+//    register(R_VAL_HP) = register(R_VAL_HP) + 1 being done by heapificate atm
   }
 }
 
 case class ValPush(v : HeapValue) extends PatternOpcode("??? pshv " + v) {
   override def execute : Unit = {
-    valStack(register(R_VAL_SP)) = valHeap(0) //TODO not correct atm
+    valStack(register(R_VAL_SP)) = unheapificate(0) //TODO not correct atm
     register(R_VAL_SP) = register(R_VAL_SP) + 1
   }
 }
