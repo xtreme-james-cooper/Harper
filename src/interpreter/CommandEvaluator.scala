@@ -1,4 +1,4 @@
-package reduction
+package interpreter
 
 import model.{ Value, SetCmd, Ret, Get, Decl, Command, Bind, Action }
 

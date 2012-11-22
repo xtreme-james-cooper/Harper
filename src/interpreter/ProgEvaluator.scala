@@ -1,4 +1,4 @@
-package reduction
+package interpreter
 
 import model.{Value, TypeDefn, Prog, ExprDefn, Defn}
 

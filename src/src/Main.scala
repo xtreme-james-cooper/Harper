@@ -1,8 +1,9 @@
 package src
 
 import typechecker.ProgChecker
-import reduction.ProgEvaluator
+import interpreter.ProgEvaluator
 import parser.ProgParser
+import compiler.ProgCompiler
 
 object Main {
 
@@ -88,20 +89,17 @@ object Main {
       + "decl a := 2 in decl b := 3 in bind aa <- command !a; bind bb <- command !b; bind x <- ((sum aa) bb); a := ((plus x) 1); bind y <- command !a; return y")
   }
 
-  def printTest(name : String, value : Any) : Unit = {
-    println(name)
-    println(value.toString)
-    println
-  }
-
   def test(progs : String) {
-    printTest("prog", progs)
+    println("prog" + ": " + progs)
     val prog = ProgParser.parse(progs)
-    printTest("parse", prog)
+    println("parse" + ": " + prog)
     println("type")
     for ((name, typ) <- ProgChecker.typeCheck(prog)) println(name + " : " + typ)
-    println
-    printTest("value", ProgEvaluator.run(prog))
+    val intVal = ProgEvaluator.run(prog)
+    println("value" + ": " + intVal)
+    val compVal = ProgCompiler.run(prog)
+    println("value" + ": " + compVal)
+    println("equivalent?: " + (intVal == compVal))
     println("-----------------------------")
 
   }

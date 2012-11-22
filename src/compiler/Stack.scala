@@ -1,4 +1,4 @@
-package reduction
+package compiler
 
 import model.Expr
 import model.Rule
