@@ -17,7 +17,7 @@ case class Thrw(s : String) extends PatternOpcode("thrw \"" + s + "\"") {
 }
 
 case class Label(l : String) extends PatternOpcode("   :" + l + "") {
-  override def execute : Unit = throw new Exception("Executing label " + l)
+  override def execute : Unit = ()
 }
 
 case class SetReg(n : Int, v : Int) extends PatternOpcode("setr r" + n + " #" + v) {
@@ -31,6 +31,16 @@ case class Jump(l : String) extends PatternOpcode("jump :" + l) { //TODO do sear
       PC = PC + 1
     }
   }
+}
+
+case class JIfLEq(n : Int, v : Int, l : String) extends PatternOpcode("jile r" + n + " #" + v + " :" + l) { //TODO do search better
+  override def execute : Unit =
+    if (register(n) <= v) {
+      PC = 0
+      while (prog(PC) != Label(l)) {
+        PC = PC + 1
+      }
+    }
 }
 
 case class JIfNEq(n : Int, v : Int, l : String) extends PatternOpcode("jine r" + n + " #" + v + " :" + l) { //TODO do search better
@@ -57,24 +67,25 @@ case class ValPush(v : HeapValue) extends PatternOpcode("??? pshv " + v) {
   }
 }
 
+case class ValPushA(x : HeapValue) extends PatternOpcode("??? pshv " + v) {
+  override def execute : Unit = {
+    valStack(register(R_VAL_SP)) = v.a //TODO not correct atm
+    register(R_VAL_SP) = register(R_VAL_SP) + 1
+  }
+}
+
+case class ValPushB(x : HeapValue) extends PatternOpcode("??? pshv " + v) {
+  override def execute : Unit = {
+    valStack(register(R_VAL_SP)) = v.b //TODO not correct atm
+    register(R_VAL_SP) = register(R_VAL_SP) + 1
+  }
+}
+
 case object ValPop extends PatternOpcode("??? popv") {
   override def execute : Unit = {
     register(R_VAL_SP) = register(R_VAL_SP) - 1
     v = valStack(register(R_VAL_SP))
     register(R_TAG) = v.tag
-  }
-}
-
-case object VIntoReg extends PatternOpcode("??? pushloadstack") {
-  override def execute : Unit = {
-    if (v.tag > TRIVTAG) {
-      valStack(register(R_VAL_SP)) = v.a
-      register(R_VAL_SP) = register(R_VAL_SP) + 1
-    }
-    if (v.tag > FOLDTAG) {
-      valStack(register(R_VAL_SP)) = v.b
-      register(R_VAL_SP) = register(R_VAL_SP) + 1
-    }
   }
 }
 

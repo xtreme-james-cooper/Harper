@@ -22,24 +22,29 @@ object PatternCompiler {
     }
   }
 
-  def compileRule(p : Pattern, b : Expr, succtag : String, failtag : String) : List[PatternOpcode] = p match {
-    case WildPat    => List(ValPop, SetRetval(b), Jump(succtag))
-    case TrivPat    => List(ValPop, VIntoReg, SetRetval(b), Jump(succtag))
-    case VarPat(x)  => List(ValPop, PushVRetStack(x), SetRetval(b), Jump(succtag))
-    case ZPat       => List(ValPop, VIntoReg, JIfNEq(PatternCPU.R_TAG, PatternCPU.ZTAG, failtag), SetRetval(b), Jump(succtag))
-    case SPat(sp)   => List(ValPop, VIntoReg, JIfNEq(PatternCPU.R_TAG, PatternCPU.STAG, failtag)) ++ compileRule(sp, b, succtag, failtag)
-    case InLPat(sp) => List(ValPop, VIntoReg, JIfNEq(PatternCPU.R_TAG, PatternCPU.INLTAG, failtag)) ++ compileRule(sp, b, succtag, failtag)
-    case InRPat(sp) => List(ValPop, VIntoReg, JIfNEq(PatternCPU.R_TAG, PatternCPU.INRTAG, failtag)) ++ compileRule(sp, b, succtag, failtag)
-    case PairPat(p1, p2) => {
-      val subsucc1 = "success" + n
-      n = n + 1
-      val subOps1 = compileRule(p2, b, subsucc1, failtag)
-      val subsucc2 = "success" + n
-      n = n + 1
-      val subOps2 = compileRule(p1, b, subsucc2, failtag)
-      List(ValPop, VIntoReg) ++ subOps1 ++ List(Label(subsucc1)) ++ subOps2 ++ List(
-        Label(subsucc2), SetRetval(b), Jump(succtag))
-    }
+  def compileRule(p : Pattern, b : Expr, succtag : String, failtag : String) : List[PatternOpcode] = {
+    val vintoFlag = "heaping" + n
+    n = n + 1
+    val putVIntoRegs = List(JIfLEq(PatternCPU.R_TAG, PatternCPU.TRIVTAG, vintoFlag), ValPushA(null), 
+        JIfLEq(PatternCPU.R_TAG, PatternCPU.FOLDTAG, vintoFlag), ValPushB(null), Label(vintoFlag))
+    List(ValPop) ++ (p match {
+      case WildPat    => List(SetRetval(b), Jump(succtag))
+      case TrivPat    => putVIntoRegs ++ List(SetRetval(b), Jump(succtag))
+      case VarPat(x)  => List(PushVRetStack(x), SetRetval(b), Jump(succtag))
+      case ZPat       => putVIntoRegs ++ List(JIfNEq(PatternCPU.R_TAG, PatternCPU.ZTAG, failtag), SetRetval(b), Jump(succtag))
+      case SPat(sp)   => putVIntoRegs ++ List(JIfNEq(PatternCPU.R_TAG, PatternCPU.STAG, failtag)) ++ compileRule(sp, b, succtag, failtag)
+      case InLPat(sp) => putVIntoRegs ++ List(JIfNEq(PatternCPU.R_TAG, PatternCPU.INLTAG, failtag)) ++ compileRule(sp, b, succtag, failtag)
+      case InRPat(sp) => putVIntoRegs ++ List(JIfNEq(PatternCPU.R_TAG, PatternCPU.INRTAG, failtag)) ++ compileRule(sp, b, succtag, failtag)
+      case PairPat(p1, p2) => {
+        val subsucc1 = "success" + n
+        n = n + 1
+        val subOps1 = compileRule(p2, b, subsucc1, failtag)
+        val subsucc2 = "success" + n
+        n = n + 1
+        val subOps2 = compileRule(p1, b, subsucc2, failtag)
+        putVIntoRegs ++ subOps1 ++ List(Label(subsucc1)) ++ subOps2 ++ List(Label(subsucc2), SetRetval(b), Jump(succtag))
+      }
+    })
   }
 
 }
