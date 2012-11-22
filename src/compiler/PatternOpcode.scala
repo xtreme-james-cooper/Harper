@@ -1,6 +1,6 @@
 package compiler
 
-import model.{ZVal, Value, TrivVal, SVal, PairVal, InRVal, InLVal, FoldVal, Expr}
+import model.{ ZVal, Value, TrivVal, SVal, PairVal, InRVal, InLVal, FoldVal, Expr }
 import PatternCPU._
 
 sealed abstract class PatternOpcode(name : String) {
@@ -20,11 +20,31 @@ case class Label(l : String) extends PatternOpcode("   :" + l + "") {
   override def execute : Unit = throw new Exception("Executing label " + l)
 }
 
-case object ResetV extends PatternOpcode("rstv") {
+case class SetReg(n : Int, v : Int) extends PatternOpcode("set r" + n + " #" + v) {
+  override def execute : Unit = register(n) = v
+}
+
+case class Jump(l : String) extends PatternOpcode("jump :" + l) { //TODO do search better
   override def execute : Unit = {
-    valStack(0) = backup
-    register(VAL_SP_REGISTER) = 1
+    PC = 0
+    while (prog(PC) != Label(l)) {
+      PC = PC + 1
+    }
   }
+}
+
+case class JIfNEq(n : Int, v : Int, l : String) extends PatternOpcode("jine r" + n + " #" + v + " :" + l) { //TODO do search better
+  override def execute : Unit =
+    if (register(n) != v) {
+      PC = 0
+      while (prog(PC) != Label(l)) {
+        PC = PC + 1
+      }
+    }
+}
+
+case object ResetV extends PatternOpcode("??? rstv") {
+  override def execute : Unit = valStack(0) = backup
 }
 
 case object ValPop extends PatternOpcode("??? popv") {
@@ -73,55 +93,14 @@ case object VIntoReg extends PatternOpcode("??? pushloadstack") {
   }
 }
 
-case object ClearRetStack extends PatternOpcode("rstr") {
-  override def execute : Unit = register(BIND_SP_REGISTER) = 0
-}
-
-case object PushRetStack extends PatternOpcode("pshr") {
-  override def execute : Unit = {
-    bindStack(register(BIND_SP_REGISTER)) = Nil
-    register(BIND_SP_REGISTER) = register(BIND_SP_REGISTER) + 1
-  }
-}
-
 case class PushVRetStack(x : String) extends PatternOpcode("pshr " + x + " -> v") {
   override def execute : Unit = {
-    bindStack(register(BIND_SP_REGISTER)) = List(x -> v)
+    bindStack(register(BIND_SP_REGISTER)) = (x -> v)
     register(BIND_SP_REGISTER) = register(BIND_SP_REGISTER) + 1
   }
 }
 
-case object PopRetStack extends PatternOpcode("popr") {
-  override def execute : Unit = register(BIND_SP_REGISTER) = register(BIND_SP_REGISTER) - 1
-}
-
-case object AddRetStack extends PatternOpcode("addr") {
-  override def execute : Unit = {
-    register(BIND_SP_REGISTER) = register(BIND_SP_REGISTER) - 1
-    bindStack(register(BIND_SP_REGISTER) - 1) = bindStack(register(BIND_SP_REGISTER) - 1) ++ bindStack(register(BIND_SP_REGISTER))
-  }
-}
-
-case class SetRetval(x : Expr) extends PatternOpcode("setr") {
+case class SetRetval(x : Expr) extends PatternOpcode("??? setr") {
   override def execute : Unit = retval = x
-}
-
-case class Jump(l : String) extends PatternOpcode("jump :" + l) { //TODO do search better
-  override def execute : Unit = {
-    PC = 0
-    while (prog(PC) != Label(l)) {
-      PC = PC + 1
-    }
-  }
-}
-
-case class JIfNEq(n : Int, v : Int, l : String) extends PatternOpcode("jine r" + n + " #" + v + " :" + l) { //TODO do search better
-  override def execute : Unit =
-    if (register(n) != v) {
-      PC = 0
-      while (prog(PC) != Label(l)) {
-        PC = PC + 1
-      }
-    }
 }
   

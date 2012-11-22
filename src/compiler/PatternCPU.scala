@@ -21,7 +21,7 @@ object PatternCPU {
   val BIND_SP_REGISTER = 2
   
   val valStack : Array[Value] = Array.ofDim(1000) //TODO large enough?
-  val bindStack : Array[List[(String, Value)]] = Array.ofDim(1000) //TODO large enough?
+  val bindStack : Array[(String, Value)] = Array.ofDim(1000) //TODO large enough?
   
   var backup : Value = null
   
@@ -41,9 +41,7 @@ object PatternCPU {
       PC = PC + 1
     }
     
-    if (register(BIND_SP_REGISTER) != 1) throw new Exception("extra bindings on the stack?")
-    
-    (retval, Map() ++ bindStack(0))
+    (retval, Map() ++ (for (i <- 0 until register(BIND_SP_REGISTER)) yield bindStack(i)))
   }
 
 }
