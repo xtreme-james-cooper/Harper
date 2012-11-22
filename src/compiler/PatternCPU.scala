@@ -29,8 +29,6 @@ object PatternCPU {
 
   var retval : Expr = null
   
-  var matchRetval : List[(String, Value)] = null
-  
   def run(v1 : Value, pr : List[PatternOpcode]) : (Expr, Map[String, Value]) = {
     PC = 0
     backup = v1
@@ -43,7 +41,9 @@ object PatternCPU {
       PC = PC + 1
     }
     
-    (retval, Map() ++ matchRetval)
+    if (register(BIND_SP_REGISTER) != 1) throw new Exception("extra bindings on the stack?")
+    
+    (retval, Map() ++ bindStack(0))
   }
 
 }

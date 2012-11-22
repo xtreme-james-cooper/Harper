@@ -22,10 +22,10 @@ object PatternCompiler {
   }
 
   def compileRule(p : Pattern, b : Expr, succtag : String, failtag : String) : List[PatternOpcode] = p match {
-    case WildPat    => List(ValPop, SetMatchRetval(Nil), SetRetval(b), Jump(succtag))
-    case TrivPat    => List(ValPop, VIntoReg, SetMatchRetval(Nil), SetRetval(b), Jump(succtag))
-    case VarPat(x)  => List(ValPop, AddMatchRetval(x), SetRetval(b), Jump(succtag))
-    case ZPat       => List(ValPop, VIntoReg, JIfNEq(PatternCPU.TAG_REGISTER, 0, failtag), SetMatchRetval(Nil), SetRetval(b), Jump(succtag))
+    case WildPat    => List(ValPop, PushRetStack, SetRetval(b), Jump(succtag))
+    case TrivPat    => List(ValPop, VIntoReg, PushRetStack, SetRetval(b), Jump(succtag))
+    case VarPat(x)  => List(ValPop, PushVRetStack(x), SetRetval(b), Jump(succtag))
+    case ZPat       => List(ValPop, VIntoReg, JIfNEq(PatternCPU.TAG_REGISTER, 0, failtag), PushRetStack, SetRetval(b), Jump(succtag))
     case SPat(sp)   => List(ValPop, VIntoReg, JIfNEq(PatternCPU.TAG_REGISTER, 1, failtag)) ++ compileRule(sp, b, succtag, failtag)
     case InLPat(sp) => List(ValPop, VIntoReg, JIfNEq(PatternCPU.TAG_REGISTER, 2, failtag)) ++ compileRule(sp, b, succtag, failtag)
     case InRPat(sp) => List(ValPop, VIntoReg, JIfNEq(PatternCPU.TAG_REGISTER, 3, failtag)) ++ compileRule(sp, b, succtag, failtag)
@@ -36,7 +36,8 @@ object PatternCompiler {
       val subsucc2 = "success" + n
       n = n + 1
       val subOps2 = compileRule(p2, b, subsucc2, failtag)
-      List(ValPop, VIntoReg) ++ subOps1 ++ List(Label(subsucc1), PushRetStack) ++ subOps2 ++ List(Label(subsucc2), PopRetStack, SetRetval(b), Jump(succtag))
+      List(ValPop, VIntoReg) ++ subOps1 ++ List(Label(subsucc1)) ++ subOps2 ++ List(
+          Label(subsucc2), AddRetStack, SetRetval(b), Jump(succtag))
     }
   }
 

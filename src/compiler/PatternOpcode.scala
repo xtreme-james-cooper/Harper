@@ -27,7 +27,7 @@ case object ResetV extends PatternOpcode("rstv") {
   }
 }
 
-case object ValPop extends PatternOpcode("popv") {
+case object ValPop extends PatternOpcode("??? popv") {
   override def execute : Unit = {
     register(VAL_SP_REGISTER) = register(VAL_SP_REGISTER) - 1
     v = valStack(register(VAL_SP_REGISTER))
@@ -79,28 +79,31 @@ case object ClearRetStack extends PatternOpcode("rstr") {
 
 case object PushRetStack extends PatternOpcode("pshr") {
   override def execute : Unit = {
-    bindStack(register(BIND_SP_REGISTER)) = matchRetval
+    bindStack(register(BIND_SP_REGISTER)) = Nil
+    register(BIND_SP_REGISTER) = register(BIND_SP_REGISTER) + 1
+  }
+}
+
+case class PushVRetStack(x : String) extends PatternOpcode("pshr " + x + " -> v") {
+  override def execute : Unit = {
+    bindStack(register(BIND_SP_REGISTER)) = List(x -> v)
     register(BIND_SP_REGISTER) = register(BIND_SP_REGISTER) + 1
   }
 }
 
 case object PopRetStack extends PatternOpcode("popr") {
+  override def execute : Unit = register(BIND_SP_REGISTER) = register(BIND_SP_REGISTER) - 1
+}
+
+case object AddRetStack extends PatternOpcode("addr") {
   override def execute : Unit = {
     register(BIND_SP_REGISTER) = register(BIND_SP_REGISTER) - 1
-    matchRetval = matchRetval ++ bindStack(register(BIND_SP_REGISTER))
+    bindStack(register(BIND_SP_REGISTER) - 1) = bindStack(register(BIND_SP_REGISTER) - 1) ++ bindStack(register(BIND_SP_REGISTER))
   }
 }
 
 case class SetRetval(x : Expr) extends PatternOpcode("setr") {
   override def execute : Unit = retval = x
-}
-
-case class SetMatchRetval(x : List[(String, Value)]) extends PatternOpcode("setm") {
-  override def execute : Unit = matchRetval = x
-}
-
-case class AddMatchRetval(x : String) extends PatternOpcode("??? addmatchretval " + x) {
-  override def execute : Unit = matchRetval = List(x -> v)
 }
 
 case class Jump(l : String) extends PatternOpcode("jump :" + l) { //TODO do search better
