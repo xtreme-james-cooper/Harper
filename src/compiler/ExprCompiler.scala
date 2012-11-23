@@ -1,28 +1,19 @@
 package compiler
 
-import model.{ZVal, Z, Var, Value, Unfold, TypeLam, TypeApp, TryCatch, TrivVal, Triv, ThrowEx, SVal, S, Rule, RecursiveLamVal, 
-  PairVal, PairEx, Match, LamVal, Lam, InRVal, InR, InLVal, InL, FoldVal, Fold, Fix, Expr, ExceptionValue, CommandExp, App, Action}
+import model.{ ZVal, Z, Var, Value, Unfold, TypeLam, TypeApp, TryCatch, TrivVal, Triv, ThrowEx, SVal, S, RecursiveLamVal, PairVal, PairEx, Match, LamVal, Lam, InRVal, InR, InLVal, InL, FoldVal, Fold, Fix, Expr, ExceptionValue, CommandExp, App, Action }
 
 object ExprCompiler {
 
   type Env = List[Map[String, Value]] //Not V, specifically Value
-  
+
   //All these are init'd to null, because they are manually set in each pass
   //Conceptually, this is a tail-recursive state-machine; for efficiency reasons we actually modify vars, but it's not strictly necessary
   var target : Target = null //The expression being evaluated, the value being returned, or the Exception being thrown
   var stack : List[ExprStack] = null //The parts of the expression whose evaluation has been deferred
   private var env : Env = null //The stack of variable-binding frames
-  
+
   def push(s : ExprStack) : Unit = stack = s :: stack
 
-  def pop : ExprStack = stack match {
-    case Nil => throw new Exception("Should have aborted the driver loop!") //This is the escape case
-    case s :: stk => {
-      stack = stk
-      s
-    }
-  }
-  
   def getBinding(e : Env, x : String) : Value = e match {
     case Nil                     => throw new Exception("Unbound identifier : " + x) //Typechecker should blow up on this first
     case m :: e if m.contains(x) => m(x)
@@ -42,109 +33,182 @@ object ExprCompiler {
     env = m
     target = Eval(e)
     stack = Nil
-    
-    while (target.isInstanceOf[Eval] || !stack.isEmpty) {
-      target match {
-        case Eval(e)   => evalStep(e)
-        case Return(v) => returnStep(v, pop)
-        case Throw(s)  => throwStep(s)
+
+    doEval
+  }
+
+  def doEval : Value = target match {
+    case Eval(e) => e match {
+      case Var(x) => {
+        target = Return(getBinding(env, x))
+        doEval
+      }
+      case Z => {
+        target = Return(ZVal)
+        doEval
+      }
+      case S(n) => {
+        target = Eval(n)
+        push(StackS)
+        doEval
+      }
+      case Lam(v, t, e) => {
+        target = Return(LamVal(v, e, flattenEnv))
+        doEval
+      }
+      case App(e1, e2) => {
+        target = Eval(e1)
+        push(StackLam(e2))
+        doEval
+      }
+      case Fix(v, Lam(x, t2, e)) => {
+        pushEnv(Map(v -> RecursiveLamVal(v, x, e, flattenEnv)))
+        target = Eval(Lam(x, t2, e))
+        doEval
+      }
+      case Fix(v, e) => {
+        target = Eval(e)
+        doEval
+      }
+      case Triv => {
+        target = Return(TrivVal)
+        doEval
+      }
+      case PairEx(e1, e2) => {
+        target = Eval(e1)
+        push(StackLPair(e2))
+        doEval
+      }
+      case InL(e) => {
+        target = Eval(e)
+        push(StackInL)
+        doEval
+      }
+      case InR(e) => {
+        target = Eval(e)
+        push(StackInR)
+        doEval
+      }
+      case Match(e, rs) => {
+        target = Eval(e)
+        push(StackCase(rs))
+        doEval
+      }
+      case Fold(mu, t, e) => {
+        target = Eval(e)
+        push(StackFold)
+        doEval
+      }
+      case Unfold(e) => {
+        target = Eval(e)
+        push(StackUnfold)
+        doEval
+      }
+      case TypeLam(t, e) => {
+        target = Eval(e)
+        doEval
+      }
+      case TypeApp(e, t) => {
+        target = Eval(e)
+        doEval
+      }
+      case ThrowEx(s) => {
+        target = Throw(s)
+        doEval
+      }
+      case TryCatch(e1, e2) => {
+        target = Eval(e1)
+        push(StackHandler(e2))
+        doEval
+      }
+      case CommandExp(c) => {
+        target = Return(Action(c, flattenEnv))
+        doEval
       }
     }
-    
-    target match {
-      case Return(v) => v
-      case Throw(s)  => ExceptionValue(s)
-      case Eval(e)   => throw new Exception("returning with evaluation still to be done?")
+    case Return(v) => stack match {
+      case Nil => v
+      case StackS :: stk => {
+        target = Return(SVal(v))
+        stack = stk
+        doEval
+      }
+      case StackLam(e2) :: stk => {
+        target = Eval(e2)
+        stack = stk
+        push(StackArg(v))
+        doEval
+      }
+      case StackArg(LamVal(x, e, clos)) :: stk => {
+        pushEnv(clos + (x -> v))
+        stack = stk
+        target = Eval(e)
+        doEval
+      }
+      case StackArg(v1) :: stk => throw new Exception("Application of a non-function : " + v1) //Typechecker should have caught this
+      case StackLPair(e2) :: stk => {
+        target = Eval(e2)
+        stack = stk
+        push(StackRPair(v))
+        doEval
+      }
+      case StackRPair(v1) :: stk => {
+        target = Return(PairVal(v1, v))
+        stack = stk
+        doEval
+      }
+      case StackInL :: stk => {
+        target = Return(InLVal(v))
+        stack = stk
+        doEval
+      }
+      case StackInR :: stk => {
+        target = Return(InRVal(v))
+        stack = stk
+        doEval
+      }
+      case StackCase(rs) :: stk => {
+        val (e, bind) = PatternCompiler.run(v, rs)
+        pushEnv(bind)
+        target = Eval(e)
+        stack = stk
+        doEval
+      }
+      case StackFold :: stk => {
+        target = Return(FoldVal(v))
+        stack = stk
+        doEval
+      }
+      case StackUnfold :: stk => v match {
+        case FoldVal(v) => {
+          target = Return(v)
+          stack = stk
+          doEval
+        }
+        case v => throw new Exception("Attempt to unfold a non-recursive value " + v) //typechecker should catch
+      }
+      case StackHandler(e2) :: stk => {
+        stack = stk //if a value is returned, skip the handler
+        doEval
+      }
+      case PopFrame :: stk => {
+        env = env.tail //'tail' is safe, pops are added only with a frame
+        stack = stk
+        doEval
+      }
     }
-  }
-
-  def evalStep(e : Expr) : Unit = e match {
-    case Var(x) => target = Return(getBinding(env, x))
-    case Z      => target = Return(ZVal)
-    case S(n) => {
-      target = Eval(n)
-      push(StackS)
+    case Throw(s) => stack match {
+      case Nil => ExceptionValue(s)
+      case StackHandler(e2) :: stk => {
+        target = Eval(e2)
+        stack = stk
+        doEval
+      }
+      case _ :: stk => {
+        stack = stk //if an exception is being thrown, pop stack
+        doEval
+      }
     }
-    case Lam(v, t, e) => target = Return(LamVal(v, e, flattenEnv))
-    case App(e1, e2) => {
-      target = Eval(e1)
-      push(StackLam(e2))
-    }
-    case Fix(v, Lam(x, t2, e)) => {
-      pushEnv(Map(v -> RecursiveLamVal(v, x, e, flattenEnv)))
-      target = Eval(Lam(x, t2, e))
-    }
-    case Fix(v, e) => target = Eval(e) //this will explode on CAFs (eg, recursive non-functions) so don't write them
-    case Triv      => target = Return(TrivVal)
-    case PairEx(e1, e2) => {
-      target = Eval(e1)
-      push(StackLPair(e2))
-    }
-    case InL(e) => {
-      target = Eval(e)
-      push(StackInL)
-    }
-    case InR(e) => {
-      target = Eval(e)
-      push(StackInR)
-    }
-    case Match(e, rs) => {
-      target = Eval(e)
-      push(StackCase(rs))
-    }
-    case Fold(mu, t, e) => {
-      target = Eval(e)
-      push(StackFold)
-    }
-    case Unfold(e) => {
-      target = Eval(e)
-      push(StackUnfold)
-    }
-    case TypeLam(t, e) => target = Eval(e) //Ignore types
-    case TypeApp(e, t) => target = Eval(e) //Ignore types
-    case ThrowEx(s)    => target = Throw(s)
-    case TryCatch(e1, e2) => {
-      target = Eval(e1)
-      push(StackHandler(e2))
-    }
-    case CommandExp(c) => target = Return(Action(c, flattenEnv))
-  }
-
-  def returnStep(v : Value, s : ExprStack) : Unit = s match {
-    case StackS => target = Return(SVal(v))
-    case StackLam(e2) => {
-      target = Eval(e2)
-      push(StackArg(v))
-    }
-    case StackArg(LamVal(x, e, clos)) => {
-      pushEnv(clos + (x -> v))
-      target = Eval(e)
-    }
-    case StackArg(v1) => throw new Exception("Application of a non-function : " + v1) //Typechecker should have caught this
-    case StackLPair(e2) => {
-      target = Eval(e2)
-      push(StackRPair(v))
-    }
-    case StackRPair(v1) => target = Return(PairVal(v1, v))
-    case StackInL       => target = Return(InLVal(v))
-    case StackInR       => target = Return(InRVal(v))
-    case StackCase(rs) => {
-      val (e, bind) = PatternCompiler.run(v, rs)
-      pushEnv(bind)
-      target = Eval(e)
-    }
-    case StackFold => target = Return(FoldVal(v))
-    case StackUnfold => v match {
-      case FoldVal(v) => target = Return(v)
-      case v          => throw new Exception("Attempt to unfold a non-recursive value " + v) //typechecker should catch
-    }
-    case StackHandler(e2) => () //if a value is returned, skip the handler
-    case PopFrame         => env = env.tail //'tail' is safe, pops are added only with a frame
-  }
-
-  def throwStep(s : String) : Unit = pop match {
-    case StackHandler(e2) => target = Eval(e2)
-    case _                => () //if an exception is being thrown, pop stack
   }
 
 }
