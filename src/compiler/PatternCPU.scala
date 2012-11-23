@@ -17,22 +17,23 @@ object PatternCPU {
 
   val register : Array[Int] = Array.ofDim(32)
   val R_TAG = 0
-  val R_VAL_SP = 1
-  val R_BIND_SP = 2
-  val R_VAL_HP = 3
+  val R_HEAP_A = 1
+  val R_HEAP_B = 2
+  val R_VAL_SP = 3
+  val R_BIND_SP = 4
+  val R_VAL_HP = 5
 
   val valStack : Array[HeapValue] = Array.ofDim(1000) //TODO large enough?
   val bindStack : Array[(String, HeapValue)] = Array.ofDim(1000) //TODO large enough?
   val valHeap : Array[HeapValue] = Array.ofDim(100000) //TODO large enough?
-
-  var v : HeapValue = null
 
   var retval : Expr = null
 
   def run(v1 : Value, pr : List[PatternOpcode]) : (Expr, Map[String, Value]) = {
     PC = 0
     register(R_VAL_HP) = 0
-    heapificate(v1)
+    heapUp(v1)
+
     prog = pr
 
     prog.foreach(println)
@@ -68,22 +69,18 @@ object PatternCPU {
     case HeapValue(PAIRTAG, a, b) => PairVal(unheap(valHeap(a)), unheap(valHeap(b)))
   }
 
-  def heapificate(v : Value) : Int = {
+  def heapUp(v : Value) : Int = {
     val ix = register(R_VAL_HP)
     register(R_VAL_HP) = register(R_VAL_HP) + 1
     valHeap(ix) = v match {
-      case ZVal       => HeapValue(ZTAG, -1, -1)
-      case TrivVal    => HeapValue(TRIVTAG, -1, -1)
-      case SVal(a)    => HeapValue(STAG, heapificate(a), -1)
-      case InLVal(a)  => HeapValue(INLTAG, heapificate(a), -1)
-      case InRVal(a)  => HeapValue(INRTAG, heapificate(a), -1)
-      case FoldVal(a) => HeapValue(FOLDTAG, heapificate(a), -1)
-      case PairVal(a, b) => {
-        val ha = heapificate(a) //Force ordering
-        val hb = heapificate(b)
-        HeapValue(PAIRTAG, ha, hb)
-      }
-      case _ => throw new Exception("not possible in pattern matching!" + v)
+      case ZVal          => HeapValue(ZTAG, -1, -1)
+      case TrivVal       => HeapValue(TRIVTAG, -1, -1)
+      case SVal(a)       => HeapValue(STAG, heapUp(a), -1)
+      case InLVal(a)     => HeapValue(INLTAG, heapUp(a), -1)
+      case InRVal(a)     => HeapValue(INRTAG, heapUp(a), -1)
+      case FoldVal(a)    => HeapValue(FOLDTAG, heapUp(a), -1)
+      case PairVal(a, b) => HeapValue(PAIRTAG, heapUp(a), heapUp(b))
+      case _             => throw new Exception("not possible in pattern matching!" + v)
     }
     ix
   }

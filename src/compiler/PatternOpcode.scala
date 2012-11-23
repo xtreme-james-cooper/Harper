@@ -53,23 +53,23 @@ case class JIfNEq(n : Int, v : Int, l : String) extends PatternOpcode("jine r" +
     }
 }
 
-case class ValPush(v : HeapValue) extends PatternOpcode("??? pshv " + v) {
+case class ValPush(x : HeapValue) extends PatternOpcode("??? pshv " + x) {
   override def execute : Unit = {
     valStack(register(R_VAL_SP)) = valHeap(0) //TODO not correct atm
     register(R_VAL_SP) = register(R_VAL_SP) + 1
   }
 }
 
-case class ValPushA(x : HeapValue) extends PatternOpcode("??? pshv " + v) {
+case class ValPushA(x : HeapValue) extends PatternOpcode("??? pshv " + x) {
   override def execute : Unit = {
-    valStack(register(R_VAL_SP)) = valHeap(v.a) //TODO not correct atm
+    valStack(register(R_VAL_SP)) = valHeap(register(R_HEAP_A)) //TODO not correct atm
     register(R_VAL_SP) = register(R_VAL_SP) + 1
   }
 }
 
-case class ValPushB(x : HeapValue) extends PatternOpcode("??? pshv " + v) {
+case class ValPushB(x : HeapValue) extends PatternOpcode("??? pshv " + x) {
   override def execute : Unit = {
-    valStack(register(R_VAL_SP)) = valHeap(v.b) //TODO not correct atm
+    valStack(register(R_VAL_SP)) = valHeap(register(R_HEAP_B)) //TODO not correct atm
     register(R_VAL_SP) = register(R_VAL_SP) + 1
   }
 }
@@ -77,14 +77,16 @@ case class ValPushB(x : HeapValue) extends PatternOpcode("??? pshv " + v) {
 case object ValPop extends PatternOpcode("??? popv") {
   override def execute : Unit = {
     register(R_VAL_SP) = register(R_VAL_SP) - 1
-    v = valStack(register(R_VAL_SP))
+    val v = valStack(register(R_VAL_SP))
     register(R_TAG) = v.tag
+    register(R_HEAP_A) = v.a
+    register(R_HEAP_B) = v.b
   }
 }
 
 case class PushVRetStack(x : String) extends PatternOpcode("??? pshe " + x + " -> v") {
   override def execute : Unit = {
-    bindStack(register(R_BIND_SP)) = (x -> v)
+    bindStack(register(R_BIND_SP)) = (x -> HeapValue(register(R_TAG), register(R_HEAP_A), register(R_HEAP_B)))
     register(R_BIND_SP) = register(R_BIND_SP) + 1
   }
 }
