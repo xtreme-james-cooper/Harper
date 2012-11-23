@@ -5,6 +5,7 @@ import model.{Value, SVal, Expr, ExceptionValue}
 import model.{Rule, PairVal, LamVal, InRVal, InLVal, FoldVal}
 import model.Action
 import model.Command
+import model.RecursiveLamVal
 
 sealed abstract class ExprOpcode(name : String) {
   override def toString : String = name
@@ -26,10 +27,6 @@ case class ExprLabel(l : String) extends ExprOpcode("   :" + l + "") {
 /*
  * Bogus
  */
-
-case class RunExpr(e : Expr) extends ExprOpcode("???? runex " + e) {
-  override def execute : Unit = retval = ExprCompiler.doEval(e, env) :: retval
-}
 
 case class ReturnOp(v : Value) extends ExprOpcode("???? retval " + v) {
   override def execute : Unit = retval = v :: retval
@@ -120,4 +117,12 @@ case object RunLambda extends ExprOpcode("???? runlam") {
 
 case object FlattenEnv extends ExprOpcode("???? flattenv") {
   override def execute : Unit = envTemp = ExprCompiler.flatten(env)
+}
+
+case class PushRecursiveLamEnv(v : String, x : String, e : Expr) extends ExprOpcode("???? pushrecursivelamenv") {
+  override def execute : Unit = envTemp = ExprCompiler.flatten(Map(v -> RecursiveLamVal(v, x, e, ExprCompiler.flatten(env))) :: env)
+}
+
+case class DerefVar(x : String) extends ExprOpcode("???? derefvar " + x) {
+  override def execute : Unit = retval = ExprCompiler.getBinding(env, x) :: retval
 }

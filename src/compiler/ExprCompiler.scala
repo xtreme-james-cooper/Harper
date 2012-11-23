@@ -18,7 +18,7 @@ object ExprCompiler {
   def run(e : Expr, m : List[Map[String, Value]]) : Value = ExprCPU.run(compileExpr(e) ++ List(ExprExit), m)
 
   def compileExpr(e0 : Expr) : List[ExprOpcode] = e0 match {
-    case Var(x) => List(RunExpr(e0))
+    case Var(x) => List(DerefVar(x))
     case Z      => List(ReturnOp(ZVal))
     case S(e) => {
       val exnLabel = "exnshortcut" + n
@@ -31,7 +31,10 @@ object ExprCompiler {
       n = n + 1
       compileExpr(e1) ++ List(JIfExn(exnLabel)) ++ compileExpr(e2) ++ List(PushEnvFromLambda, RunLambda, PopEnv, ExprLabel(exnLabel))
     }
-    case Fix(v, e) => List(RunExpr(e0))
+    case Fix(v, Lam(x, t2, e2)) => {
+      List(PushRecursiveLamEnv(v, x, e2), PushLam(x, e2))
+    }
+    case Fix(v, e) => compileExpr(e) //this will explode on CAFs (eg, recursive non-functions) so don't write them
     case Triv      => List(ReturnOp(TrivVal))
     case PairEx(e1, e2) => {
       val exnLabel = "exnshortcut" + n
@@ -75,10 +78,9 @@ object ExprCompiler {
   }
 
   def doEval(e : Expr, env : List[Map[String, Value]]) : Value = e match {
-    case Var(x)                => getBinding(env, x)
     case Fix(v, Lam(x, t2, e)) => doEval(Lam(x, t2, e), Map(v -> RecursiveLamVal(v, x, e, flatten(env))) :: env)
-    case Fix(v, e)             => doEval(e, env) //this will explode on CAFs (eg, recursive non-functions) so don't write them
-
+    case Fix(v, e0)             => doEval(e0, env) 
+    case Var(x)                => getBinding(env, x)
     case Triv                  => TrivVal
     case TypeLam(t, e)         => doEval(e, env)
     case TypeApp(e, t)         => doEval(e, env)
