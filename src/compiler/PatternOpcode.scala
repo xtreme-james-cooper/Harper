@@ -64,22 +64,23 @@ case class ValPushR(x : Int) extends PatternOpcode("pshv r" + x) {
   override def execute : Unit = {
     valStack(register(R_VAL_SP)) = valHeap(register(x))
     register(R_VAL_SP) = register(R_VAL_SP) + 1
+    valStack(register(R_VAL_SP)) = valHeap(register(x) + 1)
+    register(R_VAL_SP) = register(R_VAL_SP) + 1
+    valStack(register(R_VAL_SP)) = valHeap(register(x) + 2)
+    register(R_VAL_SP) = register(R_VAL_SP) + 1
   }
 }
 
-case object ValPop extends PatternOpcode("??? popv") {
+case class ValPop(x : Int) extends PatternOpcode("popv r" + x) {
   override def execute : Unit = {
     register(R_VAL_SP) = register(R_VAL_SP) - 1
-    val v = valStack(register(R_VAL_SP))
-    register(R_TAG) = v.tag
-    register(R_HEAP_A) = v.a
-    register(R_HEAP_B) = v.b
+    register(x) = valStack(register(R_VAL_SP))
   }
 }
 
 case class PushVRetStack(x : String) extends PatternOpcode("??? pshe " + x + " -> v") {
   override def execute : Unit = {
-    bindStack(register(R_BIND_SP)) = (x -> HeapValue(register(R_TAG), register(R_HEAP_A), register(R_HEAP_B)))
+    bindStack(register(R_BIND_SP)) = (x -> (register(R_TAG), register(R_HEAP_A), register(R_HEAP_B)))
     register(R_BIND_SP) = register(R_BIND_SP) + 1
   }
 }

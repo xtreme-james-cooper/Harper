@@ -23,9 +23,9 @@ object PatternCPU {
   val R_BIND_SP = 4
   val R_VAL_HP = 5
 
-  val valStack : Array[HeapValue] = Array.ofDim(1000) //TODO large enough?
-  val bindStack : Array[(String, HeapValue)] = Array.ofDim(1000) //TODO large enough?
-  val valHeap : Array[HeapValue] = Array.ofDim(100000) //TODO large enough?
+  val valStack : Array[Int] = Array.ofDim(10000) //TODO large enough?
+  val bindStack : Array[(String, (Int, Int, Int))] = Array.ofDim(100) //Should never have 100 bindings from a pattern
+  val valHeap : Array[Int] = Array.ofDim(100000) //TODO large enough?
 
   var retval : Expr = null
 
@@ -59,28 +59,40 @@ object PatternCPU {
   val FOLDTAG = 5
   val PAIRTAG = 6
 
-  def unheap(h : HeapValue) : Value = h match {
-    case HeapValue(ZTAG, _, _)    => ZVal
-    case HeapValue(TRIVTAG, _, _) => TrivVal
-    case HeapValue(STAG, a, _)    => SVal(unheap(valHeap(a)))
-    case HeapValue(INLTAG, a, _)  => InLVal(unheap(valHeap(a)))
-    case HeapValue(INRTAG, a, _)  => InRVal(unheap(valHeap(a)))
-    case HeapValue(FOLDTAG, a, _) => FoldVal(unheap(valHeap(a)))
-    case HeapValue(PAIRTAG, a, b) => PairVal(unheap(valHeap(a)), unheap(valHeap(b)))
+  def unheap(h : (Int, Int, Int)) : Value = h match {
+    case (ZTAG, _, _)    => ZVal
+    case (TRIVTAG, _, _) => TrivVal
+    case (STAG, a, _)    => SVal(unheap((valHeap(a), valHeap(a + 1), valHeap(a + 2))))
+    case (INLTAG, a, _)  => InLVal(unheap((valHeap(a), valHeap(a + 1), valHeap(a + 2))))
+    case (INRTAG, a, _)  => InRVal(unheap((valHeap(a), valHeap(a + 1), valHeap(a + 2))))
+    case (FOLDTAG, a, _) => FoldVal(unheap((valHeap(a), valHeap(a + 1), valHeap(a + 2))))
+    case (PAIRTAG, a, b) => PairVal(unheap((valHeap(a), valHeap(a + 1), valHeap(a + 2))), unheap((valHeap(b), valHeap(b + 1), valHeap(b + 2))))
   }
 
   def heapUp(v : Value) : Int = {
     val ix = register(R_VAL_HP)
-    register(R_VAL_HP) = register(R_VAL_HP) + 1
+    register(R_VAL_HP) = register(R_VAL_HP) + 3
     valHeap(ix) = v match {
-      case ZVal          => HeapValue(ZTAG, -1, -1)
-      case TrivVal       => HeapValue(TRIVTAG, -1, -1)
-      case SVal(a)       => HeapValue(STAG, heapUp(a), -1)
-      case InLVal(a)     => HeapValue(INLTAG, heapUp(a), -1)
-      case InRVal(a)     => HeapValue(INRTAG, heapUp(a), -1)
-      case FoldVal(a)    => HeapValue(FOLDTAG, heapUp(a), -1)
-      case PairVal(a, b) => HeapValue(PAIRTAG, heapUp(a), heapUp(b))
+      case ZVal          => ZTAG
+      case TrivVal       => TRIVTAG
+      case SVal(a)       => STAG
+      case InLVal(a)     => INLTAG
+      case InRVal(a)     => INRTAG
+      case FoldVal(a)    => FOLDTAG
+      case PairVal(a, b) => PAIRTAG
       case _             => throw new Exception("not possible in pattern matching!" + v)
+    }
+    valHeap(ix + 1) = v match {
+      case SVal(a)       => heapUp(a)
+      case InLVal(a)     => heapUp(a)
+      case InRVal(a)     => heapUp(a)
+      case FoldVal(a)    => heapUp(a)
+      case PairVal(a, b) => heapUp(a)
+      case _             => -1
+    }
+    valHeap(ix + 2) = v match {
+      case PairVal(a, b) => heapUp(b)
+      case _             => -1
     }
     ix
   }
