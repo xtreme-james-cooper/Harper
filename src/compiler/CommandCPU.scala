@@ -1,7 +1,5 @@
 package compiler
 
-import model.Value
-
 object CommandCPU {
 
   var PC : Int = 0

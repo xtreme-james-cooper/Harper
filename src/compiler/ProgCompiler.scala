@@ -1,6 +1,6 @@
 package compiler
 
-import model.{Value, TypeDefn, Prog, ExprDefn, Defn}
+import model.{ TypeDefn, Prog, ExprDefn, Defn}
 
 object ProgCompiler {
 

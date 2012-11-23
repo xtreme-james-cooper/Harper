@@ -1,6 +1,6 @@
 package compiler
 
-import model.{ Value, SetCmd, Ret, Get, Decl, Command, Bind, Action }
+import model.{SetCmd, Ret, Get, Decl, Command, Bind}
 
 object CommandCompiler {
 

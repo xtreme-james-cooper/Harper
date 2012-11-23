@@ -1,6 +1,5 @@
 package compiler
 
-import model.Value
 import model.Expr
 
 object ExprCPU {

@@ -1,11 +1,7 @@
 package compiler
 
 import ExprCPU._
-import model.{ Value, SVal, Expr, ExceptionValue }
-import model.{ Rule, PairVal, LamVal, InRVal, InLVal, FoldVal }
-import model.Action
-import model.Command
-import model.RecursiveLamVal
+import model.{Rule, Expr, Command}
 
 sealed abstract class ExprOpcode(name : String) {
   override def toString : String = name

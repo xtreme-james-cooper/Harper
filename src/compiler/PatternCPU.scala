@@ -1,14 +1,6 @@
 package compiler
 
 import model.Expr
-import model.Value
-import model.TrivVal
-import model.InLVal
-import model.ZVal
-import model.InRVal
-import model.PairVal
-import model.SVal
-import model.FoldVal
 
 object PatternCPU {
 

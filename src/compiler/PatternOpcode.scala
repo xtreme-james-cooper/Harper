@@ -1,7 +1,7 @@
 package compiler
 
-import model.{ ZVal, Value, TrivVal, SVal, PairVal, InRVal, InLVal, FoldVal, Expr }
 import PatternCPU._
+import model.Expr
 
 sealed abstract class PatternOpcode(name : String) {
   override def toString : String = name

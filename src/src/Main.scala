@@ -108,7 +108,7 @@ object Main {
     for ((name, typ) <- ProgChecker.typeCheck(prog)) println(name + " : " + typ)
     val intVal = ProgEvaluator.run(prog)
     val compVal = ProgCompiler.run(prog)
-    if (intVal != compVal) throw new Exception("values don't match! " + intVal + " " + compVal)
+    if (intVal.toString != compVal.toString) throw new Exception("values don't match! " + intVal + " " + compVal)
     println("value" + ": " + intVal)
     println("-----------------------------")
 

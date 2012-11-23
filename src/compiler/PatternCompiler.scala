@@ -1,6 +1,6 @@
 package compiler
 
-import model.{ ZPat, WildPat, VarPat, Value, TrivPat, SPat, Rule, Pattern, PairPat, InRPat, InLPat, Expr }
+import model.{ ZPat, WildPat, VarPat, TrivPat, SPat, Rule, Pattern, PairPat, InRPat, InLPat, Expr }
 import PatternCPU._
 
 object PatternCompiler {
