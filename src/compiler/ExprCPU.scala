@@ -9,9 +9,11 @@ object ExprCPU {
 
   val register : Array[Int] = Array.ofDim(32)
 
-  var retval : Value = null
+  var retval : List[Value] = Nil
 
   var env : List[Map[String, Value]] = null
+  
+  var envTemp : Map[String, Value] = null
   
   def run(pr : List[ExprOpcode], m : List[Map[String, Value]]) : Value = {
     PC = 0
@@ -27,7 +29,7 @@ object ExprCPU {
       PC = PC + 1
     }
 
-    retval
+    retval.head
   }
 
 }
