@@ -37,7 +37,7 @@ object PatternCPU {
 
     prog = pr
 
-    prog.foreach(println)
+//    prog.foreach(println)
 
     while (prog(PC) != Exit) {
       prog(PC).execute
