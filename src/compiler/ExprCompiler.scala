@@ -44,34 +44,35 @@ object ExprCompiler {
       case CommandExp(c)         => doEval(Return(Action(c, flatten(env))), None, env, stack)
     }
     case Return(v) =>
-      if (exval.isEmpty)
-        stack match {
-          case Nil                                 => v
-          case StackS :: stk                       => doEval(Return(SVal(v)), None, env, stk)
-          case StackLam(e2) :: stk                 => doEval(Eval(e2), None, env, StackArg(v) :: stk)
-          case StackArg(LamVal(x, e, clos)) :: stk => doEval(Eval(e), None, clos + (x -> v) :: env, PopFrame :: stk)
-          case StackArg(v1) :: stk                 => throw new Exception("Application of a non-function : " + v1) //Typechecker should have caught this
-          case StackLPair(e2) :: stk               => doEval(Eval(e2), None, env, StackRPair(v) :: stk)
-          case StackRPair(v1) :: stk               => doEval(Return(PairVal(v1, v)), None, env, stk)
-          case StackInL :: stk                     => doEval(Return(InLVal(v)), None, env, stk)
-          case StackInR :: stk                     => doEval(Return(InRVal(v)), None, env, stk)
-          case StackCase(rs) :: stk => {
-            val (e, bind) = PatternCompiler.run(v, rs)
-            doEval(Eval(e), None, bind :: env, PopFrame :: stk)
-          }
-          case StackFold :: stk => doEval(Return(FoldVal(v)), None, env, stk)
-          case StackUnfold :: stk => v match {
-            case FoldVal(v) => doEval(Return(v), None, env, stk)
-            case v          => throw new Exception("Attempt to unfold a non-recursive value " + v) //typechecker should catch
-          }
-          case StackHandler(e2) :: stk => doEval(target, None, env, stk)
-          case PopFrame :: stk         => doEval(target, None, env.tail, stk)
+
+      stack match {
+        case Nil => exval match {
+          case None    => v
+          case Some(s) => ExceptionValue(exval.get)
         }
-      else stack match {
-        case Nil                     => ExceptionValue(exval.get)
-        case StackHandler(e2) :: stk => doEval(Eval(e2), None, env, stk)
-        case _ :: stk                => doEval(target, exval, env, stk)
+        case StackS :: stk       => doEval(if (exval.isEmpty) Return(SVal(v)) else target, exval, env, stk)
+        case StackLam(e2) :: stk => doEval(if (exval.isEmpty) Eval(e2) else target, exval, env, StackArg(v) :: stk)
+        case StackArg(v1) :: stk =>
+          if (exval.isDefined) doEval(target, exval, env, stk)
+          else v1 match {
+            case LamVal(x, e, clos) => doEval(Eval(e), exval, clos + (x -> v) :: env, PopFrame :: stk)
+            case _                  => throw new Exception("Application of a non-function : " + v1)
+          }
+        case StackLPair(e2) :: stk => doEval(if (exval.isEmpty) Eval(e2) else target, exval, env, StackRPair(v) :: stk)
+        case StackRPair(v1) :: stk => doEval(if (exval.isEmpty) Return(PairVal(v1, v)) else target, exval, env, stk)
+        case StackInL :: stk       => doEval(if (exval.isEmpty) Return(InLVal(v)) else target, exval, env, stk)
+        case StackInR :: stk       => doEval(if (exval.isEmpty) Return(InRVal(v)) else target, exval, env, stk)
+        case StackCase(rs) :: stk => if (exval.isEmpty) {
+          val (e, bind) = PatternCompiler.run(v, rs)
+          doEval(Eval(e), exval, bind :: env, PopFrame :: stk)
+        } else
+          doEval(target, exval, env, stk)
+        case StackFold :: stk        => doEval(if (exval.isEmpty) Return(FoldVal(v)) else target, exval, env, stk)
+        case StackUnfold :: stk      => doEval(if (exval.isEmpty) Return(v.asInstanceOf[FoldVal].v) else target, exval, env, stk)
+        case StackHandler(e2) :: stk => doEval(if (exval.isEmpty) target else Eval(e2), None, env, stk)
+        case PopFrame :: stk         => doEval(target, exval, env.tail, stk)
       }
+
   }
 
 }
