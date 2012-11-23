@@ -53,25 +53,21 @@ case class JIfNEq(n : Int, v : Int, l : String) extends PatternOpcode("jine r" +
     }
 }
 
-case class HeapPush(h : TaggedValue) extends PatternOpcode("??? aloc " + h) {
-  override def execute : Unit = heapificate(h) //Doing dirty work atm
-}
-
-case class ValPush(v : TaggedValue) extends PatternOpcode("??? pshv " + v) {
+case class ValPush(v : HeapValue) extends PatternOpcode("??? pshv " + v) {
   override def execute : Unit = {
     valStack(register(R_VAL_SP)) = valHeap(0) //TODO not correct atm
     register(R_VAL_SP) = register(R_VAL_SP) + 1
   }
 }
 
-case class ValPushA(x : TaggedValue) extends PatternOpcode("??? pshv " + v) {
+case class ValPushA(x : HeapValue) extends PatternOpcode("??? pshv " + v) {
   override def execute : Unit = {
     valStack(register(R_VAL_SP)) = valHeap(v.a) //TODO not correct atm
     register(R_VAL_SP) = register(R_VAL_SP) + 1
   }
 }
 
-case class ValPushB(x : TaggedValue) extends PatternOpcode("??? pshv " + v) {
+case class ValPushB(x : HeapValue) extends PatternOpcode("??? pshv " + v) {
   override def execute : Unit = {
     valStack(register(R_VAL_SP)) = valHeap(v.b) //TODO not correct atm
     register(R_VAL_SP) = register(R_VAL_SP) + 1
