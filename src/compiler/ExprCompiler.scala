@@ -1,8 +1,24 @@
 package compiler
 
-import model.{ ZVal, Z, Var, Value, Unfold, TypeLam, TypeApp, TryCatch, TrivVal, Triv, ThrowEx, SVal, S, RecursiveLamVal, PairVal, PairEx, Match, LamVal, Lam, InRVal, InR, InLVal, InL, FoldVal, Fold, Fix, Expr, ExceptionValue, CommandExp, App, Action }
+import model.{ ZVal, Z, Var, Value, Unfold, TypeLam, TypeApp, TryCatch, TrivVal, Triv, ThrowEx, SVal, S, Rule, RecursiveLamVal, PairVal, PairEx, Match, LamVal, Lam, InRVal, InR, InLVal, InL, FoldVal, Fold, Fix, Expr, ExceptionValue, CommandExp, App, Action }
 
 object ExprCompiler {
+
+  sealed abstract class ExprStack(name : String) {
+    override def toString : String = name
+  }
+
+  case class StackLam(e2 : Expr) extends ExprStack("((-) " + e2 + ")")
+  case class StackArg(v1 : Value) extends ExprStack("(" + v1 + ", (-))")
+  case class StackLPair(e2 : Expr) extends ExprStack("((-), " + e2 + ")")
+  case class StackRPair(v1 : Value) extends ExprStack("(" + v1 + ", (_))")
+  case object StackInL extends ExprStack("inl (-)")
+  case object StackInR extends ExprStack("inr (-)")
+  case class StackCase(rs : List[Rule]) extends ExprStack("case (-) of { " + rs.foldRight("")({ case (r1, r2) => r1 + " | " + r2 }) + "}")
+  case object StackUnfold extends ExprStack("unfold (-)")
+  case object StackFold extends ExprStack("fold (-)")
+  case class StackHandler(e2 : Expr) extends ExprStack("try (-) catch " + e2)
+  case object PopFrame extends ExprStack(" ! ")
 
   sealed abstract class Target
   case class Eval(e : Expr) extends Target
@@ -21,11 +37,17 @@ object ExprCompiler {
 
   def run(e : Expr, m : List[Map[String, Value]]) : Value = doEval(Eval(e), None, m, Nil)
 
-  def doEval(target : Target, exval : Option[String], env : Env, stack : List[ExprStack]) : Value = target match {
+  def doEval(target : Target, exval : Option[ExceptionValue], env : Env, stack : List[ExprStack]) : Value = target match {
     case Eval(e) => e match {
       case Var(x)                => doEval(Return(getBinding(env, x)), None, env, stack)
       case Z                     => doEval(Return(ZVal), None, env, stack)
-      case S(n)                  => doEval(Eval(n), None, env, StackS :: stack)
+      case S(n)                  => {
+        val v = doEval(Eval(n), None, env, Nil)
+        if (v.isInstanceOf[ExceptionValue])
+          doEval(Return(v), Some(v.asInstanceOf[ExceptionValue]), env, stack)
+        else
+          doEval(Return(SVal(v)), None, env, stack)
+      }
       case Lam(v, t, e)          => doEval(Return(LamVal(v, e, flatten(env))), None, env, stack)
       case App(e1, e2)           => doEval(Eval(e1), None, env, StackLam(e2) :: stack)
       case Fix(v, Lam(x, t2, e)) => doEval(Eval(Lam(x, t2, e)), None, Map(v -> RecursiveLamVal(v, x, e, flatten(env))) :: env, PopFrame :: stack)
@@ -39,16 +61,15 @@ object ExprCompiler {
       case Unfold(e)             => doEval(Eval(e), None, env, StackUnfold :: stack)
       case TypeLam(t, e)         => doEval(Eval(e), None, env, stack)
       case TypeApp(e, t)         => doEval(Eval(e), None, env, stack)
-      case ThrowEx(s)            => doEval(Return(TrivVal), Some(s), env, stack)
+      case ThrowEx(s)            => doEval(Return(TrivVal), Some(ExceptionValue(s)), env, stack)
       case TryCatch(e1, e2)      => doEval(Eval(e1), None, env, StackHandler(e2) :: stack)
       case CommandExp(c)         => doEval(Return(Action(c, flatten(env))), None, env, stack)
     }
     case Return(v) => stack match {
       case Nil => exval match {
         case None    => v
-        case Some(s) => ExceptionValue(exval.get)
+        case Some(s) => exval.get
       }
-      case StackS :: stk       => doEval(if (exval.isEmpty) Return(SVal(v)) else target, exval, env, stk)
       case StackLam(e2) :: stk => doEval(if (exval.isEmpty) Eval(e2) else target, exval, env, StackArg(v) :: stk)
       case StackArg(v1) :: stk =>
         if (exval.isDefined) doEval(target, exval, env, stk)
