@@ -4,20 +4,39 @@ import model.{ ZVal, Z, Var, Value, Unfold, TypeLam, TypeApp, TryCatch, TrivVal,
 
 object ExprCompiler {
 
-  type Env = List[Map[String, Value]] //Not V, specifically Value
-
-  def getBinding(e : Env, x : String) : Value = e match {
+  def getBinding(e : List[Map[String, Value]], x : String) : Value = e match {
     case Nil                     => throw new Exception("Unbound identifier : " + x) //Typechecker should blow up on this first
     case m :: e if m.contains(x) => m(x)
     case m :: e                  => getBinding(e, x)
   }
 
   //Crush the env down into a single stack frame for use as a closure
-  private def flatten(env : Env) : Map[String, Value] = env.foldRight(Map[String, Value]())({ case (m1, m2) => m2 ++ m1 })
+  private def flatten(env : List[Map[String, Value]]) : Map[String, Value] = env.foldRight(Map[String, Value]())({ case (m1, m2) => m2 ++ m1 })
 
-  def run(e : Expr, m : List[Map[String, Value]]) : Value = doEval(e, m)
+  def run(e : Expr, m : List[Map[String, Value]]) : Value = ExprCPU.run(compileExpr(e), m)
 
-  def doEval(e : Expr, env : Env) : Value = e match {
+  def compileExpr(e0 : Expr) : List[ExprOpcode] = e0 match {
+    case Var(x)           => List(RunExpr(e0), ExprExit)
+    case Z                => List(RunExpr(e0), ExprExit)
+    case S(n)             => List(RunExpr(e0), ExprExit)
+    case Lam(v, t, e)     => List(RunExpr(e0), ExprExit)
+    case App(e1, e2)      => List(RunExpr(e0), ExprExit)
+    case Fix(v, e)        => List(RunExpr(e0), ExprExit)
+    case Triv             => List(RunExpr(e0), ExprExit)
+    case PairEx(e1, e2)   => List(RunExpr(e0), ExprExit)
+    case InL(e)           => List(RunExpr(e0), ExprExit)
+    case InR(e)           => List(RunExpr(e0), ExprExit)
+    case Match(e, rs)     => List(RunExpr(e0), ExprExit)
+    case Fold(mu, t, e)   => List(RunExpr(e0), ExprExit)
+    case Unfold(e)        => List(RunExpr(e0), ExprExit)
+    case TypeLam(t, e)    => List(RunExpr(e0), ExprExit)
+    case TypeApp(e, t)    => List(RunExpr(e0), ExprExit)
+    case ThrowEx(s)       => List(RunExpr(e0), ExprExit)
+    case TryCatch(e1, e2) => List(RunExpr(e0), ExprExit)
+    case CommandExp(c)    => List(RunExpr(e0), ExprExit)
+  }
+
+  def doEval(e : Expr, env : List[Map[String, Value]]) : Value = e match {
     case Var(x) => getBinding(env, x)
     case Z      => ZVal
     case S(n) => {
