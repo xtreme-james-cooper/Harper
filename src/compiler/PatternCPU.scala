@@ -21,11 +21,11 @@ object PatternCPU {
   val R_BIND_SP = 2
   val R_VAL_HP = 3
 
-  val valStack : Array[TaggedValue] = Array.ofDim(1000) //TODO large enough?
-  val bindStack : Array[(String, TaggedValue)] = Array.ofDim(1000) //TODO large enough?
+  val valStack : Array[HeapValue] = Array.ofDim(1000) //TODO large enough?
+  val bindStack : Array[(String, HeapValue)] = Array.ofDim(1000) //TODO large enough?
   val valHeap : Array[HeapValue] = Array.ofDim(100000) //TODO large enough?
 
-  var v : TaggedValue = null
+  var v : HeapValue = null
 
   var retval : Expr = null
 
@@ -71,14 +71,14 @@ object PatternCPU {
     case _             => throw new Exception("not possible in pattern matching!" + v)
   }
 
-  def unheap(h : TaggedValue) : Value = h match {
-    case TaggedValue(ZTAG, a, b)    => ZVal
-    case TaggedValue(TRIVTAG, a, b) => TrivVal
-    case TaggedValue(STAG, a, b)    => SVal(unheap(a))
-    case TaggedValue(INLTAG, a, b)  => InLVal(unheap(a))
-    case TaggedValue(INRTAG, a, b)  => InRVal(unheap(a))
-    case TaggedValue(FOLDTAG, a, b) => FoldVal(unheap(a))
-    case TaggedValue(PAIRTAG, a, b) => PairVal(unheap(a), unheap(b))
+  def unheap(h : HeapValue) : Value = h match {
+    case HeapValue(ZTAG, a, b)    => ZVal
+    case HeapValue(TRIVTAG, a, b) => TrivVal
+    case HeapValue(STAG, a, b)    => SVal(unheap(valHeap(a)))
+    case HeapValue(INLTAG, a, b)  => InLVal(unheap(valHeap(a)))
+    case HeapValue(INRTAG, a, b)  => InRVal(unheap(valHeap(a)))
+    case HeapValue(FOLDTAG, a, b) => FoldVal(unheap(valHeap(a)))
+    case HeapValue(PAIRTAG, a, b) => PairVal(unheap(valHeap(a)), unheap(valHeap(b)))
   }
 
   def heapificate(h : TaggedValue) : Int =
@@ -91,10 +91,5 @@ object PatternCPU {
       valHeap(ix) = HeapValue(h.tag, a, b)
       ix
     }
-
-  def unheapificate(ix : Int) : TaggedValue =
-    TaggedValue(valHeap(ix).tag, 
-        if (valHeap(ix).a != -1) unheapificate(valHeap(ix).a) else null, 
-        if (valHeap(ix).b != -1) unheapificate(valHeap(ix).b) else null)
 
 }

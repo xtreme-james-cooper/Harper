@@ -59,21 +59,21 @@ case class HeapPush(h : TaggedValue) extends PatternOpcode("??? aloc " + h) {
 
 case class ValPush(v : TaggedValue) extends PatternOpcode("??? pshv " + v) {
   override def execute : Unit = {
-    valStack(register(R_VAL_SP)) = unheapificate(0) //TODO not correct atm
+    valStack(register(R_VAL_SP)) = valHeap(0) //TODO not correct atm
     register(R_VAL_SP) = register(R_VAL_SP) + 1
   }
 }
 
 case class ValPushA(x : TaggedValue) extends PatternOpcode("??? pshv " + v) {
   override def execute : Unit = {
-    valStack(register(R_VAL_SP)) = v.a //TODO not correct atm
+    valStack(register(R_VAL_SP)) = valHeap(v.a) //TODO not correct atm
     register(R_VAL_SP) = register(R_VAL_SP) + 1
   }
 }
 
 case class ValPushB(x : TaggedValue) extends PatternOpcode("??? pshv " + v) {
   override def execute : Unit = {
-    valStack(register(R_VAL_SP)) = v.b //TODO not correct atm
+    valStack(register(R_VAL_SP)) = valHeap(v.b) //TODO not correct atm
     register(R_VAL_SP) = register(R_VAL_SP) + 1
   }
 }
