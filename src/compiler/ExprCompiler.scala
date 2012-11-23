@@ -25,14 +25,20 @@ object ExprCompiler {
       n = n + 1
       compileExpr(e) ++ List(JIfExn(exnLabel), PushS, ExprLabel(exnLabel))
     }
-    case Lam(v, t, e) => List(FlattenEnv, PushLam(v, e))
+    case Lam(v, t, e) => {
+      val procname = "proc" + n
+      n = n + 1
+      List(FlattenEnv, PushLam(v, e)) ++ compileSubroutine(procname, e)
+    }
     case App(e1, e2) => {
       val exnLabel = "exnshortcut" + n
       n = n + 1
-      compileExpr(e1) ++ List(JIfExn(exnLabel)) ++ compileExpr(e2) ++ List(PushEnvFromLambda, RunLambda, PopEnv, ExprLabel(exnLabel))
+      compileExpr(e1) ++ List(JIfExn(exnLabel)) ++ compileExpr(e2) ++ List(RunLambda, PopEnv, ExprLabel(exnLabel))
     }
     case Fix(v, Lam(x, t2, e2)) => {
-      List(PushRecursiveLamEnv(v, x, e2), PushLam(x, e2))
+      val procname = "proc" + n
+      n = n + 1
+      List(PushRecursiveLamEnv(v, x, e2), PushLam(x, e2)) ++ compileSubroutine(procname, e2)
     }
     case Fix(v, e) => compileExpr(e) //this will explode on CAFs (eg, recursive non-functions) so don't write them
     case Triv      => List(ReturnOp(TrivVal))
@@ -165,6 +171,12 @@ object ExprCompiler {
     }
     case Lam(v, t, e)          => LamVal(v, e, flatten(env))
     case CommandExp(c)         => Action(c, flatten(env))
+  }
+  
+  def compileSubroutine(name : String, body : Expr) : List[ExprOpcode] = {
+    val jump = "jump" + n
+    n = n + 1
+    List(ExprJump(jump)) ++ compileExpr(body) ++ List(ExprLabel(jump))
   }
 
 }

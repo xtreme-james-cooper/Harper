@@ -1,8 +1,8 @@
 package compiler
 
 import ExprCPU._
-import model.{Value, SVal, Expr, ExceptionValue}
-import model.{Rule, PairVal, LamVal, InRVal, InLVal, FoldVal}
+import model.{ Value, SVal, Expr, ExceptionValue }
+import model.{ Rule, PairVal, LamVal, InRVal, InLVal, FoldVal }
 import model.Action
 import model.Command
 import model.RecursiveLamVal
@@ -22,6 +22,15 @@ case class ExprThrw(s : String) extends ExprOpcode("thrw \"" + s + "\"") {
 
 case class ExprLabel(l : String) extends ExprOpcode("   :" + l + "") {
   override def execute : Unit = ()
+}
+
+case class ExprJump(l : String) extends ExprOpcode("???? jump :" + l) {
+  override def execute : Unit = {
+    PC = 0
+    while (prog(PC) != ExprLabel(l)) {
+      PC = PC + 1
+    }
+  }
 }
 
 /*
@@ -44,7 +53,7 @@ case class JIfExn(l : String) extends ExprOpcode("???? jifx :" + l) {
 
 case class JIfNExn(l : String) extends ExprOpcode("???? jifnx :" + l) {
   override def execute : Unit =
-    if (! retval.head.isInstanceOf[ExceptionValue]) {
+    if (!retval.head.isInstanceOf[ExceptionValue]) {
       PC = 0
       while (prog(PC) != ExprLabel(l)) {
         PC = PC + 1
@@ -100,18 +109,14 @@ case object PopEnv extends ExprOpcode("???? popenv") {
   override def execute : Unit = env = env.tail
 }
 
-case object PushEnvFromLambda extends ExprOpcode("???? pshenvfrompat") {
-  override def execute : Unit = {
-    val l = retval.tail.head.asInstanceOf[LamVal]
-    val v = retval.head
-    env = (l.closure + (l.v -> v)) :: env
-  }
-}
-
 case object RunLambda extends ExprOpcode("???? runlam") {
   override def execute : Unit = {
-    val l = retval.tail.head.asInstanceOf[LamVal]
-    retval = ExprCompiler.doEval(l.e, env) :: retval.tail.tail
+	val v = retval.head
+	retval = retval.tail
+    val l = retval.head.asInstanceOf[LamVal]
+	retval = retval.tail
+    env = (l.closure + (l.v -> v)) :: env
+    retval = ExprCompiler.doEval(l.e, env) :: retval
   }
 }
 
