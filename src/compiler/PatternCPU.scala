@@ -21,11 +21,11 @@ object PatternCPU {
   val R_BIND_SP = 2
   val R_VAL_HP = 3
 
-  val valStack : Array[HeapValue] = Array.ofDim(1000) //TODO large enough?
-  val bindStack : Array[(String, HeapValue)] = Array.ofDim(1000) //TODO large enough?
-  val valHeap : Array[Int] = Array.ofDim(100000) //TODO large enough?
+  val valStack : Array[TaggedValue] = Array.ofDim(1000) //TODO large enough?
+  val bindStack : Array[(String, TaggedValue)] = Array.ofDim(1000) //TODO large enough?
+  val valHeap : Array[HeapValue] = Array.ofDim(100000) //TODO large enough?
 
-  var v : HeapValue = null
+  var v : TaggedValue = null
 
   var retval : Expr = null
 
@@ -48,8 +48,10 @@ object PatternCPU {
     } yield (s, unheap(h))))
   }
 
-  case class HeapValue(tag : Int, a : HeapValue, b : HeapValue)
+  case class TaggedValue(tag : Int, a : TaggedValue, b : TaggedValue)
 
+  case class HeapValue(tag : Int, a : Int, b : Int)
+  
   val ZTAG = 0
   val TRIVTAG = 1
   val STAG = 2
@@ -58,41 +60,41 @@ object PatternCPU {
   val FOLDTAG = 5
   val PAIRTAG = 6
 
-  def heap(v : Value) : HeapValue = v match {
-    case ZVal          => HeapValue(ZTAG, null, null)
-    case TrivVal       => HeapValue(TRIVTAG, null, null)
-    case SVal(a)       => HeapValue(STAG, heap(a), null)
-    case InLVal(a)     => HeapValue(INLTAG, heap(a), null)
-    case InRVal(a)     => HeapValue(INRTAG, heap(a), null)
-    case FoldVal(a)    => HeapValue(FOLDTAG, heap(a), null)
-    case PairVal(a, b) => HeapValue(PAIRTAG, heap(a), heap(b))
+  def heap(v : Value) : TaggedValue = v match {
+    case ZVal          => TaggedValue(ZTAG, null, null)
+    case TrivVal       => TaggedValue(TRIVTAG, null, null)
+    case SVal(a)       => TaggedValue(STAG, heap(a), null)
+    case InLVal(a)     => TaggedValue(INLTAG, heap(a), null)
+    case InRVal(a)     => TaggedValue(INRTAG, heap(a), null)
+    case FoldVal(a)    => TaggedValue(FOLDTAG, heap(a), null)
+    case PairVal(a, b) => TaggedValue(PAIRTAG, heap(a), heap(b))
     case _             => throw new Exception("not possible in pattern matching!" + v)
   }
 
-  def unheap(h : HeapValue) : Value = h match {
-    case HeapValue(ZTAG, a, b)    => ZVal
-    case HeapValue(TRIVTAG, a, b) => TrivVal
-    case HeapValue(STAG, a, b)    => SVal(unheap(a))
-    case HeapValue(INLTAG, a, b)  => InLVal(unheap(a))
-    case HeapValue(INRTAG, a, b)  => InRVal(unheap(a))
-    case HeapValue(FOLDTAG, a, b) => FoldVal(unheap(a))
-    case HeapValue(PAIRTAG, a, b) => PairVal(unheap(a), unheap(b))
+  def unheap(h : TaggedValue) : Value = h match {
+    case TaggedValue(ZTAG, a, b)    => ZVal
+    case TaggedValue(TRIVTAG, a, b) => TrivVal
+    case TaggedValue(STAG, a, b)    => SVal(unheap(a))
+    case TaggedValue(INLTAG, a, b)  => InLVal(unheap(a))
+    case TaggedValue(INRTAG, a, b)  => InRVal(unheap(a))
+    case TaggedValue(FOLDTAG, a, b) => FoldVal(unheap(a))
+    case TaggedValue(PAIRTAG, a, b) => PairVal(unheap(a), unheap(b))
   }
 
-  def heapificate(h : HeapValue) : Int =
+  def heapificate(h : TaggedValue) : Int =
     if (h == null) -1
     else {
       val ix = register(R_VAL_HP)
-      valHeap(ix) = h.tag
-      register(R_VAL_HP) = register(R_VAL_HP) + 3
-      valHeap(ix + 1) = heapificate(h.a)
-      valHeap(ix + 2) = heapificate(h.b)
+      register(R_VAL_HP) = register(R_VAL_HP) + 1
+      val a = heapificate(h.a)
+      val b = heapificate(h.b)
+      valHeap(ix) = HeapValue(h.tag, a, b)
       ix
     }
 
-  def unheapificate(ix : Int) : HeapValue =
-    HeapValue(valHeap(ix), 
-        if (valHeap(ix + 1) != -1) unheapificate(valHeap(ix + 1)) else null, 
-        if (valHeap(ix + 2) != -1) unheapificate(valHeap(ix + 2)) else null)
+  def unheapificate(ix : Int) : TaggedValue =
+    TaggedValue(valHeap(ix).tag, 
+        if (valHeap(ix).a != -1) unheapificate(valHeap(ix).a) else null, 
+        if (valHeap(ix).b != -1) unheapificate(valHeap(ix).b) else null)
 
 }

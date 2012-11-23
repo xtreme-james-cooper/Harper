@@ -7,6 +7,7 @@ object PatternCompiler {
   var n : Int = 0
 
   def run(v1 : Value, rs : List[Rule]) : (Expr, Map[String, Value]) = {
+    n = 0
     PatternCPU.run(v1, compileFullPattern(rs))
   }
 
