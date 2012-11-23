@@ -19,16 +19,19 @@ object PatternCompiler {
     case Rule(p, b) :: rs => {
       val failtag = "failure" + n
       n = n + 1
-      List(SetReg(R_BIND_SP, 0), SetReg(R_VAL_SP, 0), ValPushC(0), ValPushC(1), ValPushC(2)) ++
+      List(SetReg(R_BIND_SP, 0), SetReg(R_VAL_SP, 0), SetReg(R_DUMMY, 0)) ++ pushVal(R_DUMMY) ++
         compileRule(p, b, "donePattern", failtag) ++ List(Label(failtag)) ++ compileRules(rs)
     }
   }
 
+  def pushVal(reg : Int) : List[PatternOpcode] = List(ValPush(reg), Add1(reg), ValPush(reg), Add1(reg), ValPush(reg))
+
   def compileRule(p : Pattern, b : Expr, succtag : String, failtag : String) : List[PatternOpcode] = {
     val vintoFlag = "heaping" + n
     n = n + 1
-    val putVIntoRegs = List(JIfLEq(R_TAG, TRIVTAG, vintoFlag), ValPushR(R_HEAP_A), 
-        JIfLEq(R_TAG, FOLDTAG, vintoFlag), ValPushR(R_HEAP_B), Label(vintoFlag))
+    val putVIntoRegs = List(JIfLEq(R_TAG, TRIVTAG, vintoFlag)) ++ pushVal(R_HEAP_A) ++
+      List(JIfLEq(R_TAG, FOLDTAG, vintoFlag)) ++ pushVal(R_HEAP_B) ++ List(Label(vintoFlag))
+   
     List(ValPop(R_HEAP_B), ValPop(R_HEAP_A), ValPop(R_TAG)) ++ (p match {
       case WildPat    => List(SetRetval(b), Jump(succtag))
       case TrivPat    => putVIntoRegs ++ List(SetRetval(b), Jump(succtag))

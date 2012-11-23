@@ -22,6 +22,7 @@ object PatternCPU {
   val R_VAL_SP = 3
   val R_BIND_SP = 4
   val R_VAL_HP = 5
+  val R_DUMMY = 31
 
   val valStack : Array[Int] = Array.ofDim(10000) //TODO large enough?
   val bindStack : Array[(String, (Int, Int, Int))] = Array.ofDim(100) //Should never have 100 bindings from a pattern

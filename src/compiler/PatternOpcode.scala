@@ -24,6 +24,10 @@ case class SetReg(n : Int, v : Int) extends PatternOpcode("setr r" + n + " #" + 
   override def execute : Unit = register(n) = v
 }
 
+case class Add1(n : Int) extends PatternOpcode("add1 r" + n) {
+  override def execute : Unit = register(n) = register(n) + 1
+}
+
 case class Jump(l : String) extends PatternOpcode("jump :" + l) { //TODO do search better
   override def execute : Unit = {
     PC = 0
@@ -53,20 +57,9 @@ case class JIfNEq(n : Int, v : Int, l : String) extends PatternOpcode("jine r" +
     }
 }
 
-case class ValPushC(x : Int) extends PatternOpcode("pshv #" + x) {
-  override def execute : Unit = {
-    valStack(register(R_VAL_SP)) = valHeap(x)
-    register(R_VAL_SP) = register(R_VAL_SP) + 1
-  }
-}
-
-case class ValPushR(x : Int) extends PatternOpcode("pshv r" + x) {
+case class ValPush(x : Int) extends PatternOpcode("pshv r" + x) {
   override def execute : Unit = {
     valStack(register(R_VAL_SP)) = valHeap(register(x))
-    register(R_VAL_SP) = register(R_VAL_SP) + 1
-    valStack(register(R_VAL_SP)) = valHeap(register(x) + 1)
-    register(R_VAL_SP) = register(R_VAL_SP) + 1
-    valStack(register(R_VAL_SP)) = valHeap(register(x) + 2)
     register(R_VAL_SP) = register(R_VAL_SP) + 1
   }
 }
@@ -85,7 +78,7 @@ case class PushVRetStack(x : String) extends PatternOpcode("??? pshe " + x + " -
   }
 }
 
-case class SetRetval(x : Expr) extends PatternOpcode("??? sete") {
+case class SetRetval(x : Expr) extends PatternOpcode("sete " + x) {
   override def execute : Unit = retval = x
 }
   
