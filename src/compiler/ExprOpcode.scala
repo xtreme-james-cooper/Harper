@@ -1,10 +1,10 @@
 package compiler
 
 import ExprCPU._
-import model.{ Value, SVal, Expr, ExceptionValue }
-import model.InRVal
-import model.InLVal
-import model.PairVal
+import model.{Value, SVal, Expr, ExceptionValue}
+import model.{Rule, PairVal, LamVal, InRVal, InLVal, FoldVal}
+import model.Action
+import model.Command
 
 sealed abstract class ExprOpcode(name : String) {
   override def toString : String = name
@@ -45,6 +45,16 @@ case class JIfExn(l : String) extends ExprOpcode("???? jifx :" + l) {
     }
 }
 
+case class JIfNExn(l : String) extends ExprOpcode("???? jifnx :" + l) {
+  override def execute : Unit =
+    if (! retval.head.isInstanceOf[ExceptionValue]) {
+      PC = 0
+      while (prog(PC) != ExprLabel(l)) {
+        PC = PC + 1
+      }
+    }
+}
+
 case object PushS extends ExprOpcode("???? pshS") {
   override def execute : Unit = retval = SVal(retval.head) :: retval.tail
 }
@@ -61,4 +71,53 @@ case object PushPair extends ExprOpcode("???? pshpair") {
   override def execute : Unit = retval = PairVal(retval.tail.head, retval.head) :: retval.tail.tail
 }
 
+case object PushFold extends ExprOpcode("???? pshfold") {
+  override def execute : Unit = retval = FoldVal(retval.head) :: retval.tail
+}
 
+case class PushLam(x : String, e : Expr) extends ExprOpcode("???? pshlam " + x + " " + e) {
+  override def execute : Unit = retval = LamVal(x, e, envTemp) :: retval
+}
+
+case class PushCommand(c : Command) extends ExprOpcode("???? pshcom " + c) {
+  override def execute : Unit = retval = Action(c, envTemp) :: retval
+}
+
+case object PopFold extends ExprOpcode("???? popfold") {
+  override def execute : Unit = retval = retval.head.asInstanceOf[FoldVal].v :: retval.tail
+}
+
+case class RunPat(rs : List[Rule]) extends ExprOpcode("???? runPat " + rs) {
+  override def execute : Unit = patReturn = PatternCompiler.run(retval.head, rs)
+}
+
+case object RunExprFromPat extends ExprOpcode("???? runexfrompat ") {
+  override def execute : Unit = retval = ExprCompiler.doEval(patReturn._1, env) :: retval
+}
+
+case object PushEnvFromPat extends ExprOpcode("???? pshenvfrompat") {
+  override def execute : Unit = env = patReturn._2 :: env
+}
+
+case object PopEnv extends ExprOpcode("???? popenv") {
+  override def execute : Unit = env = env.tail
+}
+
+case object PushEnvFromLambda extends ExprOpcode("???? pshenvfrompat") {
+  override def execute : Unit = {
+    val l = retval.tail.head.asInstanceOf[LamVal]
+    val v = retval.head
+    env = (l.closure + (l.v -> v)) :: env
+  }
+}
+
+case object RunLambda extends ExprOpcode("???? runlam") {
+  override def execute : Unit = {
+    val l = retval.tail.head.asInstanceOf[LamVal]
+    retval = ExprCompiler.doEval(l.e, env) :: retval.tail.tail
+  }
+}
+
+case object FlattenEnv extends ExprOpcode("???? flattenv") {
+  override def execute : Unit = envTemp = ExprCompiler.flatten(env)
+}

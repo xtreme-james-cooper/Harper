@@ -25,10 +25,14 @@ object ExprCompiler {
       n = n + 1
       compileExpr(e) ++ List(JIfExn(exnLabel), PushS, ExprLabel(exnLabel))
     }
-    case Lam(v, t, e) => List(RunExpr(e0))
-    case App(e1, e2)  => List(RunExpr(e0))
-    case Fix(v, e)    => List(RunExpr(e0))
-    case Triv         => List(ReturnOp(TrivVal))
+    case Lam(v, t, e) => List(FlattenEnv, PushLam(v, e))
+    case App(e1, e2) => {
+      val exnLabel = "exnshortcut" + n
+      n = n + 1
+      compileExpr(e1) ++ List(JIfExn(exnLabel)) ++ compileExpr(e2) ++ List(PushEnvFromLambda, RunLambda, PopEnv, ExprLabel(exnLabel))
+    }
+    case Fix(v, e) => List(RunExpr(e0))
+    case Triv      => List(ReturnOp(TrivVal))
     case PairEx(e1, e2) => {
       val exnLabel = "exnshortcut" + n
       n = n + 1
@@ -44,72 +48,41 @@ object ExprCompiler {
       n = n + 1
       compileExpr(e) ++ List(JIfExn(exnLabel), PushInR, ExprLabel(exnLabel))
     }
-    case Match(e, rs)     => List(RunExpr(e0))
-    case Fold(mu, t, e)   => List(RunExpr(e0))
-    case Unfold(e)        => List(RunExpr(e0))
-    case TypeLam(t, e)    => compileExpr(e)
-    case TypeApp(e, t)    => compileExpr(e)
-    case ThrowEx(s)       => List(RunExpr(e0))
-    case TryCatch(e1, e2) => List(RunExpr(e0))
-    case CommandExp(c)    => List(RunExpr(e0))
+    case Match(e, rs) => {
+      val exnLabel = "exnshortcut" + n
+      n = n + 1
+      compileExpr(e) ++ List(JIfExn(exnLabel), RunPat(rs), PushEnvFromPat, RunExprFromPat, PopEnv, ExprLabel(exnLabel))
+    }
+    case Fold(mu, t, e) => {
+      val exnLabel = "exnshortcut" + n
+      n = n + 1
+      compileExpr(e) ++ List(JIfExn(exnLabel), PushFold, ExprLabel(exnLabel))
+    }
+    case Unfold(e) => {
+      val exnLabel = "exnshortcut" + n
+      n = n + 1
+      compileExpr(e) ++ List(JIfExn(exnLabel), PopFold, ExprLabel(exnLabel))
+    }
+    case TypeLam(t, e) => compileExpr(e)
+    case TypeApp(e, t) => compileExpr(e)
+    case ThrowEx(s)    => List(ReturnOp(ExceptionValue(s)))
+    case TryCatch(e1, e2) => {
+      val exnLabel = "exnshortcut" + n
+      n = n + 1
+      compileExpr(e1) ++ List(JIfNExn(exnLabel)) ++ compileExpr(e2) ++ List(ExprLabel(exnLabel))
+    }
+    case CommandExp(c) => List(FlattenEnv, PushCommand(c))
   }
 
   def doEval(e : Expr, env : List[Map[String, Value]]) : Value = e match {
-    case Var(x)       => getBinding(env, x)
-    case Lam(v, t, e) => LamVal(v, e, flatten(env))
-    case App(e1, e2) => {
-      val v1 = doEval(e1, env)
-      if (v1.isInstanceOf[ExceptionValue])
-        v1
-      else {
-        val v2 = doEval(e2, env)
-        if (v2.isInstanceOf[ExceptionValue])
-          v2
-        else v1 match {
-          case LamVal(x, e, clos) => doEval(e, clos + (x -> v2) :: env)
-          case _                  => throw new Exception("Application of a non-function : " + v1) //Not possible by typecheck
-        }
-      }
-    }
+    case Var(x)                => getBinding(env, x)
     case Fix(v, Lam(x, t2, e)) => doEval(Lam(x, t2, e), Map(v -> RecursiveLamVal(v, x, e, flatten(env))) :: env)
     case Fix(v, e)             => doEval(e, env) //this will explode on CAFs (eg, recursive non-functions) so don't write them
-    case Match(e, rs) => {
-      val v = doEval(e, env)
-      if (v.isInstanceOf[ExceptionValue])
-        v
-      else {
-        val (e, bind) = PatternCompiler.run(v, rs)
-        doEval(e, bind :: env)
-      }
-    }
-    case Fold(mu, t, e) => {
-      val v = doEval(e, env)
-      if (v.isInstanceOf[ExceptionValue])
-        v
-      else
-        FoldVal(v)
-    }
-    case Unfold(e) => {
-      val v = doEval(e, env)
-      if (v.isInstanceOf[ExceptionValue])
-        v
-      else
-        v.asInstanceOf[FoldVal].v
-    }
-    case ThrowEx(s) => ExceptionValue(s)
-    case TryCatch(e1, e2) => {
-      val v = doEval(e1, env)
-      if (v.isInstanceOf[ExceptionValue])
-        doEval(e2, env)
-      else
-        v
-    }
-    case CommandExp(c) => Action(c, flatten(env))
 
-    case Triv          => TrivVal
-    case TypeLam(t, e) => doEval(e, env)
-    case TypeApp(e, t) => doEval(e, env)
-    case Z             => ZVal
+    case Triv                  => TrivVal
+    case TypeLam(t, e)         => doEval(e, env)
+    case TypeApp(e, t)         => doEval(e, env)
+    case Z                     => ZVal
     case S(n) => {
       val v = doEval(n, env)
       if (v.isInstanceOf[ExceptionValue])
@@ -143,7 +116,53 @@ object ExprCompiler {
           PairVal(v1, v2)
       }
     }
-
+    case Match(e, rs) => {
+      val v = doEval(e, env)
+      if (v.isInstanceOf[ExceptionValue])
+        v
+      else {
+        val (e, bind) = PatternCompiler.run(v, rs)
+        doEval(e, bind :: env)
+      }
+    }
+    case Fold(mu, t, e) => {
+      val v = doEval(e, env)
+      if (v.isInstanceOf[ExceptionValue])
+        v
+      else
+        FoldVal(v)
+    }
+    case Unfold(e) => {
+      val v = doEval(e, env)
+      if (v.isInstanceOf[ExceptionValue])
+        v
+      else
+        v.asInstanceOf[FoldVal].v
+    }
+    case ThrowEx(s) => ExceptionValue(s)
+    case App(e1, e2) => {
+      val v1 = doEval(e1, env)
+      if (v1.isInstanceOf[ExceptionValue])
+        v1
+      else {
+        val v2 = doEval(e2, env)
+        if (v2.isInstanceOf[ExceptionValue])
+          v2
+        else v1 match {
+          case LamVal(x, e, clos) => doEval(e, clos + (x -> v2) :: env)
+          case _                  => throw new Exception("Application of a non-function : " + v1) //Not possible by typecheck
+        }
+      }
+    }
+    case TryCatch(e1, e2) => {
+      val v = doEval(e1, env)
+      if (v.isInstanceOf[ExceptionValue])
+        doEval(e2, env)
+      else
+        v
+    }
+    case Lam(v, t, e)          => LamVal(v, e, flatten(env))
+    case CommandExp(c)         => Action(c, flatten(env))
   }
 
 }

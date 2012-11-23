@@ -88,6 +88,9 @@ object Main {
         + "return try (((ifC false) \\x:Nat . 3) \\x:Nat . throw bleh) catch 2")
 
     test("return S(throw bleh)")
+    
+    test("a(b : Nat) : Nat = throw bleh;"
+        + "return try (a 2) catch 4")
         
     test("plus(a : Nat, b : Nat) : Nat = case a of {Z -> b | S(n) -> S(((plus n) b))};"
         + "decl a := 0 in decl b := 3 in bind x <- command !b; a := ((plus x) 2); bind y <- command !a; return y")

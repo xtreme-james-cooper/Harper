@@ -1,6 +1,7 @@
 package compiler
 
 import model.Value
+import model.Expr
 
 object ExprCPU {
 
@@ -9,20 +10,21 @@ object ExprCPU {
 
   val register : Array[Int] = Array.ofDim(32)
 
-  var retval : List[Value] = Nil
+  var retval : List[Value] = null
 
   var env : List[Map[String, Value]] = null
   
   var envTemp : Map[String, Value] = null
   
+  var patReturn : (Expr, Map[String, Value]) = null
+  
   def run(pr : List[ExprOpcode], m : List[Map[String, Value]]) : Value = {
     PC = 0
-
     env = m
-    
     prog = pr
-
-    //    prog.foreach(println)
+    retval = Nil
+    
+        prog.foreach(println)
 
     while (prog(PC) != ExprExit) {
       prog(PC).execute
