@@ -1,10 +1,6 @@
 package compiler
 
-import model.Expr
-import model.Rule
-import model.Pattern
-import model.Value
-import model.Command
+import model.{ Value, Rule, Expr }
 
 sealed abstract class ExprStack(name : String) {
   override def toString : String = name
@@ -22,18 +18,4 @@ case object StackUnfold extends ExprStack("unfold (-)")
 case object StackFold extends ExprStack("fold (-)")
 case class StackHandler(e2 : Expr) extends ExprStack("try (-) catch " + e2)
 case object PopFrame extends ExprStack(" ! ")
-
-sealed abstract class PatStack(name : String) {
-  override def toString : String = name
-}
-
-case class PatStackLPair(v2 : Value, p2 : Pattern) extends PatStack("((-), " + v2 + ") ~ ((-), " + p2 + ")")
-case class PatStackRPair(m : Map[String, Value]) extends PatStack("(" + m + ", (-))")
-
-sealed abstract class CmdStack(name : String) {
-  override def toString : String = name
-}
-
-case class CmdStackBind(x : String, m : Command) extends CmdStack(x + " <- (-); " + m)
-case object PopBlock extends CmdStack(" ! ")
 

@@ -4,9 +4,9 @@ import model.{ Value, SetCmd, Ret, Get, Decl, Command, Bind, Action }
 
 object CommandCompiler {
 
-  sealed abstract class Target
-  case class Eval(e : Command) extends Target
-  case class Return(v : Value) extends Target
+  sealed abstract class CmdStack(name : String) {
+    override def toString : String = name
+  }
 
   def getBinding(e : List[Map[String, Value]], x : String) : Value = e match {
     case Nil                     => throw new Exception("Unbound identifier : " + x) //Typechecker should blow up on this first
@@ -22,26 +22,20 @@ object CommandCompiler {
     case m :: e                  => m :: innerUpdateMemory(x, v, e)
   }
 
-  def run(c : Command, e : List[Map[String, Value]]) : Value = executeCommand(Eval(c), e, Nil, Nil)
+  def run(c : Command, e : List[Map[String, Value]]) : Value = executeCommand(c, e, Nil)
 
-  def executeCommand(target : Target, env : List[Map[String, Value]], mem : List[Map[String, Value]], stack : List[CmdStack]) : Value =
-    target match {
-      case Eval(e) => e match {
-        case Ret(e) => executeCommand(Return(ExprCompiler.run(e, env)), env, mem, stack)
-        case Bind(x, e, m) => ExprCompiler.run(e, env) match {
-          case Action(m2, closure) => executeCommand(Eval(m2), closure :: env, mem, CmdStackBind(x, m) :: stack)
-          case v => throw new Exception("Attempt to bind a non-action " + v)
-        }
-        //Guarenteed to be there by the typechecker
-        case Get(x)          => executeCommand(Return(getBinding(mem, x)), env, mem, stack)
-        case SetCmd(x, e, m) => executeCommand(Eval(m), env, updateMemory(x, ExprCompiler.run(e, env), mem), stack)
-        case Decl(x, e, m) => executeCommand(Eval(m), env, Map(x -> ExprCompiler.run(e, env)) :: mem, PopBlock :: stack)
+  def executeCommand(c : Command, env : List[Map[String, Value]], mem : List[Map[String, Value]]) : Value =
+    c match {
+      case Ret(e) => ExprCompiler.run(e, env)
+      case Bind(x, e, m) => {
+        val Action(m2, closure) = ExprCompiler.run(e, env)
+        val v = executeCommand(m2, closure :: env, mem)
+        executeCommand(m, Map(x -> v) :: env, mem)
       }
-      case Return(v) => stack match {
-        case Nil => v
-        case PopBlock :: stk => executeCommand(target, env, mem.tail, stk)
-        case CmdStackBind(x, m) :: stk => executeCommand(Eval(m), Map(x -> v) :: env, mem, stk)
-      }
+      //Guarenteed to be there by the typechecker
+      case Get(x)          => getBinding(mem, x)
+      case SetCmd(x, e, m) => executeCommand(m, env, updateMemory(x, ExprCompiler.run(e, env), mem))
+      case Decl(x, e, m)   => executeCommand(m, env, Map(x -> ExprCompiler.run(e, env)) :: mem)
     }
 
 }

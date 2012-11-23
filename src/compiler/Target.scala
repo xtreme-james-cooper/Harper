@@ -1,6 +1,8 @@
 package compiler
 
-sealed abstract class Target[E, V]
-case class Eval[E, V](e : E) extends Target[E, V]
-case class Return[E, V](v : V) extends Target[E, V]
-case class Throw[E, V](s : String) extends Target[E, V]
+import model.{ Value, Expr }
+
+sealed abstract class Target
+case class Eval(e : Expr) extends Target
+case class Return(v : Value) extends Target
+case class Throw(s : String) extends Target

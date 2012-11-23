@@ -3,11 +3,31 @@ package compiler
 import model.{ZVal, Z, Var, Value, Unfold, TypeLam, TypeApp, TryCatch, TrivVal, Triv, ThrowEx, SVal, S, Rule, RecursiveLamVal, 
   PairVal, PairEx, Match, LamVal, Lam, InRVal, InR, InLVal, InL, FoldVal, Fold, Fix, Expr, ExceptionValue, CommandExp, App, Action}
 
-object ExprCompiler extends Compiler[ExprStack, Expr, Value] {
+object ExprCompiler {
 
+  type Env = List[Map[String, Value]] //Not V, specifically Value
+  
   //All these are init'd to null, because they are manually set in each pass
   //Conceptually, this is a tail-recursive state-machine; for efficiency reasons we actually modify vars, but it's not strictly necessary
+  var target : Target = null //The expression being evaluated, the value being returned, or the Exception being thrown
+  var stack : List[ExprStack] = null //The parts of the expression whose evaluation has been deferred
   private var env : Env = null //The stack of variable-binding frames
+  
+  def push(s : ExprStack) : Unit = stack = s :: stack
+
+  def pop : ExprStack = stack match {
+    case Nil => throw new Exception("Should have aborted the driver loop!") //This is the escape case
+    case s :: stk => {
+      stack = stk
+      s
+    }
+  }
+  
+  def getBinding(e : Env, x : String) : Value = e match {
+    case Nil                     => throw new Exception("Unbound identifier : " + x) //Typechecker should blow up on this first
+    case m :: e if m.contains(x) => m(x)
+    case m :: e                  => getBinding(e, x)
+  }
 
   //Ensure that all pushes are matched with pops
   private def pushEnv(e : Map[String, Value]) : Unit = {
@@ -20,8 +40,16 @@ object ExprCompiler extends Compiler[ExprStack, Expr, Value] {
 
   def run(e : Expr, m : List[Map[String, Value]]) : Value = {
     env = m
-
-    loop(e)
+    target = Eval(e)
+    stack = Nil
+    
+    while (target.isInstanceOf[Eval] || !stack.isEmpty) {
+      target match {
+        case Eval(e)   => evalStep(e)
+        case Return(v) => returnStep(v, pop)
+        case Throw(s)  => throwStep(s)
+      }
+    }
     
     target match {
       case Return(v) => v
@@ -30,7 +58,7 @@ object ExprCompiler extends Compiler[ExprStack, Expr, Value] {
     }
   }
 
-  override def evalStep(e : Expr) : Unit = e match {
+  def evalStep(e : Expr) : Unit = e match {
     case Var(x) => target = Return(getBinding(env, x))
     case Z      => target = Return(ZVal)
     case S(n) => {
@@ -82,7 +110,7 @@ object ExprCompiler extends Compiler[ExprStack, Expr, Value] {
     case CommandExp(c) => target = Return(Action(c, flattenEnv))
   }
 
-  override def returnStep(v : Value, s : ExprStack) : Unit = s match {
+  def returnStep(v : Value, s : ExprStack) : Unit = s match {
     case StackS => target = Return(SVal(v))
     case StackLam(e2) => {
       target = Eval(e2)
@@ -114,7 +142,7 @@ object ExprCompiler extends Compiler[ExprStack, Expr, Value] {
     case PopFrame         => env = env.tail //'tail' is safe, pops are added only with a frame
   }
 
-  override def throwStep(s : String) : Unit = pop match {
+  def throwStep(s : String) : Unit = pop match {
     case StackHandler(e2) => target = Eval(e2)
     case _                => () //if an exception is being thrown, pop stack
   }
