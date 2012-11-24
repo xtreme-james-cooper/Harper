@@ -20,7 +20,7 @@ object ExprCompiler {
   def run(e : Expr, m : List[Map[String, Value]], subdefs : List[ExprOpcode]) : Value = {
     val code = compileExpr(e) ++ List(ExprExit) ++ subdefs
     
-    for (i <- 0 until code.length) println(i + ": " + code(i))
+//    for (i <- 0 until code.length) println(i + ": " + code(i))
     
     ExprCPU.run(code, m)
   }

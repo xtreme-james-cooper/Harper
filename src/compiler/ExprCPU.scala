@@ -27,7 +27,7 @@ object ExprCPU {
     returnStack = Nil
 
     while (prog(PC) != ExprExit) {
-      println("executing line " + PC + " " + prog(PC) + " " + retval)
+//      println("executing line " + PC + " " + prog(PC) + " " + retval)
 
       prog(PC).execute
       PC = PC + 1

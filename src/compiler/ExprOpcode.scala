@@ -89,6 +89,7 @@ case class RunPat(rs : List[(Pattern, String)]) extends ExprOpcode("???? runPat 
   override def execute : Unit = {
     patReturn = PatternCompiler.run(retval.head, rs)
     env = patReturn._2 :: env
+    retval = retval.tail
   }
 }
 
