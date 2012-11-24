@@ -21,18 +21,18 @@ object CommandCompiler {
     case (y, vv) :: e           => (y, vv) :: updateMemory(x, v, e)
   }
 
-  def run(c : Command, e : List[Map[String, Value]]) : Value = executeCommand(c, e, Nil)
+  def run(c : Command, e : List[Map[String, Value]], subdefs : List[ExprOpcode]) : Value = executeCommand(c, e, Nil, subdefs)
 
-  def executeCommand(c : Command, env : List[Map[String, Value]], mem : List[(String, Value)]) : Value =
+  def executeCommand(c : Command, env : List[Map[String, Value]], mem : List[(String, Value)], subdefs : List[ExprOpcode]) : Value =
     c match {
-      case Ret(e)          => ExprCompiler.run(e, env)
+      case Ret(e)          => ExprCompiler.run(e, env, subdefs)
       case Get(x)          => getBinding(mem, x)
-      case SetCmd(x, e, m) => executeCommand(m, env, updateMemory(x, ExprCompiler.run(e, env), mem))
-      case Decl(x, e, m)   => executeCommand(m, env, (x -> ExprCompiler.run(e, env)) :: mem)
+      case SetCmd(x, e, m) => executeCommand(m, env, updateMemory(x, ExprCompiler.run(e, env, subdefs), mem), subdefs)
+      case Decl(x, e, m)   => executeCommand(m, env, (x -> ExprCompiler.run(e, env, subdefs)) :: mem, subdefs)
       case Bind(x, e, m) => {
-        val Action(m2, closure) = ExprCompiler.run(e, env)
-        val v = executeCommand(m2, closure :: env, mem)
-        executeCommand(m, Map(x -> v) :: env, mem)
+        val Action(m2, closure) = ExprCompiler.run(e, env, subdefs)
+        val v = executeCommand(m2, closure :: env, mem, subdefs)
+        executeCommand(m, Map(x -> v) :: env, mem, subdefs)
       }
     }
 

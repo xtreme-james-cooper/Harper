@@ -92,12 +92,9 @@ case class RunPat(rs : List[(Pattern, String)]) extends ExprOpcode("???? runPat 
   }
 }
 
-//case object RunExprFromPat extends ExprOpcode("???? runexfrompat ") {
-//  override def execute : Unit = {
-//    
-//    retval = ExprCompiler.doEval(patReturn._1, env) :: retval
-//  }
-//}
+case object JumpPatBody extends ExprOpcode("???? jmppatbdy") {
+  override def execute : Unit = goto(patReturn._1)
+}
 
 case object PopEnv extends ExprOpcode("???? popenv") {
   override def execute : Unit = env = env.tail
@@ -112,10 +109,6 @@ case object RunLambda extends ExprOpcode("???? runlam") {
     env = (l.closure + (l.v -> v)) :: env
     retval = ExprCompiler.doEval(l.e, env) :: retval
   }
-}
-
-case object RunPatBody extends ExprOpcode("???? runpat") {
-  override def execute : Unit = goto(patReturn._1)
 }
 
 case object FlattenEnv extends ExprOpcode("???? flattenv") {

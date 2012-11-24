@@ -17,8 +17,8 @@ object ExprCompiler {
   //Crush the env down into a single stack frame for use as a closure
   def flatten(env : List[Map[String, Value]]) : Map[String, Value] = env.foldRight(Map[String, Value]())({ case (m1, m2) => m2 ++ m1 })
 
-  def run(e : Expr, m : List[Map[String, Value]]) : Value = {
-    val code = compileExpr(e) ++ List(ExprExit)
+  def run(e : Expr, m : List[Map[String, Value]], subdefs : List[ExprOpcode]) : Value = {
+    val code = compileExpr(e) ++ List(ExprExit) ++ subdefs
     code.foreach(println)
     println("*****************")
     ExprCPU.run(code, m)
@@ -77,7 +77,7 @@ object ExprCompiler {
         rules = rules ++ List((p, subname))
       }
 
-      compileExpr(e) ++ List(JIfExn(exnLabel)) ++ bodies ++ List(RunPat(rules)) ++ patSubroutineCall ++ List(ExprLabel(exnLabel))
+      compileExpr(e) ++ List(JIfExn(exnLabel)) ++ bodies ++ patSubroutineCall(rules) ++ List(ExprLabel(exnLabel))
     }
     case Fold(mu, t, e) => {
       val exnLabel = "exnshortcut" + n
@@ -202,10 +202,10 @@ object ExprCompiler {
     List(PushReturn(returnLabel), RunLambda, ExprLabel(returnLabel), PopEnv)
   }
 
-  def patSubroutineCall : List[ExprOpcode] = {
+  def patSubroutineCall(rules : List[(Pattern, String)]) : List[ExprOpcode] = {
     val returnLabel = "return" + n
     n = n + 1
-    List(PushReturn(returnLabel), RunPatBody, ExprLabel(returnLabel), PopEnv)
+    List(RunPat(rules), PushReturn(returnLabel), JumpPatBody, ExprLabel(returnLabel), PopEnv)
   }
 
 }
