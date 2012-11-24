@@ -21,9 +21,6 @@ object ExprCompiler {
     val code = compileExpr(e) ++ List(ExprExit) ++ subdefs
     
     for (i <- 0 until code.length) println(i + ": " + code(i))
-    println("*****************")
-    
-    Thread.sleep(1000)
     
     ExprCPU.run(code, m)
   }

@@ -109,8 +109,6 @@ case object RunLambda extends ExprOpcode("???? runlam") {
     env = (l.closure + (l.v -> v)) :: env
     
     goto(l.codePointer)
-    
-//    retval = ExprCompiler.doEval(l.e, env) :: retval
   }
 }
 

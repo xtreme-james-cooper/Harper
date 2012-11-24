@@ -9,8 +9,10 @@ object ProgCompiler {
   def innerRun(e : Command, defs : List[Defn], env : Map[String, Value], code : List[ExprOpcode]) : Value = defs match {
     case Nil                                   => CommandCompiler.run(e, List(env), code)
     case TypeDefn(_, _) :: ds                  => innerRun(e, ds, env, code)
-    case ExprDefn(n, Lam(x, t, b), args) :: ds => innerRun(e, ds, env + (n -> RecursiveLamVal(n, x, env)), code ++ ExprCompiler.compileSubroutine(n, b))
-    case ExprDefn(n, b, args) :: ds            => innerRun(e, ds, env + (n -> ExprCompiler.run(b, List(env), code)), code ++ ExprCompiler.compileExpr(b))
+    case ExprDefn(n, b, args) :: ds            => {
+      val newcode = ExprCompiler.compileExpr(b)
+      innerRun(e, ds, env + (n -> ExprCPU.run(newcode ++ List(ExprExit) ++ code, List(env))), code ++ newcode)
+    }
   }
 
 }
