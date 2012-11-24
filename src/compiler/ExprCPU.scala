@@ -15,7 +15,7 @@ object ExprCPU {
 
   var envTemp : Map[String, Value] = null
 
-  var patReturn : (Expr, Map[String, Value]) = null
+  var patReturn : (String, Map[String, Value]) = null
 
   var returnStack : List[String] = null
 
@@ -38,7 +38,7 @@ object ExprCPU {
 
   def goto(l : String) : Unit = { //TODO do search better
     PC = 0
-    while (prog(PC) != Label(l)) {
+    while (prog(PC) != ExprLabel(l)) {
       PC = PC + 1
     }
   }

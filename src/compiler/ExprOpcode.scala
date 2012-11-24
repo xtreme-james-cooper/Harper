@@ -1,7 +1,8 @@
 package compiler
 
 import ExprCPU._
-import model.{Rule, Expr, Command}
+import model.{ Rule, Expr, Command }
+import model.Pattern
 
 sealed abstract class ExprOpcode(name : String) {
   override def toString : String = name
@@ -84,16 +85,19 @@ case object PopFold extends ExprOpcode("???? popfold") {
   override def execute : Unit = retval = retval.head.asInstanceOf[FoldVal].v :: retval.tail
 }
 
-case class RunPat(rs : List[Rule]) extends ExprOpcode("???? runPat " + rs) {
-  override def execute : Unit = patReturn = PatternCompiler.run(retval.head, rs)
-}
-
-case object RunExprFromPat extends ExprOpcode("???? runexfrompat ") {
+case class RunPat(rs : List[(Pattern, String)]) extends ExprOpcode("???? runPat " + rs) {
   override def execute : Unit = {
+    patReturn = PatternCompiler.run(retval.head, rs)
     env = patReturn._2 :: env
-    retval = ExprCompiler.doEval(patReturn._1, env) :: retval
   }
 }
+
+//case object RunExprFromPat extends ExprOpcode("???? runexfrompat ") {
+//  override def execute : Unit = {
+//    
+//    retval = ExprCompiler.doEval(patReturn._1, env) :: retval
+//  }
+//}
 
 case object PopEnv extends ExprOpcode("???? popenv") {
   override def execute : Unit = env = env.tail
@@ -101,13 +105,17 @@ case object PopEnv extends ExprOpcode("???? popenv") {
 
 case object RunLambda extends ExprOpcode("???? runlam") {
   override def execute : Unit = {
-	val v = retval.head
-	retval = retval.tail
+    val v = retval.head
+    retval = retval.tail
     val l = retval.head.asInstanceOf[LamVal]
-	retval = retval.tail
+    retval = retval.tail
     env = (l.closure + (l.v -> v)) :: env
     retval = ExprCompiler.doEval(l.e, env) :: retval
   }
+}
+
+case object RunPatBody extends ExprOpcode("???? runpat") {
+  override def execute : Unit = goto(patReturn._1)
 }
 
 case object FlattenEnv extends ExprOpcode("???? flattenv") {

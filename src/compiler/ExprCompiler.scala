@@ -1,6 +1,8 @@
 package compiler
 
 import model.{ Z, Var, Unfold, TypeLam, TypeApp, TryCatch, Triv, ThrowEx, S, PairEx, Match, Lam, InR, InL, Fold, Fix, Expr, CommandExp, App }
+import model.Rule
+import model.Pattern
 
 object ExprCompiler {
 
@@ -15,7 +17,12 @@ object ExprCompiler {
   //Crush the env down into a single stack frame for use as a closure
   def flatten(env : List[Map[String, Value]]) : Map[String, Value] = env.foldRight(Map[String, Value]())({ case (m1, m2) => m2 ++ m1 })
 
-  def run(e : Expr, m : List[Map[String, Value]]) : Value = ExprCPU.run(compileExpr(e) ++ List(ExprExit), m)
+  def run(e : Expr, m : List[Map[String, Value]]) : Value = {
+    val code = compileExpr(e) ++ List(ExprExit)
+    code.foreach(println)
+    println("*****************")
+    ExprCPU.run(code, m)
+  }
 
   def compileExpr(e0 : Expr) : List[ExprOpcode] = e0 match {
     case Var(x) => List(DerefVar(x))
@@ -60,7 +67,17 @@ object ExprCompiler {
     case Match(e, rs) => {
       val exnLabel = "exnshortcut" + n
       n = n + 1
-      compileExpr(e) ++ List(JIfExn(exnLabel), RunPat(rs), RunExprFromPat, PopEnv, ExprLabel(exnLabel))
+
+      var bodies : List[ExprOpcode] = Nil
+      var rules : List[(Pattern, String)] = Nil
+      for (Rule(p, b) <- rs) {
+        val subname = "matchbody" + n
+        n = n + 1
+        bodies = bodies ++ compileSubroutine(subname, b)
+        rules = rules ++ List((p, subname))
+      }
+
+      compileExpr(e) ++ List(JIfExn(exnLabel)) ++ bodies ++ List(RunPat(rules)) ++ patSubroutineCall ++ List(ExprLabel(exnLabel))
     }
     case Fold(mu, t, e) => {
       val exnLabel = "exnshortcut" + n
@@ -129,7 +146,7 @@ object ExprCompiler {
       if (v.isInstanceOf[ExceptionValue])
         v
       else {
-        val (e, bind) = PatternCompiler.run(v, rs)
+        val (e, bind) = PatternCompiler.fakerun(v, rs)
         doEval(e, bind :: env)
       }
     }
@@ -183,6 +200,12 @@ object ExprCompiler {
     val returnLabel = "return" + n
     n = n + 1
     List(PushReturn(returnLabel), RunLambda, ExprLabel(returnLabel), PopEnv)
+  }
+
+  def patSubroutineCall : List[ExprOpcode] = {
+    val returnLabel = "return" + n
+    n = n + 1
+    List(PushReturn(returnLabel), RunPatBody, ExprLabel(returnLabel), PopEnv)
   }
 
 }
