@@ -73,8 +73,8 @@ case object PushFold extends ExprOpcode("???? pshfold") {
   override def execute : Unit = retval = FoldVal(retval.head) :: retval.tail
 }
 
-case class PushLam(x : String, e : Expr) extends ExprOpcode("???? pshlam " + x + " " + e) {
-  override def execute : Unit = retval = LamVal(x, e, envTemp) :: retval
+case class PushLam(x : String, codePointer : String) extends ExprOpcode("???? pshlam " + x + " " + codePointer) {
+  override def execute : Unit = retval = LamVal(x, codePointer, envTemp) :: retval
 }
 
 case class PushCommand(c : Command) extends ExprOpcode("???? pshcom " + c) {
@@ -102,21 +102,20 @@ case object PopEnv extends ExprOpcode("???? popenv") {
 
 case object RunLambda extends ExprOpcode("???? runlam") {
   override def execute : Unit = {
-    val v = retval.head
-    retval = retval.tail
     val l = retval.head.asInstanceOf[LamVal]
     retval = retval.tail
+    val v = retval.head
+    retval = retval.tail
     env = (l.closure + (l.v -> v)) :: env
-    retval = ExprCompiler.doEval(l.e, env) :: retval
+    
+    goto(l.codePointer)
+    
+//    retval = ExprCompiler.doEval(l.e, env) :: retval
   }
 }
 
 case object FlattenEnv extends ExprOpcode("???? flattenv") {
   override def execute : Unit = envTemp = ExprCompiler.flatten(env)
-}
-
-case class PushRecursiveLamEnv(v : String, x : String, e : Expr) extends ExprOpcode("???? pushrecursivelamenv") {
-  override def execute : Unit = envTemp = ExprCompiler.flatten(Map(v -> RecursiveLamVal(v, x, e, ExprCompiler.flatten(env))) :: env)
 }
 
 case class DerefVar(x : String) extends ExprOpcode("???? derefvar " + x) {

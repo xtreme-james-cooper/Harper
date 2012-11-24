@@ -27,7 +27,7 @@ object ExprCPU {
     returnStack = Nil
 
     while (prog(PC) != ExprExit) {
-      //println("executing line " + PC + " " + prog(PC) + " " + retval)
+      println("executing line " + PC + " " + prog(PC) + " " + retval)
 
       prog(PC).execute
       PC = PC + 1
@@ -37,6 +37,8 @@ object ExprCPU {
   }
 
   def goto(l : String) : Unit = { //TODO do search better
+//    println("looking for " + l)
+    
     PC = 0
     while (prog(PC) != ExprLabel(l)) {
       PC = PC + 1

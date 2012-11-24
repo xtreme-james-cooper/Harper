@@ -29,12 +29,12 @@ case class SVal(e : Value) extends Value(e.numVal match {
   override def numVal = for (n <- e.numVal) yield n + 1
 }
 //A thunk; e is unevaluated
-case class LamVal(v : String, e : Expr, var closure : Map[String, Value]) extends Value("\\" + v + " . " + e)
+case class LamVal(v : String, codePointer : String, var closure : Map[String, Value]) extends Value("call " + codePointer)
 //Includes a reference to itself in the closure; this is the one place (so far) that we *need* vars
 object RecursiveLamVal {
-  def apply(n : String, v : String, e : Expr, closure : Map[String, Value]) : LamVal = {
-    val lam = LamVal(v, e, closure)
-    lam.closure = lam.closure + (n -> lam)
+  def apply(name : String, x : String, closure : Map[String, Value]) : LamVal = {
+    val lam = LamVal(x, name, closure)
+    lam.closure = lam.closure + (name -> lam)
     lam
   }
 }

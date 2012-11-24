@@ -19,8 +19,12 @@ object ExprCompiler {
 
   def run(e : Expr, m : List[Map[String, Value]], subdefs : List[ExprOpcode]) : Value = {
     val code = compileExpr(e) ++ List(ExprExit) ++ subdefs
-    code.foreach(println)
+    
+    for (i <- 0 until code.length) println(i + ": " + code(i))
     println("*****************")
+    
+    Thread.sleep(1000)
+    
     ExprCPU.run(code, m)
   }
 
@@ -35,12 +39,12 @@ object ExprCompiler {
     case Lam(v, t, e) => {
       val procname = "proc" + n
       n = n + 1
-      List(FlattenEnv, PushLam(v, e)) ++ compileSubroutine(procname, e)
+      List(FlattenEnv, PushLam(v, procname)) ++ compileSubroutine(procname, e)
     }
     case App(e1, e2) => {
       val exnLabel = "exnshortcut" + n
       n = n + 1
-      compileExpr(e1) ++ List(JIfExn(exnLabel)) ++ compileExpr(e2) ++ subroutineCall ++ List(ExprLabel(exnLabel))
+      compileExpr(e2) ++ List(JIfExn(exnLabel)) ++ compileExpr(e1) ++ List(JIfExn(exnLabel)) ++ subroutineCall ++ List(ExprLabel(exnLabel))
     }
     case Triv      => List(ReturnOp(TrivVal))
     case PairEx(e1, e2) => {
@@ -92,94 +96,6 @@ object ExprCompiler {
       compileExpr(e1) ++ List(JIfNExn(exnLabel)) ++ compileExpr(e2) ++ List(ExprLabel(exnLabel))
     }
     case CommandExp(c) => List(FlattenEnv, PushCommand(c))
-  }
-
-  def doEval(e : Expr, env : List[Map[String, Value]]) : Value = e match {
-    case Var(x)                => getBinding(env, x)
-    case Triv                  => TrivVal
-    case TypeLam(t, e)         => doEval(e, env)
-    case TypeApp(e, t)         => doEval(e, env)
-    case Z                     => ZVal
-    case S(n) => {
-      val v = doEval(n, env)
-      if (v.isInstanceOf[ExceptionValue])
-        v
-      else
-        SVal(v)
-    }
-    case InL(e) => {
-      val v = doEval(e, env)
-      if (v.isInstanceOf[ExceptionValue])
-        v
-      else
-        InLVal(v)
-    }
-    case InR(e) => {
-      val v = doEval(e, env)
-      if (v.isInstanceOf[ExceptionValue])
-        v
-      else
-        InRVal(v)
-    }
-    case PairEx(e1, e2) => {
-      val v1 = doEval(e1, env)
-      if (v1.isInstanceOf[ExceptionValue])
-        v1
-      else {
-        val v2 = doEval(e2, env)
-        if (v2.isInstanceOf[ExceptionValue])
-          v2
-        else
-          PairVal(v1, v2)
-      }
-    }
-    case Match(e, rs) => {
-      val v = doEval(e, env)
-      if (v.isInstanceOf[ExceptionValue])
-        v
-      else {
-        val (e, bind) = PatternCompiler.fakerun(v, rs)
-        doEval(e, bind :: env)
-      }
-    }
-    case Fold(mu, t, e) => {
-      val v = doEval(e, env)
-      if (v.isInstanceOf[ExceptionValue])
-        v
-      else
-        FoldVal(v)
-    }
-    case Unfold(e) => {
-      val v = doEval(e, env)
-      if (v.isInstanceOf[ExceptionValue])
-        v
-      else
-        v.asInstanceOf[FoldVal].v
-    }
-    case ThrowEx(s) => ExceptionValue(s)
-    case App(e1, e2) => {
-      val v1 = doEval(e1, env)
-      if (v1.isInstanceOf[ExceptionValue])
-        v1
-      else {
-        val v2 = doEval(e2, env)
-        if (v2.isInstanceOf[ExceptionValue])
-          v2
-        else v1 match {
-          case LamVal(x, e, clos) => doEval(e, clos + (x -> v2) :: env)
-          case _                  => throw new Exception("Application of a non-function : " + v1) //Not possible by typecheck
-        }
-      }
-    }
-    case TryCatch(e1, e2) => {
-      val v = doEval(e1, env)
-      if (v.isInstanceOf[ExceptionValue])
-        doEval(e2, env)
-      else
-        v
-    }
-    case Lam(v, t, e)  => LamVal(v, e, flatten(env))
-    case CommandExp(c) => Action(c, flatten(env))
   }
 
   def compileSubroutine(name : String, body : Expr) : List[ExprOpcode] = {
