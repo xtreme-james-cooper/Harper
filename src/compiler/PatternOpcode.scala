@@ -61,10 +61,6 @@ case class PushVRetStack(x : String) extends PatternOpcode("??? pshe " + x + " -
   }
 }
 
-case class FakeSetRetval(x : Expr) extends PatternOpcode("sete " + x) {
-  override def execute : Unit = fakeretval = x
-}
-
 case class SetRetval(x : String) extends PatternOpcode("sete " + x) {
   override def execute : Unit = retval = x
 }

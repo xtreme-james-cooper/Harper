@@ -20,7 +20,6 @@ object PatternCPU {
   val bindStack : Array[(String, (Int, Int, Int))] = Array.ofDim(100) //Should never have 100 bindings from a pattern
   val valHeap : Array[Int] = Array.ofDim(100000) //TODO large enough?
 
-  var fakeretval : Expr = null
   var retval : String = null
 
   def run(v1 : Value, pr : List[PatternOpcode]) : (String, Map[String, Value]) = {
@@ -98,32 +97,4 @@ object PatternCPU {
     ix
   }
 
-  
-  
-  
-  
-  //TODO elimiante
-  
-    
-  def fakerun(v1 : Value, pr : List[PatternOpcode]) : (Expr, Map[String, Value]) = {
-    PC = 0
-    register(R_VAL_HP) = 0
-    heapUp(v1)
-
-    prog = pr
-
-    //    prog.foreach(println)
-
-    while (prog(PC) != Exit) {
-      prog(PC).execute
-      PC = PC + 1
-    }
-
-    (fakeretval, Map() ++ (for {
-      i <- 0 until register(R_BIND_SP)
-      (s, h) = bindStack(i)
-    } yield (s, unheap(h))))
-  }
-
-  
 }

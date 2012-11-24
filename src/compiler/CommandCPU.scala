@@ -9,19 +9,39 @@ object CommandCPU {
 
   var retval : Value = null
 
-  def run(pr : List[CommandOpcode]) : Value = {
+  var env : List[Map[String, Value]] = null
+
+  var mem : List[(String, Value)] = null
+  
+  var subdefs : List[ExprOpcode] = null
+  
+  def run(pr : List[CommandOpcode], e : List[Map[String, Value]], s : List[ExprOpcode]) : Value = {
     PC = 0
 
+    env = e
+    mem = Nil
+    subdefs = s
+    
     prog = pr
 
-    //    prog.foreach(println)
+    while (prog(PC) != CmdExit) {
 
-    while (prog(PC) != Exit) {
+      //      println("executing line " + PC + " " + prog(PC) + " " + retval)
+
       prog(PC).execute
       PC = PC + 1
     }
 
     retval
+  }
+
+  def goto(l : String) : Unit = { //TODO do search better
+    //    println("looking for " + l)
+
+    PC = 0
+    while (prog(PC) != CmdLabel(l)) {
+      PC = PC + 1
+    }
   }
 
 }

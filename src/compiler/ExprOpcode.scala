@@ -21,7 +21,7 @@ case class ExprLabel(l : String) extends ExprOpcode("   :" + l + "") {
   override def execute : Unit = ()
 }
 
-case class ExprJump(l : String) extends ExprOpcode("???? jump :" + l) {
+case class ExprJump(l : String) extends ExprOpcode("jump :" + l) {
   override def execute : Unit = goto(l)
 }
 
