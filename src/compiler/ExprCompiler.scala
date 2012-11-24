@@ -1,6 +1,6 @@
 package compiler
 
-import model.{Z, Var, Unfold, TypeLam, TypeApp, TryCatch, Triv, ThrowEx, S, PairEx, Match, Lam, InR, InL, Fold, Fix, Expr, CommandExp, App}
+import model.{ Z, Var, Unfold, TypeLam, TypeApp, TryCatch, Triv, ThrowEx, S, PairEx, Match, Lam, InR, InL, Fold, Fix, Expr, CommandExp, App }
 
 object ExprCompiler {
 
@@ -33,7 +33,7 @@ object ExprCompiler {
     case App(e1, e2) => {
       val exnLabel = "exnshortcut" + n
       n = n + 1
-      compileExpr(e1) ++ List(JIfExn(exnLabel)) ++ compileExpr(e2) ++ List(RunLambda, PopEnv, ExprLabel(exnLabel))
+      compileExpr(e1) ++ List(JIfExn(exnLabel)) ++ compileExpr(e2) ++ subroutineCall ++ List(ExprLabel(exnLabel))
     }
     case Fix(v, Lam(x, t2, e2)) => {
       val procname = "proc" + n
@@ -60,7 +60,7 @@ object ExprCompiler {
     case Match(e, rs) => {
       val exnLabel = "exnshortcut" + n
       n = n + 1
-      compileExpr(e) ++ List(JIfExn(exnLabel), RunPat(rs), PushEnvFromPat, RunExprFromPat, PopEnv, ExprLabel(exnLabel))
+      compileExpr(e) ++ List(JIfExn(exnLabel), RunPat(rs), RunExprFromPat, PopEnv, ExprLabel(exnLabel))
     }
     case Fold(mu, t, e) => {
       val exnLabel = "exnshortcut" + n
@@ -85,7 +85,7 @@ object ExprCompiler {
 
   def doEval(e : Expr, env : List[Map[String, Value]]) : Value = e match {
     case Fix(v, Lam(x, t2, e)) => doEval(Lam(x, t2, e), Map(v -> RecursiveLamVal(v, x, e, flatten(env))) :: env)
-    case Fix(v, e0)             => doEval(e0, env) 
+    case Fix(v, e0)            => doEval(e0, env)
     case Var(x)                => getBinding(env, x)
     case Triv                  => TrivVal
     case TypeLam(t, e)         => doEval(e, env)
@@ -169,14 +169,20 @@ object ExprCompiler {
       else
         v
     }
-    case Lam(v, t, e)          => LamVal(v, e, flatten(env))
-    case CommandExp(c)         => Action(c, flatten(env))
+    case Lam(v, t, e)  => LamVal(v, e, flatten(env))
+    case CommandExp(c) => Action(c, flatten(env))
   }
-  
+
   def compileSubroutine(name : String, body : Expr) : List[ExprOpcode] = {
     val jump = "jump" + n
     n = n + 1
-    List(ExprJump(jump)) ++ compileExpr(body) ++ List(ExprLabel(jump))
+    List(ExprJump(jump), ExprLabel(name)) ++ compileExpr(body) ++ List(JumpReturn, ExprLabel(jump))
+  }
+
+  def subroutineCall : List[ExprOpcode] = {
+    val returnLabel = "return" + n
+    n = n + 1
+    List(PushReturn(returnLabel), RunLambda, ExprLabel(returnLabel), PopEnv)
   }
 
 }

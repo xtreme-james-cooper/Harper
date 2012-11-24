@@ -57,6 +57,21 @@ case class JIfNExn(l : String) extends ExprOpcode("???? jifnx :" + l) {
     }
 }
 
+case object JumpReturn extends ExprOpcode("???? jumpreturn") {
+  override def execute : Unit = {
+    val l = returnStack.head
+    returnStack = returnStack.tail
+    PC = 0
+    while (prog(PC) != ExprLabel(l)) {
+      PC = PC + 1
+    }
+  }
+}
+
+case class PushReturn(s : String) extends ExprOpcode("???? pushreturn " + s) {
+  override def execute : Unit = returnStack = s :: returnStack
+}
+
 case object PushS extends ExprOpcode("???? pshS") {
   override def execute : Unit = retval = SVal(retval.head) :: retval.tail
 }
@@ -94,11 +109,10 @@ case class RunPat(rs : List[Rule]) extends ExprOpcode("???? runPat " + rs) {
 }
 
 case object RunExprFromPat extends ExprOpcode("???? runexfrompat ") {
-  override def execute : Unit = retval = ExprCompiler.doEval(patReturn._1, env) :: retval
-}
-
-case object PushEnvFromPat extends ExprOpcode("???? pshenvfrompat") {
-  override def execute : Unit = env = patReturn._2 :: env
+  override def execute : Unit = {
+    env = patReturn._2 :: env
+    retval = ExprCompiler.doEval(patReturn._1, env) :: retval
+  }
 }
 
 case object PopEnv extends ExprOpcode("???? popenv") {

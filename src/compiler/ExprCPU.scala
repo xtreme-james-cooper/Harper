@@ -11,24 +11,24 @@ object ExprCPU {
 
   var retval : List[Value] = null
 
-  var lamStack : List[(String, Expr, Map[String, Value])] = null
-  
   var env : List[Map[String, Value]] = null
 
   var envTemp : Map[String, Value] = null
 
   var patReturn : (Expr, Map[String, Value]) = null
 
+  var returnStack : List[String] = null
+  
   def run(pr : List[ExprOpcode], m : List[Map[String, Value]]) : Value = {
     PC = 0
     env = m
     prog = pr
     retval = Nil
-    lamStack = Nil
+    returnStack = Nil
     
-    prog.foreach(println)
-
     while (prog(PC) != ExprExit) {
+//      println("executing line " + PC + " " + prog(PC) + " " + retval)
+      
       prog(PC).execute
       PC = PC + 1
     }
