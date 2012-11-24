@@ -13,6 +13,10 @@ object Main {
 
     test("null : Unit = (); return null")
 
+    test("return (\\x:Nat . S(x) S(Z))")
+    
+    test("add1(x : Nat) : Nat = S(x); return (add1 S(S(Z)))")
+    
     test("plus(a : Nat, b : Nat) : Nat = case a of {Z -> b | S(n) -> S(((plus n) b))}; return ((plus 2) 3)")
 
     test("swap(p : (Unit, Nat)) : (Nat, Unit) = case p of {(a, b) -> (b, a)};"

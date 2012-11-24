@@ -1,7 +1,7 @@
 package typechecker
 
 import model.{ Z, Var, Unknown, UnitTy, Unfold, TypeLam, TypeApp, Type, TryCatch, Triv, ThrowEx, Sum, S, 
-  Product, PairEx, Nat, Match, Lam, Inductive, InR, InL, ForAll, Fold, Fix, Expr, CommandExp, Arrow, App }
+  Product, PairEx, Nat, Match, Lam, Inductive, InR, InL, ForAll, Fold, Expr, CommandExp, Arrow, App }
 
 object ExprChecker extends TypeChecker {
 
@@ -29,11 +29,6 @@ object ExprChecker extends TypeChecker {
       val (t1, cs1) = getType(e1, env, tyenv, as)
       val (t2, cs2) = getType(e2, env, tyenv, as)
       (hole2, (t1, Arrow(hole1, hole2)) :: (hole1, t2) :: cs1 ++ cs2)
-    }
-    case Fix(v, e) => {
-      val t = env(v) //Guarenteed to be there by construction, since Fixes are only built by defs, which enhance the environment 
-      val (t2, cs) = getType(e, env + (v -> t), tyenv, as)
-      (t, (t, t2) :: cs)
     }
     case PairEx(e1, e2) => {
       val (t1, cs1) = getType(e1, env, tyenv, as)

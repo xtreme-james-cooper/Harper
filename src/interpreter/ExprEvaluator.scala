@@ -1,7 +1,7 @@
 package interpreter
 
 import model.{ZVal, Z, Var, Value, Unfold, TypeLam, TypeApp, TryCatch, TrivVal, Triv, ThrowEx, SVal, S, Rule, RecursiveLamVal, 
-  PairVal, PairEx, Match, LamVal, Lam, InRVal, InR, InLVal, InL, FoldVal, Fold, Fix, Expr, ExceptionValue, CommandExp, App, Action}
+  PairVal, PairEx, Match, LamVal, Lam, InRVal, InR, InLVal, InL, FoldVal, Fold, Expr, ExceptionValue, CommandExp, App, Action}
 
 object ExprEvaluator extends Evaluator[ExprStack, Expr, Value] {
 
@@ -42,11 +42,6 @@ object ExprEvaluator extends Evaluator[ExprStack, Expr, Value] {
       target = Eval(e1)
       push(StackLam(e2))
     }
-    case Fix(v, Lam(x, t2, e)) => {
-      pushEnv(Map(v -> RecursiveLamVal(v, x, e, flattenEnv)))
-      target = Eval(Lam(x, t2, e))
-    }
-    case Fix(v, e) => target = Eval(e) //this will explode on CAFs (eg, recursive non-functions) so don't write them
     case Triv      => target = Return(TrivVal)
     case PairEx(e1, e2) => {
       target = Eval(e1)

@@ -1,6 +1,6 @@
 package compiler
 
-import model.{ Z, Var, Unfold, TypeLam, TypeApp, TryCatch, Triv, ThrowEx, S, PairEx, Match, Lam, InR, InL, Fold, Fix, Expr, CommandExp, App }
+import model.{ Z, Var, Unfold, TypeLam, TypeApp, TryCatch, Triv, ThrowEx, S, PairEx, Match, Lam, InR, InL, Fold, Expr, CommandExp, App }
 import model.Rule
 import model.Pattern
 
@@ -42,12 +42,6 @@ object ExprCompiler {
       n = n + 1
       compileExpr(e1) ++ List(JIfExn(exnLabel)) ++ compileExpr(e2) ++ subroutineCall ++ List(ExprLabel(exnLabel))
     }
-    case Fix(v, Lam(x, t2, e2)) => {
-      val procname = "proc" + n
-      n = n + 1
-      List(PushRecursiveLamEnv(v, x, e2), PushLam(x, e2)) ++ compileSubroutine(procname, e2)
-    }
-    case Fix(v, e) => compileExpr(e) //this will explode on CAFs (eg, recursive non-functions) so don't write them
     case Triv      => List(ReturnOp(TrivVal))
     case PairEx(e1, e2) => {
       val exnLabel = "exnshortcut" + n
@@ -101,8 +95,6 @@ object ExprCompiler {
   }
 
   def doEval(e : Expr, env : List[Map[String, Value]]) : Value = e match {
-    case Fix(v, Lam(x, t2, e)) => doEval(Lam(x, t2, e), Map(v -> RecursiveLamVal(v, x, e, flatten(env))) :: env)
-    case Fix(v, e0)            => doEval(e0, env)
     case Var(x)                => getBinding(env, x)
     case Triv                  => TrivVal
     case TypeLam(t, e)         => doEval(e, env)
