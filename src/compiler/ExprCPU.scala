@@ -18,22 +18,29 @@ object ExprCPU {
   var patReturn : (Expr, Map[String, Value]) = null
 
   var returnStack : List[String] = null
-  
+
   def run(pr : List[ExprOpcode], m : List[Map[String, Value]]) : Value = {
     PC = 0
     env = m
     prog = pr
     retval = Nil
     returnStack = Nil
-    
+
     while (prog(PC) != ExprExit) {
-//      println("executing line " + PC + " " + prog(PC) + " " + retval)
-      
+      //println("executing line " + PC + " " + prog(PC) + " " + retval)
+
       prog(PC).execute
       PC = PC + 1
     }
 
     retval.head
+  }
+
+  def goto(l : String) : Unit = { //TODO do search better
+    PC = 0
+    while (prog(PC) != Label(l)) {
+      PC = PC + 1
+    }
   }
 
 }

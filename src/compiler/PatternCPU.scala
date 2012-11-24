@@ -29,7 +29,7 @@ object PatternCPU {
 
     prog = pr
 
-//    prog.foreach(println)
+    //    prog.foreach(println)
 
     while (prog(PC) != Exit) {
       prog(PC).execute
@@ -40,6 +40,13 @@ object PatternCPU {
       i <- 0 until register(R_BIND_SP)
       (s, h) = bindStack(i)
     } yield (s, unheap(h))))
+  }
+
+  def goto(l : String) : Unit = { //TODO do search better
+    PC = 0
+    while (prog(PC) != Label(l)) {
+      PC = PC + 1
+    }
   }
 
   case class HeapValue(tag : Int, a : Int, b : Int)

@@ -21,12 +21,7 @@ case class ExprLabel(l : String) extends ExprOpcode("   :" + l + "") {
 }
 
 case class ExprJump(l : String) extends ExprOpcode("???? jump :" + l) {
-  override def execute : Unit = {
-    PC = 0
-    while (prog(PC) != ExprLabel(l)) {
-      PC = PC + 1
-    }
-  }
+  override def execute : Unit = goto(l)
 }
 
 /*
@@ -38,33 +33,18 @@ case class ReturnOp(v : Value) extends ExprOpcode("???? retval " + v) {
 }
 
 case class JIfExn(l : String) extends ExprOpcode("???? jifx :" + l) {
-  override def execute : Unit =
-    if (retval.head.isInstanceOf[ExceptionValue]) {
-      PC = 0
-      while (prog(PC) != ExprLabel(l)) {
-        PC = PC + 1
-      }
-    }
+  override def execute : Unit = if (retval.head.isInstanceOf[ExceptionValue]) goto(l)
 }
 
 case class JIfNExn(l : String) extends ExprOpcode("???? jifnx :" + l) {
-  override def execute : Unit =
-    if (!retval.head.isInstanceOf[ExceptionValue]) {
-      PC = 0
-      while (prog(PC) != ExprLabel(l)) {
-        PC = PC + 1
-      }
-    }
+  override def execute : Unit = if (!retval.head.isInstanceOf[ExceptionValue]) goto(l)
 }
 
 case object JumpReturn extends ExprOpcode("???? jumpreturn") {
   override def execute : Unit = {
     val l = returnStack.head
     returnStack = returnStack.tail
-    PC = 0
-    while (prog(PC) != ExprLabel(l)) {
-      PC = PC + 1
-    }
+    goto(l)
   }
 }
 
