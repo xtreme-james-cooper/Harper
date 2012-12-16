@@ -1,7 +1,8 @@
 package parser
 
 import Parser.{ pLit, pIdent }
-import model.{ Z, S, Expr, Var, IfZ }
+import TypeParser.typeParser
+import model.{ Z, Var, S, Lam, IfZ, Fix, Expr, Ap }
 
 object ExprParser {
 
@@ -12,27 +13,14 @@ object ExprParser {
     pLit("ifz") thenJ exprParser thenK pLit("{") thenK pLit("Z") thenK pLit("=") thenK pLit(">") thenS exprParser thenK pLit(";") thenK
       pLit("S") thenK pLit("(") thenS pIdent thenK pLit(")") thenK pLit("=") thenK pLit(">") thenS exprParser thenK pLit("}") appl
       ({ case (((e, ez), x), es) => IfZ(e, ez, x, es) })
+  private val lamParser : Parser[Expr] =
+    pLit("\\") thenJ pIdent thenK pLit(":") thenS typeParser thenK pLit(".") thenS exprParser appl ({ case ((x, t), e) => Lam(x, t, e) })
+  private val apParser : Parser[Expr] =
+    pLit("(") thenJ exprParser thenS exprParser thenK pLit(")") appl ({ case (e1, e2) => Ap(e1, e2) })
+  private val fixParser : Parser[Expr] =
+    pLit("fix") thenJ pIdent thenK pLit(":") thenS typeParser thenK pLit("in") thenS exprParser appl ({ case ((x, t), e) => Fix(x, t, e) })
 
   val exprParser : Parser[Expr] =
-    zParser or sParser or ifzParser or varParser
-
-  def parse(s : String) : Expr = {
-
-    def tokenize(s : String) : List[String] = s.headOption match {
-      case None                      => Nil
-      case Some(c) if c.isWhitespace => tokenize(s.tail)
-      case Some(c) if c.isDigit      => s.takeWhile(_ isDigit) :: tokenize(s.dropWhile(_ isDigit))
-      case Some(c) if c.isLetter     => s.takeWhile(_ isLetterOrDigit) :: tokenize(s.dropWhile(_ isLetterOrDigit))
-      case Some(c)                   => c.toString :: tokenize(s.tail)
-    }
-
-    def firstFullParse(ps : List[(Expr, List[String])]) : Expr = ps match {
-      case Nil            => throw new Exception("no full parse of " + s)
-      case (p, Nil) :: ps => p
-      case (p, x) :: ps => firstFullParse(ps)
-    }
-
-    firstFullParse(exprParser.run(tokenize(s)))
-  }
+    varParser or zParser or sParser or ifzParser or lamParser or apParser or fixParser
 
 }
