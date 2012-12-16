@@ -1,7 +1,6 @@
 package interpreter
 
-import model.{ Z, Var, S, Lam, IfZ, Fix, Expr, Ap }
-import model.Value
+import model.{ Z, Var, Triv, S, ProjR, ProjL, Pairr, Lam, IfZ, Fix, Expr, Ap }
 
 object Substitutor {
 
@@ -33,6 +32,10 @@ object Substitutor {
       val newV : String = newVar
       Fix(newV, t, subst(x, v)(subst(y, Var(newV))(e)))
     }
+    case Triv          => Triv
+    case Pairr(e1, e2) => Pairr(subst(x, v)(e1), subst(x, v)(e2))
+    case ProjL(e)      => ProjL(subst(x, v)(e))
+    case ProjR(e)      => ProjR(subst(x, v)(e))
   }
 
 }

@@ -2,7 +2,7 @@ package parser
 
 import Parser.{ pLit, pIdent }
 import TypeParser.typeParser
-import model.{ Z, Var, S, Lam, IfZ, Fix, Expr, Ap }
+import model.{ Z, Var, Triv, S, ProjR, ProjL, Pairr, Lam, IfZ, Fix, Expr, Ap }
 
 object ExprParser {
 
@@ -19,8 +19,13 @@ object ExprParser {
     pLit("(") thenJ exprParser thenS exprParser thenK pLit(")") appl ({ case (e1, e2) => Ap(e1, e2) })
   private val fixParser : Parser[Expr] =
     pLit("fix") thenJ pIdent thenK pLit(":") thenS typeParser thenK pLit("in") thenS exprParser appl ({ case ((x, t), e) => Fix(x, t, e) })
+  private val trivParser : Parser[Expr] = pLit("(") thenK pLit(")") appl (x => Triv)
+  private val pairParser : Parser[Expr] = pLit("(") thenJ exprParser thenK pLit(",") thenS exprParser thenK pLit(")") appl
+    ({ case (t1, t2) => Pairr(t1, t2) })
+  private val projLParser : Parser[Expr] = pLit("projL") thenJ exprParser appl (x => ProjL(x))
+  private val projRParser : Parser[Expr] = pLit("projR") thenJ exprParser appl (x => ProjR(x))
 
   val exprParser : Parser[Expr] =
-    varParser or zParser or sParser or ifzParser or lamParser or apParser or fixParser
+    varParser or zParser or sParser or ifzParser or lamParser or apParser or fixParser or trivParser or pairParser or projLParser or projRParser
 
 }
