@@ -10,6 +10,7 @@ object Main {
 
     test("Z")
     test("S(S(Z))")
+    test("ifz S(Z) {Z => Z; S(k) => S(S(k))}")
 
   }
 
