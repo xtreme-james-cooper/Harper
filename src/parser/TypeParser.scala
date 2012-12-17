@@ -1,7 +1,7 @@
 package parser
 
 import Parser.pLit
-import model.{ Unitt, Type, Prod, Nat, Arr }
+import model.{ Voidd, Unitt, Type, Sum, Prod, Nat, Arr }
 
 object TypeParser {
 
@@ -11,7 +11,10 @@ object TypeParser {
   val unitParser : Parser[Type] = pLit("Unit") appl (x => Unitt)
   val prodParser : Parser[Type] = pLit("(") thenJ typeParser thenK pLit(",") thenS typeParser thenK pLit(")") appl
     ({ case (t1, t2) => Prod(t1, t2) })
+  val voidParser : Parser[Type] = pLit("Void") appl (x => Voidd)
+  val sumParser : Parser[Type] = pLit("(") thenJ typeParser thenK pLit("+") thenS typeParser thenK pLit(")") appl
+    ({ case (t1, t2) => Sum(t1, t2) })
 
-  val typeParser : Parser[Type] = natParser or arrParser or unitParser or prodParser
+  val typeParser : Parser[Type] = natParser or arrParser or unitParser or prodParser or voidParser or sumParser
 
 }

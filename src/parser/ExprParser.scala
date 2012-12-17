@@ -2,7 +2,7 @@ package parser
 
 import Parser.{ pLit, pIdent }
 import TypeParser.typeParser
-import model.{ Z, Var, Triv, S, ProjR, ProjL, Pairr, Lam, IfZ, Fix, Expr, Ap }
+import model.{ Z, Var, Triv, S, ProjR, ProjL, Pairr, Lam, InR, InL, IfZ, Fix, Expr, Ap, Abort, Case }
 
 object ExprParser {
 
@@ -24,8 +24,17 @@ object ExprParser {
     ({ case (t1, t2) => Pairr(t1, t2) })
   private val projLParser : Parser[Expr] = pLit("projL") thenJ exprParser appl (x => ProjL(x))
   private val projRParser : Parser[Expr] = pLit("projR") thenJ exprParser appl (x => ProjR(x))
+  private val abortParser : Parser[Expr] = pLit("abort") thenJ pLit(":") thenJ typeParser thenS exprParser appl ({ case (t, e) => Abort(t, e) })
+  private val inLParser : Parser[Expr] = pLit("inL") thenJ pLit(":") thenJ typeParser thenS exprParser appl ({ case (t, e) => InL(t, e) })
+  private val inRParser : Parser[Expr] = pLit("inR") thenJ pLit(":") thenJ typeParser thenS exprParser appl ({ case (t, e) => InR(t, e) })
+  private val caseParser : Parser[Expr] =
+    pLit("case") thenJ exprParser thenK pLit("{") thenK
+      pLit("inL") thenS pIdent thenK pLit("=") thenK pLit(">") thenS exprParser thenK pLit(";") thenK
+      pLit("inR") thenS pIdent thenK pLit("=") thenK pLit(">") thenS exprParser thenK pLit("}") appl
+      ({ case ((((e, x1), e1), x2), e2) => Case(e, x1, e1, x2, e2) })
 
   val exprParser : Parser[Expr] =
-    varParser or zParser or sParser or ifzParser or lamParser or apParser or fixParser or trivParser or pairParser or projLParser or projRParser
+    varParser or zParser or sParser or ifzParser or lamParser or apParser or fixParser or trivParser or pairParser or projLParser or projRParser or
+      abortParser or inLParser or inRParser or caseParser
 
 }

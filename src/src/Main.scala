@@ -16,7 +16,9 @@ object Main {
     test("(fix double:(Nat=>Nat) in \\x:Nat.ifz x {Z => Z; S(k) => S(S((double k)))} S(S(S(Z))))")
     test("(\\x:Unit.Z ())")
     test("(fix swap:((Nat, Unit)=>(Unit, Nat)) in \\x:(Nat, Unit) . (projR x, projL x) (S(S(Z)), ()))")
-    
+    test("(\\x:(Unit+Nat).case x {inL x => Z; inR x => S(x)} inL:(Unit+Nat) () )")
+    test("(\\x:(Unit+Nat).case x {inL x => Z; inR x => S(x)} inR:(Unit+Nat) S(Z))")
+
   }
 
   def test(progs : String) {
