@@ -5,6 +5,7 @@ import model.{ ZPat, Z, WildPat, Voidd, VarPat, Var, Unitt, Type, TyVar, TrivPat
 import model.Unfold
 import model.Fold
 import Substitutor.substT
+import model.Let
 
 object Typechecker {
 
@@ -42,6 +43,7 @@ object Typechecker {
       verifyType(Set())(t)
       Arr(t, typecheckExpr(sig + (x -> t))(e))
     }
+    case Let(n, d, b) => typecheckExpr(sig + (n -> typecheckExpr(sig)(d)))(b)
     case Ap(e1, e2) => typecheckExpr(sig)(e1) match {
       case Arr(t1, t2) =>
         if (typecheckExpr(sig)(e2) == t1) t2

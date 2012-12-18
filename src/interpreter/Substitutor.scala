@@ -25,6 +25,7 @@ import model.Prod
 import model.Sum
 import model.Unfold
 import model.Fold
+import model.Let
 
 object Substitutor {
 
@@ -42,6 +43,10 @@ object Substitutor {
     case Lam(y, t, e) => {
       val newV : String = newVar
       Lam(newV, t, subst(bind + (y -> Var(newV)))(e))
+    }
+    case Let(n, d, b) => {
+      val newV : String = newVar
+      Let(newV, subst(bind)(d), subst(bind + (n -> Var(newV)))(b))
     }
     case Ap(e1, e2) => Ap(subst(bind)(e1), subst(bind)(e2))
     case Fix(y, t, e) => {

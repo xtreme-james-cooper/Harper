@@ -21,9 +21,10 @@ object Main {
     test("case (S(Z), inL : (Unit+Nat) ()) of { (n, inL _) => S(S(n)) ; (S(Z), inR Z) => Z }")
     test("case (S(Z), inR : (Unit+Nat) Z) of { (n, inL _) => S(S(n)) ; (S(Z), inR Z) => Z }")
     test("fix length:(mu t.(Unit+(Nat, t)) => Nat) in \\l:mu t.(Unit+(Nat, t)).case unfold l of { inL () => Z ; inR (n, l) => S((length l)) }")
-    test("(fix length:(mu t.(Unit+(Nat, t)) => Nat) in \\l:mu t.(Unit+(Nat, t)).case unfold l of { inL () => Z ; inR (n, l) => S((length l)) } " +
-      " fold:t.(Unit+(Nat, t)) inR:(Unit+(Nat,mu t.(Unit+(Nat, t)))) (Z, fold:t.(Unit+(Nat, t)) " +
-      "inR:(Unit+(Nat,mu t.(Unit+(Nat, t)))) (Z, fold:t.(Unit+(Nat, t)) inL:(Unit+(Nat,mu t.(Unit+(Nat, t)))) ())))")
+    test("let nil = fold:t.(Unit+(Nat, t)) inL:(Unit+(Nat,mu t.(Unit+(Nat, t)))) () in " +
+      "let cons = \\h:Nat . \\t:mu t.(Unit+(Nat, t)) . fold:t.(Unit+(Nat, t)) inR:(Unit+(Nat,mu t.(Unit+(Nat, t)))) (h, t) in " +
+      "let length = fix length:(mu t.(Unit+(Nat, t)) => Nat) in \\l:mu t.(Unit+(Nat, t)).case unfold l of { inL () => Z ; inR (n, l) => S((length l)) } in " +
+      "(length ((cons Z) ((cons Z) nil)))")
 
   }
 

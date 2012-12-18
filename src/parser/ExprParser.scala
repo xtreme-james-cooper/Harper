@@ -4,6 +4,7 @@ import Parser.{ pLit, pIdent }
 import PatParser.rulesParser
 import TypeParser.typeParser
 import model.{ Z, Var, Unfold, Triv, S, ProjR, ProjL, Pairr, Match, Lam, InR, InL, Fold, Fix, Expr, Ap, Abort }
+import model.Let
 
 object ExprParser {
 
@@ -30,9 +31,11 @@ object ExprParser {
   private val foldParser : Parser[Expr] = pLit("fold") thenJ pLit(":") thenJ pIdent thenK pLit(".") thenS typeParser thenS exprParser appl
     ({ case ((x, t), e) => Fold(x, t, e) })
   private val unfoldParser : Parser[Expr] = pLit("unfold") thenJ exprParser appl (e => Unfold(e))
+  private val letParser : Parser[Expr] = pLit("let") thenJ pIdent thenK pLit("=") thenS exprParser thenK pLit("in") thenS exprParser appl
+  	({ case ((n, d), b) => Let(n, d, b)})
 
   val exprParser : Parser[Expr] =
     varParser or zParser or sParser or lamParser or apParser or fixParser or trivParser or pairParser or projLParser or projRParser or
-      abortParser or inLParser or inRParser or matchParser or foldParser or unfoldParser
+      abortParser or inLParser or inRParser or matchParser or foldParser or unfoldParser or letParser
 
 }

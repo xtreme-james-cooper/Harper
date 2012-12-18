@@ -17,6 +17,7 @@ import model.Pattern
 import Substitutor.subst
 import model.Unfold
 import model.Fold
+import model.Let
 
 object Evaluator {
 
@@ -27,6 +28,7 @@ object Evaluator {
     case Z            => Z
     case S(e)         => S(evalExpr(e))
     case Lam(x, t, e) => Lam(x, t, e)
+    case Let(n, d, b) => evalExpr(subst(Map(n -> evalExpr(d)))(b))
     case Ap(e1, e2) => evalExpr(e1) match {
       case Lam(x, t, e) => evalExpr(subst(Map(x -> evalExpr(e2)))(e))
       case _            => throw new Exception("application of non-function " + e1)
