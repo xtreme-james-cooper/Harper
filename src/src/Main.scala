@@ -25,6 +25,7 @@ object Main {
       "let cons = \\h:Nat . \\t:mu t.(Unit+(Nat, t)) . fold:t.(Unit+(Nat, t)) inR:(Unit+(Nat,mu t.(Unit+(Nat, t)))) (h, t) in " +
       "let length = fix length:(mu t.(Unit+(Nat, t)) => Nat) in \\l:mu t.(Unit+(Nat, t)).case unfold l of { inL () => Z ; inR (n, l) => S((length l)) } in " +
       "(length ((cons Z) ((cons Z) nil)))")
+    test("let id = /\\t.\\x:t.x in (([id Nat] Z), ([id Unit] ()))")
 
   }
 

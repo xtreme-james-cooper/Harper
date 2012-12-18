@@ -18,6 +18,8 @@ import Substitutor.subst
 import model.Unfold
 import model.Fold
 import model.Let
+import model.TLam
+import model.TAp
 
 object Evaluator {
 
@@ -49,10 +51,13 @@ object Evaluator {
     case InR(t, e)     => InR(t, evalExpr(e))
     case Match(e, rs)  => evalRules(e)(rs)
     case Fold(x, t, e) => Fold(x, t, eval(e))
-    case Unfold(e)     => eval(e) match {
+    case Unfold(e) => eval(e) match {
       case Fold(x, t, e) => e
-      case _ => throw new Exception("unfold of non-fold " + e)
+      case _             => throw new Exception("unfold of non-fold " + e)
     }
+    case TLam(x, e) => evalExpr(e)
+    case TAp(e, t) => evalExpr(e) //ignore types at runtime
+
   }
 
   private def evalRules(e : Expr) : List[(Pattern, Expr)] => Expr = {

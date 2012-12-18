@@ -26,6 +26,9 @@ import model.Sum
 import model.Unfold
 import model.Fold
 import model.Let
+import model.All
+import model.TLam
+import model.TAp
 
 object Substitutor {
 
@@ -63,6 +66,9 @@ object Substitutor {
     case Match(e, rs)  => Match(subst(bind)(e), rs.map({ case (p, e) => substRule(bind)(p, e) }))
     case Fold(x, t, e) => Fold(x, t, subst(bind)(e))
     case Unfold(e)     => Unfold(subst(bind)(e))
+    case TLam(y, e)    => TLam(y, subst(bind)(e))
+    case TAp(e, t)     => TAp(subst(bind)(e), t)
+
   }
 
   private def substRule(bind : Map[String, Expr]) : (Pattern, Expr) => (Pattern, Expr) = (p, e) => {
@@ -94,6 +100,10 @@ object Substitutor {
     case Rec(y, t1) => {
       val newV : String = newVar
       Rec(newV, substT(x, t)(substT(y, TyVar(newV))(t1)))
+    }
+    case All(y, t1) => {
+      val newV : String = newVar
+      All(newV, substT(x, t)(substT(y, TyVar(newV))(t1)))
     }
   }
 

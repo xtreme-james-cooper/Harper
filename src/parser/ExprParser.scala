@@ -5,6 +5,8 @@ import PatParser.rulesParser
 import TypeParser.typeParser
 import model.{ Z, Var, Unfold, Triv, S, ProjR, ProjL, Pairr, Match, Lam, InR, InL, Fold, Fix, Expr, Ap, Abort }
 import model.Let
+import model.TLam
+import model.TAp
 
 object ExprParser {
 
@@ -33,9 +35,13 @@ object ExprParser {
   private val unfoldParser : Parser[Expr] = pLit("unfold") thenJ exprParser appl (e => Unfold(e))
   private val letParser : Parser[Expr] = pLit("let") thenJ pIdent thenK pLit("=") thenS exprParser thenK pLit("in") thenS exprParser appl
   	({ case ((n, d), b) => Let(n, d, b)})
+  private val tlamParser : Parser[Expr] =
+    pLit("/") thenJ pLit("\\") thenJ pIdent thenK pLit(".") thenS exprParser appl ({ case (x, e) => TLam(x, e) })
+  private val tapParser : Parser[Expr] =
+    pLit("[") thenJ exprParser thenS typeParser thenK pLit("]") appl ({ case (e, t) => TAp(e, t) })
 
   val exprParser : Parser[Expr] =
     varParser or zParser or sParser or lamParser or apParser or fixParser or trivParser or pairParser or projLParser or projRParser or
-      abortParser or inLParser or inRParser or matchParser or foldParser or unfoldParser or letParser
+      abortParser or inLParser or inRParser or matchParser or foldParser or unfoldParser or letParser or tlamParser or tapParser
 
 }
