@@ -1,10 +1,19 @@
 package interpreter
 
-import model.{ Z, Var, Triv, S, ProjR, ProjL, Pairr, Lam, IfZ, Fix, Expr, Ap }
+import model.{ Z, Var, Triv, S, ProjR, ProjL, Pairr, Lam, Fix, Expr, Ap }
 import model.Abort
 import model.InR
 import model.InL
-import model.Case
+import model.Match
+import model.Pattern
+import model.SPat
+import model.TrivPat
+import model.InRPat
+import model.PairPat
+import model.InLPat
+import model.VarPat
+import model.WildPat
+import model.ZPat
 
 object Substitutor {
 
@@ -15,50 +24,43 @@ object Substitutor {
     "var-" + varTag
   }
 
-  def subst(x : String, v : Expr) : Expr => Expr = {
-    case Var(y) =>
-      if (x == y) v
-      else Var(y)
-    case Z    => Z
-    case S(n) => S(subst(x, v)(n))
-    case IfZ(e, ez, y, es) =>
-      if (x == y) IfZ(subst(x, v)(e), subst(x, v)(ez), y, es)
-      else {
-        val newV : String = newVar
-        IfZ(subst(x, v)(e), subst(x, v)(ez), newV, subst(x, v)(subst(y, Var(newV))(es)))
-      }
+  def subst(bind : Map[String, Expr]) : Expr => Expr = {
+    case Var(y) => bind.getOrElse(y, Var(y))
+    case Z      => Z
+    case S(n)   => S(subst(bind)(n))
     case Lam(y, t, e) => {
       val newV : String = newVar
-      Lam(newV, t, subst(x, v)(subst(y, Var(newV))(e)))
+      Lam(newV, t, subst(bind + (y -> Var(newV)))(e))
     }
-    case Ap(e1, e2) => Ap(subst(x, v)(e1), subst(x, v)(e2))
+    case Ap(e1, e2) => Ap(subst(bind)(e1), subst(bind)(e2))
     case Fix(y, t, e) => {
       val newV : String = newVar
-      Fix(newV, t, subst(x, v)(subst(y, Var(newV))(e)))
+      Fix(newV, t, subst(bind + (y -> Var(newV)))(e))
     }
     case Triv          => Triv
-    case Pairr(e1, e2) => Pairr(subst(x, v)(e1), subst(x, v)(e2))
-    case ProjL(e)      => ProjL(subst(x, v)(e))
-    case ProjR(e)      => ProjR(subst(x, v)(e))
-    case Abort(t, e)   => Abort(t, subst(x, v)(e))
-    case InL(t, e)     => InL(t, subst(x, v)(e))
-    case InR(t, e)     => InR(t, subst(x, v)(e))
-    case Case(e, y1, e1, y2, e2) =>
-      if (x == y1) 
-        if (x == y2) Case(subst(x, v)(e), y1, e1, y2, e2)
-        else {
-          val newV : String = newVar
-          Case(subst(x, v)(e), y1, e1, newV, subst(x, v)(subst(y2, Var(newV))(e2)))
-        }
-      else if (x == y2) {
-        val newV : String = newVar
-          Case(subst(x, v)(e), newV, subst(x, v)(subst(y1, Var(newV))(e1)), y2, e2)
-      } else {
-        val newV1 : String = newVar
-        val newV2 : String = newVar
-        Case(subst(x, v)(e), newV1, subst(x, v)(subst(y1, Var(newV1))(e1)), newV2, subst(x, v)(subst(y2, Var(newV2))(e2)))
-      }
+    case Pairr(e1, e2) => Pairr(subst(bind)(e1), subst(bind)(e2))
+    case ProjL(e)      => ProjL(subst(bind)(e))
+    case ProjR(e)      => ProjR(subst(bind)(e))
+    case Abort(t, e)   => Abort(t, subst(bind)(e))
+    case InL(t, e)     => InL(t, subst(bind)(e))
+    case InR(t, e)     => InR(t, subst(bind)(e))
+    case Match(e, rs)  => Match(subst(bind)(e), rs.map({ case (p, e) => substRule(bind)(p, e) }))
+  }
 
+  private def substRule(bind : Map[String, Expr]) : (Pattern, Expr) => (Pattern, Expr) = (p, e) => {
+    val patternBinds = Map() ++ (for (x <- p.freeVars) yield (x, newVar))
+    (substPat(patternBinds)(p), subst(bind ++ patternBinds.map({ case (x, v) => (x, Var(v)) }))(e))
+  }
+
+  private def substPat(bind : Map[String, String]) : Pattern => Pattern = {
+    case WildPat         => WildPat
+    case VarPat(x)       => VarPat(bind.getOrElse(x, x))
+    case TrivPat         => TrivPat
+    case PairPat(p1, p2) => PairPat(substPat(bind)(p1), substPat(bind)(p2))
+    case InLPat(p)       => InLPat(substPat(bind)(p))
+    case InRPat(p)       => InRPat(substPat(bind)(p))
+    case ZPat            => ZPat
+    case SPat(p)         => SPat(substPat(bind)(p))
   }
 
 }

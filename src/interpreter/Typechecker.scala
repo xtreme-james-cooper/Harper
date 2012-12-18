@@ -1,15 +1,71 @@
 package interpreter
 
-import model.Expr
-import model.{ Z, Var, Unitt, Type, Triv, S, ProjR, ProjL, Prod, Pairr, Nat, Lam, IfZ, Fix, Arr, Ap }
-import model.InR
-import model.Case
+import model.{
+  ZPat,
+  Z,
+  WildPat,
+  Voidd,
+  VarPat,
+  Var,
+  Unitt,
+  Type,
+  TrivPat,
+  Triv,
+  Sum,
+  SPat,
+  S,
+  ProjR,
+  ProjL,
+  Prod,
+  Pattern,
+  Pairr,
+  PairPat,
+  Nat,
+  Match,
+  Lam,
+  InRPat,
+  InR,
+  InLPat,
+  InL,
+  Fix,
+  Expr,
+  Arr,
+  Ap,
+  Abort
+}
+import model.TrivC
+import model.Constraint
 import model.InL
-import model.Abort
-import model.Voidd
-import model.Sum
+import model.Triv
+import model.All
+import model.Triv
+import model.InL
+import model.ZC
+import model.InL
+import model.Triv
+import model.Z
+import model.SC
+import model.S
+import model.PairC
+import model.InL
+import model.Triv
+import model.InLC
+import model.InRC
+import model.Z
+import model.S
+import model.InL
+import model.Triv
+import model.Z
+import model.S
+import model.Or
+import model.Z
+import model.Triv
+import model.S
+import model.InL
 
 object Typechecker {
+
+  def typecheck : Expr => Type = typecheckExpr(Map())
 
   private def typecheckExpr(sig : Map[String, Type]) : Expr => Type = {
     case Var(x) => sig.getOrElse(x, throw new Exception("unbound variable " + x))
@@ -17,12 +73,6 @@ object Typechecker {
     case S(e) =>
       if (typecheckExpr(sig)(e) == Nat) Nat
       else throw new Exception("successor of non-nat " + e)
-    case IfZ(e, ez, x, es) =>
-      if (typecheckExpr(sig)(e) == Nat) {
-        val t = typecheckExpr(sig)(ez)
-        if (typecheckExpr(sig + (x -> Nat))(es) == t) t
-        else throw new Exception("incompatible ifz branches " + ez + " and " + es)
-      } else throw new Exception("ifz of non-nat " + e)
     case Lam(x, t, e) => Arr(t, typecheckExpr(sig + (x -> t))(e))
     case Ap(e1, e2) => typecheckExpr(sig)(e1) match {
       case Arr(t1, t2) =>
@@ -53,18 +103,41 @@ object Typechecker {
     case InR(Sum(t1, t2), e) =>
       if (typecheckExpr(sig)(e) == t2) Sum(t1, t2)
       else throw new Exception("inL of incompatible left type " + e)
-    case InR(t, e) => throw new Exception("inR to non-sum-type " + t)
-    case Case(e, x1, e1, x2, e2) => typecheckExpr(sig)(e) match {
-      case Sum(t1, t2) => {
-        val t = typecheckExpr(sig + (x1 -> t1))(e1)
-        if (typecheckExpr(sig + (x2 -> t2))(e2) == t) t
-        else throw new Exception("incompatible case branches " + e1 + " and " + e2)
-      }
-      case _ => throw new Exception("case of non-sum " + e)
-    }
-
+    case InR(t, e)    => throw new Exception("inR to non-sum-type " + t)
+    case Match(e, rs) => typecheckRules(sig, rs, typecheckExpr(sig)(e))
   }
 
-  def typecheck : Expr => Type = typecheckExpr(Map())
+  private def typecheckRules(sig : Map[String, Type], rs : List[(Pattern, Expr)], t : Type) : Type = {
+    val typ = typecheckRule(sig, rs.head, t)
+    if (rs.forall(r => typecheckRule(sig, r, t) == typ)) typ
+    else throw new Exception("incompatible branches " + rs)
+  }
+
+  private def typecheckRule(sig : Map[String, Type], r : (Pattern, Expr), t : Type) : Type = {
+    val bind = typecheckPat(r._1, t)
+    typecheckExpr(sig ++ bind)(r._2)
+  }
+
+  private def typecheckPat : (Pattern, Type) => Map[String, Type] = {
+    case (WildPat, _)     => Map()
+    case (VarPat(x), t)   => Map(x -> t)
+    case (TrivPat, Unitt) => Map()
+    case (TrivPat, t)     => throw new Exception("got unit for type " + t)
+    case (PairPat(p1, p2), Prod(t1, t2)) => {
+      val m1 = typecheckPat(p1, t1)
+      val m2 = typecheckPat(p2, t2)
+      if (m1.keySet & m2.keySet isEmpty) m1 ++ m2
+      else throw new Exception("overlapping variables " + (m1.keySet & m2.keySet))
+    }
+    case (PairPat(p1, p2), t)     => throw new Exception("got product for type " + t)
+    case (InLPat(p), Sum(t1, t2)) => typecheckPat(p, t1)
+    case (InLPat(p), t)           => throw new Exception("got sum for type " + t)
+    case (InRPat(p), Sum(t1, t2)) => typecheckPat(p, t2)
+    case (InRPat(p), t)           => throw new Exception("got sum for type " + t)
+    case (ZPat, Nat)              => Map()
+    case (ZPat, t)                => throw new Exception("got nat for type " + t)
+    case (SPat(p), Nat)           => typecheckPat(p, Nat)
+    case (SPat(p), t)             => throw new Exception("got nat for type " + t)
+  }
 
 }

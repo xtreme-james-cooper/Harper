@@ -1,58 +1,73 @@
 package interpreter
 
-import Substitutor.subst
-import model.{ Z, Var, Triv, S, ProjR, ProjL, Pairr, Lam, IfZ, Fix, Expr, Ap }
+import model.{ Z, Var, Triv, S, ProjR, ProjL, Pairr, Lam, Fix, Expr, Ap }
 import model.InR
-import model.Case
+import model.Match
 import model.InL
 import model.Abort
+import model.SPat
+import model.TrivPat
+import model.InRPat
+import model.PairPat
+import model.InLPat
+import model.VarPat
+import model.WildPat
+import model.ZPat
+import model.Pattern
+import Substitutor.subst
 
 object Evaluator {
 
-  def eval : Expr => Expr = {
-    case Var(x) => throw new Exception("unsubstituted variable " + x)
-    case Z      => Z
-    case S(e)   => S(eval(e))
-    case IfZ(e, ez, x, es) => eval(e) match {
-      case Z    => eval(ez)
-      case S(n) => eval(subst(x, n)(es))
-      case _    => throw new Exception("ifz of non-num " + e)
-    }
+  def eval : Expr => Expr = evalExpr
+
+  private def evalExpr : Expr => Expr = {
+    case Var(x)       => throw new Exception("unsubstituted variable " + x)
+    case Z            => Z
+    case S(e)         => S(evalExpr(e))
     case Lam(x, t, e) => Lam(x, t, e)
-    case Ap(e1, e2) => eval(e1) match {
-      case Lam(x, t, e) => eval(subst(x, eval(e2))(e))
+    case Ap(e1, e2) => evalExpr(e1) match {
+      case Lam(x, t, e) => evalExpr(subst(Map(x -> evalExpr(e2)))(e))
       case _            => throw new Exception("application of non-function " + e1)
     }
-    case Fix(x, t, e)  => eval(subst(x, Fix(x, t, e))(e))
+    case Fix(x, t, e)  => evalExpr(subst(Map(x -> Fix(x, t, e)))(e))
     case Triv          => Triv
-    case Pairr(e1, e2) => Pairr(eval(e1), eval(e2))
-    case ProjL(e) => eval(e) match {
+    case Pairr(e1, e2) => Pairr(evalExpr(e1), evalExpr(e2))
+    case ProjL(e) => evalExpr(e) match {
       case Pairr(e1, e2) => e1
       case _             => throw new Exception("projL of non-pair " + e)
     }
-    case ProjR(e) => eval(e) match {
+    case ProjR(e) => evalExpr(e) match {
       case Pairr(e1, e2) => e2
       case _             => throw new Exception("projR of non-pair " + e)
     }
-    case Abort(t, e)             => Abort(t, eval(e))
-    case InL(t, e)               => InL(t, eval(e))
-    case InR(t, e)               => InR(t, eval(e))
-    case Case(e, x1, e1, x2, e2) => eval(e) match {
-      case InL(t, e) => eval(subst(x1, e)(e1))
-      case InR(t, e) => eval(subst(x2, e)(e2))
-      case _ => throw new Exception("case of non-sum " + e)
+    case Abort(t, e)  => Abort(t, evalExpr(e))
+    case InL(t, e)    => InL(t, evalExpr(e))
+    case InR(t, e)    => InR(t, evalExpr(e))
+    case Match(e, rs) => evalRules(e)(rs)
+  }
+
+  private def evalRules(e : Expr) : List[(Pattern, Expr)] => Expr = {
+    case Nil => throw new Exception("no match found for " + e)
+    case (p, b) :: rs => doMatch(p, evalExpr(e)) match {
+      case None       => evalRules(e)(rs)
+      case Some(bind) => evalExpr(subst(bind)(b))
     }
   }
 
-  def isVal : Expr => Boolean = {
-    case Z             => true
-    case S(e)          => isVal(e)
-    case Lam(x, t, e)  => true
-    case Triv          => true
-    case Pairr(e1, e2) => isVal(e1) && isVal(e2)
-    case InL(t, e)        => isVal(e)
-    case InR(t, e)        => isVal(e)
-    case _             => false
+  private def doMatch : (Pattern, Expr) => Option[Map[String, Expr]] = {
+    case (WildPat, _)    => Some(Map())
+    case (VarPat(x), e)  => Some(Map(x -> e))
+    case (TrivPat, Triv) => Some(Map())
+    case (PairPat(p1, p2), Pairr(e1, e2)) =>
+      for {
+        b1 <- doMatch(p1, e1)
+        b2 <- doMatch(p2, e2)
+      } yield b1 ++ b2
+    case (InLPat(p), InL(t, e)) => doMatch(p, e)
+    case (InRPat(p), InR(t, e)) => doMatch(p, e)
+    case (ZPat, Z)              => Some(Map())
+    case (SPat(p), S(e))        => doMatch(p, e)
+    case _                      => None
   }
 
 }
