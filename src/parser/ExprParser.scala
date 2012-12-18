@@ -1,9 +1,9 @@
 package parser
 
 import Parser.{ pLit, pIdent }
-import TypeParser.typeParser
 import PatParser.rulesParser
-import model.{ Z, Var, Triv, S, ProjR, ProjL, Pairr, Lam, InR, InL, Fix, Expr, Ap, Abort, Match }
+import TypeParser.typeParser
+import model.{ Z, Var, Unfold, Triv, S, ProjR, ProjL, Pairr, Match, Lam, InR, InL, Fold, Fix, Expr, Ap, Abort }
 
 object ExprParser {
 
@@ -27,9 +27,12 @@ object ExprParser {
   private val matchParser : Parser[Expr] =
     pLit("case") thenJ exprParser thenK pLit("of") thenK pLit("{") thenS rulesParser thenK pLit("}") appl
       ({ case (e, rs) => Match(e, rs) })
+  private val foldParser : Parser[Expr] = pLit("fold") thenJ pLit(":") thenJ pIdent thenK pLit(".") thenS typeParser thenS exprParser appl
+    ({ case ((x, t), e) => Fold(x, t, e) })
+  private val unfoldParser : Parser[Expr] = pLit("unfold") thenJ exprParser appl (e => Unfold(e))
 
   val exprParser : Parser[Expr] =
     varParser or zParser or sParser or lamParser or apParser or fixParser or trivParser or pairParser or projLParser or projRParser or
-      abortParser or inLParser or inRParser or matchParser
+      abortParser or inLParser or inRParser or matchParser or foldParser or unfoldParser
 
 }

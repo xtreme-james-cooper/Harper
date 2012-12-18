@@ -20,7 +20,11 @@ object Main {
     test("(\\x:(Unit+Nat).case x of {inL x => Z; inR x => S(x)} inR:(Unit+Nat) S(Z))")
     test("case (S(Z), inL : (Unit+Nat) ()) of { (n, inL _) => S(S(n)) ; (S(Z), inR Z) => Z }")
     test("case (S(Z), inR : (Unit+Nat) Z) of { (n, inL _) => S(S(n)) ; (S(Z), inR Z) => Z }")
-    
+    test("fix length:(mu t.(Unit+(Nat, t)) => Nat) in \\l:mu t.(Unit+(Nat, t)).case unfold l of { inL () => Z ; inR (n, l) => S((length l)) }")
+    test("(fix length:(mu t.(Unit+(Nat, t)) => Nat) in \\l:mu t.(Unit+(Nat, t)).case unfold l of { inL () => Z ; inR (n, l) => S((length l)) } " +
+      " fold:t.(Unit+(Nat, t)) inR:(Unit+(Nat,mu t.(Unit+(Nat, t)))) (Z, fold:t.(Unit+(Nat, t)) " +
+      "inR:(Unit+(Nat,mu t.(Unit+(Nat, t)))) (Z, fold:t.(Unit+(Nat, t)) inL:(Unit+(Nat,mu t.(Unit+(Nat, t)))) ())))")
+
   }
 
   def test(progs : String) {

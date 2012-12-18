@@ -14,6 +14,17 @@ import model.InLPat
 import model.VarPat
 import model.WildPat
 import model.ZPat
+import model.Type
+import model.Nat
+import model.TyVar
+import model.Unitt
+import model.Arr
+import model.Rec
+import model.Voidd
+import model.Prod
+import model.Sum
+import model.Unfold
+import model.Fold
 
 object Substitutor {
 
@@ -45,10 +56,12 @@ object Substitutor {
     case InL(t, e)     => InL(t, subst(bind)(e))
     case InR(t, e)     => InR(t, subst(bind)(e))
     case Match(e, rs)  => Match(subst(bind)(e), rs.map({ case (p, e) => substRule(bind)(p, e) }))
+    case Fold(x, t, e) => Fold(x, t, subst(bind)(e))
+    case Unfold(e)     => Unfold(subst(bind)(e))
   }
 
   private def substRule(bind : Map[String, Expr]) : (Pattern, Expr) => (Pattern, Expr) = (p, e) => {
-    val patternBinds = Map() ++ (for (x <- p.freeVars) yield (x, newVar))
+    val patternBinds : Map[String, String] = Map() ++ (for (x <- p.freeVars) yield (x, newVar))
     (substPat(patternBinds)(p), subst(bind ++ patternBinds.map({ case (x, v) => (x, Var(v)) }))(e))
   }
 
@@ -61,6 +74,22 @@ object Substitutor {
     case InRPat(p)       => InRPat(substPat(bind)(p))
     case ZPat            => ZPat
     case SPat(p)         => SPat(substPat(bind)(p))
+  }
+
+  def substT(x : String, t : Type) : Type => Type = {
+    case Nat          => Nat
+    case Arr(t1, t2)  => Arr(substT(x, t)(t1), substT(x, t)(t2))
+    case Unitt        => Unitt
+    case Prod(t1, t2) => Prod(substT(x, t)(t1), substT(x, t)(t2))
+    case Voidd        => Voidd
+    case Sum(t1, t2)  => Sum(substT(x, t)(t1), substT(x, t)(t2))
+    case TyVar(y) =>
+      if (x == y) t
+      else TyVar(y)
+    case Rec(y, t1) => {
+      val newV : String = newVar
+      Rec(newV, substT(x, t)(substT(y, TyVar(newV))(t1)))
+    }
   }
 
 }

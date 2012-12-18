@@ -19,5 +19,5 @@ case class InL(t : Type, e : Expr) extends Expr("inL : " + t + " " + e)
 case class InR(t : Type, e : Expr) extends Expr("inR : " + t + " " + e)
 case class Match(e : Expr, rules : List[(Pattern, Expr)]) extends Expr(
   "case " + e + " of { " + rules.tail.foldLeft(rules.head._1 + " => " + rules.head._2)({ case (s, (p, e)) => s + "; " + p + " => " + e }) + " }")
-
-
+case class Fold(x : String, t : Type, e : Expr) extends Expr("fold : " + x + " . " + t + " " + e)
+case class Unfold(e : Expr) extends Expr("unfold " + e)

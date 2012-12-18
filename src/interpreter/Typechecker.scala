@@ -1,71 +1,36 @@
 package interpreter
 
-import model.{
-  ZPat,
-  Z,
-  WildPat,
-  Voidd,
-  VarPat,
-  Var,
-  Unitt,
-  Type,
-  TrivPat,
-  Triv,
-  Sum,
-  SPat,
-  S,
-  ProjR,
-  ProjL,
-  Prod,
-  Pattern,
-  Pairr,
-  PairPat,
-  Nat,
-  Match,
-  Lam,
-  InRPat,
-  InR,
-  InLPat,
-  InL,
-  Fix,
-  Expr,
-  Arr,
-  Ap,
-  Abort
-}
-import model.TrivC
-import model.Constraint
-import model.InL
-import model.Triv
-import model.All
-import model.Triv
-import model.InL
-import model.ZC
-import model.InL
-import model.Triv
-import model.Z
-import model.SC
-import model.S
-import model.PairC
-import model.InL
-import model.Triv
-import model.InLC
-import model.InRC
-import model.Z
-import model.S
-import model.InL
-import model.Triv
-import model.Z
-import model.S
-import model.Or
-import model.Z
-import model.Triv
-import model.S
-import model.InL
+import model.{ ZPat, Z, WildPat, Voidd, VarPat, Var, Unitt, Type, TyVar, TrivPat, Triv, Sum, SPat, S, 
+  Rec, ProjR, ProjL, Prod, Pattern, Pairr, PairPat, Nat, Match, Lam, InRPat, InR, InLPat, InL, Fix, Expr, Arr, Ap, Abort }
+import model.Unfold
+import model.Fold
+import Substitutor.substT
 
 object Typechecker {
 
   def typecheck : Expr => Type = typecheckExpr(Map())
+
+  private def verifyType(delt : Set[String]) : Type => Unit = {
+    case Nat          => ()
+    case Arr(t1, t2)  => {
+      verifyType(delt)(t1)
+      verifyType(delt)(t2)
+    }
+    case Unitt        => ()
+    case Prod(t1, t2) => {
+      verifyType(delt)(t1) 
+      verifyType(delt)(t2)
+    }
+    case Voidd        => ()
+    case Sum(t1, t2)  => {
+      verifyType(delt)(t1) 
+      verifyType(delt)(t2)
+    }
+    case TyVar(x)     => 
+      if (delt.contains(x)) ()
+      else throw new Exception("type contains unbound tyvar " + x)
+    case Rec(x, t)    => verifyType(delt + x)(t)
+  }
 
   private def typecheckExpr(sig : Map[String, Type]) : Expr => Type = {
     case Var(x) => sig.getOrElse(x, throw new Exception("unbound variable " + x))
@@ -73,16 +38,21 @@ object Typechecker {
     case S(e) =>
       if (typecheckExpr(sig)(e) == Nat) Nat
       else throw new Exception("successor of non-nat " + e)
-    case Lam(x, t, e) => Arr(t, typecheckExpr(sig + (x -> t))(e))
+    case Lam(x, t, e) => {
+      verifyType(Set())(t)
+      Arr(t, typecheckExpr(sig + (x -> t))(e))
+    }
     case Ap(e1, e2) => typecheckExpr(sig)(e1) match {
       case Arr(t1, t2) =>
         if (typecheckExpr(sig)(e2) == t1) t2
         else throw new Exception("application of wrong argument type " + e2)
       case _ => throw new Exception("application of non-function " + e1)
     }
-    case Fix(x, t, e) =>
+    case Fix(x, t, e) => {
+      verifyType(Set())(t)
       if (typecheckExpr(sig + (x -> t))(e) == t) t
       else throw new Exception("recursive expression does not have declared type " + e)
+    }
     case Triv          => Unitt
     case Pairr(e1, e2) => Prod(typecheckExpr(sig)(e1), typecheckExpr(sig)(e2))
     case ProjL(e) => typecheckExpr(sig)(e) match {
@@ -105,6 +75,15 @@ object Typechecker {
       else throw new Exception("inL of incompatible left type " + e)
     case InR(t, e)    => throw new Exception("inR to non-sum-type " + t)
     case Match(e, rs) => typecheckRules(sig, rs, typecheckExpr(sig)(e))
+    case Fold(x, t, e) => {
+      val t2 = typecheckExpr(sig)(e)
+      if (t2 == substT(x, Rec(x, t))(t)) Rec(x, t)
+      else throw new Exception("fold of incorrect recursion type " + e)
+    }
+    case Unfold(e) => typecheckExpr(sig)(e) match {
+      case Rec(x, t) => substT(x, Rec(x, t))(t)
+      case _ => throw new Exception("unfold of non-recursive " + e)
+    }
   }
 
   private def typecheckRules(sig : Map[String, Type], rs : List[(Pattern, Expr)], t : Type) : Type = {

@@ -15,6 +15,8 @@ import model.WildPat
 import model.ZPat
 import model.Pattern
 import Substitutor.subst
+import model.Unfold
+import model.Fold
 
 object Evaluator {
 
@@ -40,10 +42,15 @@ object Evaluator {
       case Pairr(e1, e2) => e2
       case _             => throw new Exception("projR of non-pair " + e)
     }
-    case Abort(t, e)  => Abort(t, evalExpr(e))
-    case InL(t, e)    => InL(t, evalExpr(e))
-    case InR(t, e)    => InR(t, evalExpr(e))
-    case Match(e, rs) => evalRules(e)(rs)
+    case Abort(t, e)   => Abort(t, evalExpr(e))
+    case InL(t, e)     => InL(t, evalExpr(e))
+    case InR(t, e)     => InR(t, evalExpr(e))
+    case Match(e, rs)  => evalRules(e)(rs)
+    case Fold(x, t, e) => Fold(x, t, eval(e))
+    case Unfold(e)     => eval(e) match {
+      case Fold(x, t, e) => e
+      case _ => throw new Exception("unfold of non-fold " + e)
+    }
   }
 
   private def evalRules(e : Expr) : List[(Pattern, Expr)] => Expr = {
