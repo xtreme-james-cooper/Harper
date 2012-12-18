@@ -72,7 +72,7 @@ object Typechecker {
     case InL(t, e) => throw new Exception("inL to non-sum-type " + t)
     case InR(Sum(t1, t2), e) =>
       if (typecheckExpr(sig)(e) == t2) Sum(t1, t2)
-      else throw new Exception("inL of incompatible left type " + e)
+      else throw new Exception("inR of incompatible right type " + e)
     case InR(t, e)    => throw new Exception("inR to non-sum-type " + t)
     case Match(e, rs) => typecheckRules(sig, rs, typecheckExpr(sig)(e))
     case Fold(x, t, e) => {
