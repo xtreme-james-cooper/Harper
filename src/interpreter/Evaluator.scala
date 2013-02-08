@@ -50,13 +50,13 @@ object Evaluator {
     case InL(t, e)     => InL(t, evalExpr(e))
     case InR(t, e)     => InR(t, evalExpr(e))
     case Match(e, rs)  => evalRules(e)(rs)
-    case Fold(x, t, e) => Fold(x, t, eval(e))
-    case Unfold(e) => eval(e) match {
+    case Fold(x, t, e) => Fold(x, t, evalExpr(e))
+    case Unfold(e) => evalExpr(e) match {
       case Fold(x, t, e) => e
       case _             => throw new Exception("unfold of non-fold " + e)
     }
-    case TLam(x, e) => evalExpr(e)
-    case TAp(e, t) => evalExpr(e) //ignore types at runtime
+    case TLam(x, e) => evalExpr(e) //ignore types at runtime
+    case TAp(e, t)  => evalExpr(e) //ignore types at runtime
 
   }
 

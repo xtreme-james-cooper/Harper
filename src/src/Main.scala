@@ -1,11 +1,9 @@
 package src
 
 import interpreter.{ Typechecker, Evaluator }
-import model.{ Z, Unitt, Type, Triv, S, Prod, Pairr, Nat, Expr, Arr }
+import compiler.Compiler
+import model.{ Z, Unitt, Type, TyVar, Triv, Sum, S, Rec, Prod, Pairr, Nat, Expr, Arr }
 import parser.ProgParser
-import model.Rec
-import model.Sum
-import model.TyVar
 
 object Main {
 
@@ -44,6 +42,9 @@ object Main {
     println("type: " + typ)
     val intVal = Evaluator.eval(prog)
     if (eVal.isDefined && intVal != eVal.get) throw new Exception("expected " + eVal.get + " but got " + intVal)
+    val compVal = Compiler.eval(prog)
+    if (eVal.isDefined && compVal != eVal.get) throw new Exception("expected " + eVal.get + " but got " + compVal)
+    if (eVal.isDefined && compVal != intVal) throw new Exception("interpreted " + intVal + " compiled " + compVal)
     println("value" + ": " + intVal)
     println("-----------------------------")
   }
