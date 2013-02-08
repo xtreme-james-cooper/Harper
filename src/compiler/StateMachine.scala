@@ -3,14 +3,14 @@ package compiler
 import model.{ ZPat, Z, WildPat, VarPat, Var, Unitt, Unfold, UncaughtException, TrivPat, Triv, TLam, TAp, SPat, S, Raise, ProjR, ProjL, Pattern, Pairr, PairPat, Match, Let, Lam, InRPat, InR, InLPat, InL, Fold, Fix, Expr, Catch, Ap, Abort }
 import interpreter.Substitutor.subst
 
-sealed abstract class State
-case object EvalExpr extends State
-case object ReturnExpr extends State
-case object FailExpr extends State
-case object EvalRules extends State
-case object EvalMatch extends State
-case object ReturnMatch extends State
-case object FailMatch extends State
+sealed abstract class State(val isTermination : Boolean)
+case object EvalExpr extends State(false)
+case object ReturnExpr extends State(true)
+case object FailExpr extends State(true)
+case object EvalRules extends State(false)
+case object EvalMatch extends State(false)
+case object ReturnMatch extends State(false)
+case object FailMatch extends State(false)
 
 object StateMachine {
 
@@ -27,8 +27,11 @@ object StateMachine {
     stack = Nil
     do {
       doStep
-    } while (!stack.isEmpty)
-    expr
+    } while (!stack.isEmpty || !state.isTermination)
+    if (state == FailExpr)
+      UncaughtException
+    else
+      expr
   }
 
   private def doStep : Unit = state match {
@@ -43,88 +46,68 @@ object StateMachine {
 
   private def evalExpr : Unit = expr match {
     case Var(x) => throw new Exception("unsubstituted variable " + x)
-    case Z      => returnExpr
+    case Z      => state = ReturnExpr
     case S(e) => {
       expr = e
       stack = SStk :: stack
-      evalExpr
     }
-    case Lam(x, t, e) => returnExpr
+    case Lam(x, t, e) => state = ReturnExpr
     case Let(n, d, b) => {
       expr = d
       stack = LetStk(n, b) :: stack
-      evalExpr
     }
     case Ap(e1, e2) => {
       expr = e1
       stack = ApStk(e2) :: stack
-      evalExpr
     }
     case Fix(x, t, e) => {
       expr = subst(Map(x -> Fix(x, t, e)))(e)
-      evalExpr
     }
-    case Triv => returnExpr
+    case Triv => state = ReturnExpr
     case Pairr(e1, e2) => {
       expr = e1
       stack = PairrStk(e2) :: stack
-      evalExpr
     }
     case ProjL(e) => {
       expr = e
       stack = ProjLStk :: stack
-      evalExpr
     }
     case ProjR(e) => {
       expr = e
       stack = ProjRStk :: stack
-      evalExpr
     }
     case Abort(t, e) => {
       expr = e
       stack = AbortStk :: stack
-      evalExpr
     }
     case InL(t, e) => {
       expr = e
       stack = InLStk :: stack
-      evalExpr
     }
     case InR(t, e) => {
       expr = e
       stack = InRStk :: stack
-      evalExpr
     }
     case Match(e, rs) => {
       expr = e
       stack = MatchStk(rs) :: stack
-      evalExpr
     }
     case Fold(x, t, e) => {
       expr = e
       stack = FoldStk(x) :: stack
-      evalExpr
     }
     case Unfold(e) => {
       expr = e
       stack = UnfoldStk :: stack
-      evalExpr
     }
-    case TLam(x, e) => {
-      expr = e
-      evalExpr
-    }
-    case TAp(e, t) => {
-      expr = e
-      evalExpr
-    }
-    case Raise(t) => failExpr
+    case TLam(x, e) => expr = e
+    case TAp(e, t)  => expr = e
+    case Raise(t)   => state = FailExpr
     case Catch(e1, e2) => {
       expr = e1
       stack = CatchStk(e2) :: stack
-      evalExpr
     }
-    case UncaughtException => failExpr
+    case UncaughtException => state = FailExpr
   }
 
   private def returnExpr : Unit = stack match {
@@ -132,41 +115,38 @@ object StateMachine {
     case SStk :: ss => {
       expr = S(expr)
       stack = ss
-      returnExpr
     }
     case LetStk(n, b) :: ss => {
       expr = subst(Map(n -> expr))(b)
       stack = ss
-      evalExpr
+      state = EvalExpr
     }
     case ApStk(e2 : Expr) :: ss => expr match {
       case Lam(x, t, b) => {
         expr = e2
         stack = Ap2Stk(x, b) :: ss
-        evalExpr
+        state = EvalExpr
       }
       case _ => throw new Exception("application of non-function " + expr)
     }
     case Ap2Stk(x, b) :: ss => {
       expr = subst(Map(x -> expr))(b)
       stack = ss
-      evalExpr
+      state = EvalExpr
     }
     case PairrStk(e2 : Expr) :: ss => {
       stack = Pairr2Stk(expr) :: ss
       expr = e2
-      evalExpr
+      state = EvalExpr
     }
     case Pairr2Stk(e1 : Expr) :: ss => {
       expr = Pairr(e1, expr)
       stack = ss
-      returnExpr
     }
     case ProjLStk :: ss => expr match {
       case Pairr(e1, e2) => {
         expr = e1
         stack = ss
-        returnExpr
       }
       case _ => throw new Exception("projL of non-pair " + expr)
     }
@@ -174,114 +154,63 @@ object StateMachine {
       case Pairr(e1, e2) => {
         expr = e2
         stack = ss
-        returnExpr
       }
       case _ => throw new Exception("projR of non-pair " + expr)
     }
     case AbortStk :: ss => {
       expr = Abort(Unitt, expr)
       stack = ss
-      returnExpr
     }
     case InLStk :: ss => {
       expr = InL(Unitt, expr)
       stack = ss
-      returnExpr
     }
     case InRStk :: ss => {
       expr = InR(Unitt, expr)
       stack = ss
-      returnExpr
     }
     case MatchStk(rs) :: ss => {
       stack = ss
       rules = rs
-      evalRules
+      state = EvalRules
     }
     case FoldStk(x : String) :: ss => {
       expr = Fold(x, Unitt, expr)
       stack = ss
-      returnExpr
     }
     case UnfoldStk :: ss => expr match {
       case Fold(x, t, e) => {
         expr = e
         stack = ss
-        returnExpr
       }
       case _ => throw new Exception("unfold of non-fold " + expr)
     }
-    case CatchStk(e2) :: ss => {
-      stack = ss
-      returnExpr
-    }
+    case CatchStk(e2) :: ss          => stack = ss
     case PatStkRules(e, b, rs) :: ss => throw new Exception("pattern matching on stack during eval")
     case PairPatStk(p2, e2) :: ss    => throw new Exception("pattern matching on stack during eval")
     case Pair2PatStk(bind1) :: ss    => throw new Exception("pattern matching on stack during eval")
   }
 
   private def failExpr : Unit = stack match {
-    case Nil => expr = UncaughtException
-    case SStk :: ss => {
-      stack = ss
-      failExpr
-    }
-    case LetStk(n, b) :: ss => {
-      stack = ss
-      failExpr
-    }
-    case ApStk(e2 : Expr) :: ss => {
-      stack = ss
-      failExpr
-    }
-    case Ap2Stk(x, b) :: ss => {
-      stack = ss
-      failExpr
-    }
-    case PairrStk(e2 : Expr) :: ss => {
-      stack = ss
-      failExpr
-    }
-    case Pairr2Stk(e1 : Expr) :: ss => {
-      stack = ss
-      failExpr
-    }
-    case ProjLStk :: ss => {
-      stack = ss
-      failExpr
-    }
-    case ProjRStk :: ss => {
-      stack = ss
-      failExpr
-    }
-    case AbortStk :: ss => {
-      stack = ss
-      failExpr
-    }
-    case InLStk :: ss => {
-      stack = ss
-      failExpr
-    }
-    case InRStk :: ss => {
-      stack = ss
-      failExpr
-    }
-    case MatchStk(rs) :: ss => {
-      stack = ss
-      failExpr
-    }
-    case FoldStk(x : String) :: ss => {
-      stack = ss
-      failExpr
-    }
-    case UnfoldStk :: ss => {
-      stack = ss
-      failExpr
-    }
+    case Nil                        => expr = UncaughtException
+    case SStk :: ss                 => stack = ss
+    case LetStk(n, b) :: ss         => stack = ss
+    case ApStk(e2 : Expr) :: ss     => stack = ss
+    case Ap2Stk(x, b) :: ss         => stack = ss
+    case PairrStk(e2 : Expr) :: ss  => stack = ss
+    case Pairr2Stk(e1 : Expr) :: ss => stack = ss
+    case ProjLStk :: ss             => stack = ss
+    case ProjRStk :: ss             => stack = ss
+    case AbortStk :: ss             => stack = ss
+    case InLStk :: ss               => stack = ss
+    case InRStk :: ss               => stack = ss
+    case MatchStk(rs) :: ss         => stack = ss
+    case FoldStk(x : String) :: ss  => stack = ss
+    case UnfoldStk :: ss            => stack = ss
     case CatchStk(e2) :: ss => {
       expr = e2
       stack = ss
-      evalExpr
+      state = EvalExpr
     }
     case PatStkRules(e, b, rs) :: ss => throw new Exception("pattern matching on stack during eval")
     case PairPatStk(p2, e2) :: ss    => throw new Exception("pattern matching on stack during eval")
@@ -293,62 +222,51 @@ object StateMachine {
     case (p, b) :: rs => {
       stack = PatStkRules(expr, b, rs) :: stack
       comp = (p, expr)
-      evalMatch
+      state = EvalMatch
     }
   }
 
   private def evalMatch : Unit = comp match {
     case (WildPat, _) => {
       bind = Map()
-      returnMatch
+      state = ReturnMatch
     }
     case (VarPat(x), e) => {
       bind = Map(x -> e)
-      returnMatch
+      state = ReturnMatch
     }
     case (TrivPat, Triv) => {
       bind = Map()
-      returnMatch
+      state = ReturnMatch
     }
     case (PairPat(p1, p2), Pairr(e1, e2)) => {
       stack = PairPatStk(p2, e2) :: stack
       comp = (p1, e1)
-      evalMatch
     }
-    case (InLPat(p), InL(t, e)) => {
-      comp = (p, e)
-      evalMatch
-    }
-    case (InRPat(p), InR(t, e)) => {
-      comp = (p, e)
-      evalMatch
-    }
+    case (InLPat(p), InL(t, e)) => comp = (p, e)
+    case (InRPat(p), InR(t, e)) => comp = (p, e)
     case (ZPat, Z) => {
       bind = Map()
-      returnMatch
+      state = ReturnMatch
     }
-    case (SPat(p), S(e)) => {
-      comp = (p, e)
-      evalMatch
-    }
-    case _ => failMatch
+    case (SPat(p), S(e)) => comp = (p, e)
+    case _               => state = FailMatch
   }
 
   private def returnMatch : Unit = stack match {
     case PatStkRules(e, b, rs) :: ss => {
       expr = subst(bind)(b)
       stack = ss
-      evalExpr
+      state = EvalExpr
     }
     case PairPatStk(p2, e2) :: ss => {
       stack = Pair2PatStk(bind) :: ss
       comp = (p2, e2)
-      evalMatch
+      state = EvalMatch
     }
     case Pair2PatStk(bind1) :: ss => {
       stack = ss
       bind = bind1 ++ bind
-      returnMatch
     }
     case _ => throw new Exception("no pattern rules on stack")
   }
@@ -358,17 +276,11 @@ object StateMachine {
       expr = e
       stack = ss
       rules = rs
-      evalRules
+      state = EvalRules
     }
-    case PairPatStk(p2, e2) :: ss => {
-      stack = ss
-      failMatch
-    }
-    case Pair2PatStk(bind1) :: ss => {
-      stack = ss
-      failMatch
-    }
-    case _ => throw new Exception("no pattern rules on stack")
+    case PairPatStk(p2, e2) :: ss => stack = ss
+    case Pair2PatStk(bind1) :: ss => stack = ss
+    case _                        => throw new Exception("no pattern rules on stack")
   }
 
 }
