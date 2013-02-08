@@ -22,13 +22,6 @@ case class FoldStk(x : String) extends Stack("fold : " + x + " . (-)")
 case object UnfoldStk extends Stack("unfold (-)")
 case class CatchStk(e2 : Expr) extends Stack("try (-) catch " + e2)
 
-case class RulesStack(e : Expr, b : Expr, rs : List[(Pattern, Expr)]) {
-  override def toString : String = "(-) ~ " + e + " --> " + b + " || " + rs
-}
-
-sealed abstract class PatStack(name : String) {
-  override def toString : String = name
-}
-
-case class PairPatStk(p2 : Pattern, e2 : Expr) extends PatStack("((-) , " + p2 + ") ~ ((-) , " + e2 + ")")
-case class Pair2PatStk(bind1 : Map[String, Expr]) extends PatStack("(" + bind1 + " , (-))")
+case class PatStkRules(e : Expr, b : Expr, rs : List[(Pattern, Expr)]) extends Stack("(-) ~ " + e + " --> " + b + " || " + rs)
+case class PairPatStk(p2 : Pattern, e2 : Expr) extends Stack("((-) , " + p2 + ") ~ ((-) , " + e2 + ")")
+case class Pair2PatStk(bind1 : Map[String, Expr]) extends Stack("(" + bind1 + " , (-))")

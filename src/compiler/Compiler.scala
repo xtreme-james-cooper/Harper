@@ -82,43 +82,63 @@ object Compiler {
       case Fold(x, t, e) => returnExpr(e)(ss)
       case _             => throw new Exception("unfold of non-fold " + e)
     }
-    case CatchStk(e2) :: ss => returnExpr(e)(ss)
+    case CatchStk(e2) :: ss          => returnExpr(e)(ss)
+    case PatStkRules(e, b, rs) :: ss => throw new Exception("pattern matching on stack during eval")
+    case PairPatStk(p2, e2) :: ss    => throw new Exception("pattern matching on stack during eval")
+    case Pair2PatStk(bind1) :: ss    => throw new Exception("pattern matching on stack during eval")
   }
 
   private def failExpr(ss : List[Stack]) : Expr = ss match {
-    case Nil                => UncaughtException
-    case CatchStk(e2) :: ss => evalExpr(e2)(ss)
-    case _ :: ss            => failExpr(ss)
+    case Nil                         => UncaughtException
+    case SStk :: ss                  => failExpr(ss)
+    case LetStk(n, b) :: ss          => failExpr(ss)
+    case ApStk(e2 : Expr) :: ss      => failExpr(ss)
+    case Ap2Stk(x, b) :: ss          => failExpr(ss)
+    case PairrStk(e2 : Expr) :: ss   => failExpr(ss)
+    case Pairr2Stk(e1 : Expr) :: ss  => failExpr(ss)
+    case ProjLStk :: ss              => failExpr(ss)
+    case ProjRStk :: ss              => failExpr(ss)
+    case AbortStk :: ss              => failExpr(ss)
+    case InLStk :: ss                => failExpr(ss)
+    case InRStk :: ss                => failExpr(ss)
+    case MatchStk(rs) :: ss          => failExpr(ss)
+    case FoldStk(x : String) :: ss   => failExpr(ss)
+    case UnfoldStk :: ss             => failExpr(ss)
+    case CatchStk(e2) :: ss          => evalExpr(e2)(ss)
+    case PatStkRules(e, b, rs) :: ss => throw new Exception("pattern matching on stack during eval")
+    case PairPatStk(p2, e2) :: ss    => throw new Exception("pattern matching on stack during eval")
+    case Pair2PatStk(bind1) :: ss    => throw new Exception("pattern matching on stack during eval")
   }
 
   private def evalRules(e : Expr)(ss : List[(Pattern, Expr)])(out : List[Stack]) : Expr = ss match {
     case Nil          => throw new Exception("no match found for " + e)
-    case (p, b) :: rs => evalMatch(p, e)(Nil)(RulesStack(e, b, rs))(out)
+    case (p, b) :: rs => evalMatch(p, e)(PatStkRules(e, b, rs) :: out)
   }
 
-  private def evalMatch(p : Pattern, e : Expr)(ss : List[PatStack])(rs : RulesStack)(out : List[Stack]) : Expr = (p, e) match {
-    case (WildPat, _)                     => returnMatch(Map())(ss)(rs)(out)
-    case (VarPat(x), e)                   => returnMatch(Map(x -> e))(ss)(rs)(out)
-    case (TrivPat, Triv)                  => returnMatch(Map())(ss)(rs)(out)
-    case (PairPat(p1, p2), Pairr(e1, e2)) => evalMatch(p1, e1)(PairPatStk(p2, e2) :: ss)(rs)(out)
-    case (InLPat(p), InL(t, e))           => evalMatch(p, e)(ss)(rs)(out)
-    case (InRPat(p), InR(t, e))           => evalMatch(p, e)(ss)(rs)(out)
-    case (ZPat, Z)                        => returnMatch(Map())(ss)(rs)(out)
-    case (SPat(p), S(e))                  => evalMatch(p, e)(ss)(rs)(out)
-    case _                                => failMatch(ss)(rs)(out)
+  private def evalMatch(p : Pattern, e : Expr)(ss : List[Stack]) : Expr = (p, e) match {
+    case (WildPat, _)                     => returnMatch(Map())(ss)
+    case (VarPat(x), e)                   => returnMatch(Map(x -> e))(ss)
+    case (TrivPat, Triv)                  => returnMatch(Map())(ss)
+    case (PairPat(p1, p2), Pairr(e1, e2)) => evalMatch(p1, e1)(PairPatStk(p2, e2) :: ss)
+    case (InLPat(p), InL(t, e))           => evalMatch(p, e)(ss)
+    case (InRPat(p), InR(t, e))           => evalMatch(p, e)(ss)
+    case (ZPat, Z)                        => returnMatch(Map())(ss)
+    case (SPat(p), S(e))                  => evalMatch(p, e)(ss)
+    case _                                => failMatch(ss)
   }
 
-  private def returnMatch(bind : Map[String, Expr])(ss : List[PatStack])(rs : RulesStack)(out : List[Stack]) : Expr = ss match {
-    case Nil                      => evalExpr(subst(bind)(rs.b))(out)
-    case PairPatStk(p2, e2) :: ss => evalMatch(p2, e2)(Pair2PatStk(bind) :: ss)(rs)(out)
-    case Pair2PatStk(bind1) :: ss => returnMatch(bind1 ++ bind)(ss)(rs)(out)
+  private def returnMatch(bind : Map[String, Expr])(ss : List[Stack]) : Expr = ss match {
+    case PatStkRules(e, b, rs) :: ss => evalExpr(subst(bind)(b))(ss)
+    case PairPatStk(p2, e2) :: ss    => evalMatch(p2, e2)(Pair2PatStk(bind) :: ss)
+    case Pair2PatStk(bind1) :: ss    => returnMatch(bind1 ++ bind)(ss)
+    case _                           => throw new Exception("no pattern rules on stack")
   }
 
-  //just pops stack; for if we ever need to fold the stacks together
-  private def failMatch(ss : List[PatStack])(rs : RulesStack)(out : List[Stack]) : Expr = ss match {
-    case Nil                      => evalRules(rs.e)(rs.rs)(out)
-    case PairPatStk(p2, e2) :: ss => failMatch(ss)(rs)(out)
-    case Pair2PatStk(bind1) :: ss => failMatch(ss)(rs)(out)
+  private def failMatch(ss : List[Stack]) : Expr = ss match {
+    case PatStkRules(e, b, rs) :: ss => evalRules(e)(rs)(ss)
+    case PairPatStk(p2, e2) :: ss    => failMatch(ss)
+    case Pair2PatStk(bind1) :: ss    => failMatch(ss)
+    case _                           => throw new Exception("no pattern rules on stack")
   }
 
 }
