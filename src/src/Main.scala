@@ -40,6 +40,8 @@ object Main {
       "try (baddub S(Z)) catch S(S(S(Z)))", Nat, S(S(S(Z))))
     test("try raise:Nat catch raise:Nat", Nat, UncaughtException)
     test("try abort:Nat raise:Void catch Z", Nat, Z)
+    test("case S(Z) of { Z => Z }", Nat, UncaughtException)
+    test("try case S(Z) of { Z => Z } catch S(S(Z))", Nat, S(S(Z)))
   }
 
   def test(progs : String, eType : Type) : Unit = test(progs, eType, None)

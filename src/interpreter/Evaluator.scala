@@ -103,7 +103,7 @@ object Evaluator {
   }
 
   private def evalRules(e : Expr) : List[(Pattern, Expr)] => Expr = {
-    case Nil => throw new Exception("no match found for " + e)
+    case Nil => UncaughtException
     case (p, b) :: rs => doMatch(p, e) match {
       case None       => evalRules(e)(rs)
       case Some(bind) => evalExpr(subst(bind)(b))

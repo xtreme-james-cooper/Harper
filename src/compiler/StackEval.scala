@@ -111,7 +111,7 @@ object StackEval {
   }
 
   private def evalRules(e : Expr)(ss : List[(Pattern, Expr)])(out : List[Stack]) : Expr = ss match {
-    case Nil          => throw new Exception("no match found for " + e)
+    case Nil          => failExpr(out)
     case (p, b) :: rs => evalMatch(p, e)(PatStkRules(e, b, rs) :: out)
   }
 
