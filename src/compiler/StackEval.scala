@@ -25,7 +25,7 @@ import model.Raise
 import model.UncaughtException
 import model.Catch
 
-object Compiler {
+object StackEval {
 
   def eval(e : Expr) : Expr = evalExpr(e)(Nil)
 

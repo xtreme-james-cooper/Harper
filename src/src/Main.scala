@@ -1,7 +1,8 @@
 package src
 
 import interpreter.{ Typechecker, Evaluator }
-import compiler.Compiler
+import compiler.StackEval
+import compiler.StateMachine
 import model.{ Z, Unitt, Type, TyVar, Triv, Sum, S, Rec, Prod, Pairr, Nat, Expr, Arr }
 import parser.ProgParser
 import model.UncaughtException
@@ -51,10 +52,13 @@ object Main {
     if (typ != eType) throw new Exception("expected " + eType + " but got " + typ)
     println("type: " + typ)
     val intVal = Evaluator.eval(prog)
-    if (eVal.isDefined && intVal != eVal.get) throw new Exception("expected " + eVal.get + " but got " + intVal)
-    val compVal = Compiler.eval(prog)
-    if (eVal.isDefined && compVal != eVal.get) throw new Exception("expected " + eVal.get + " but got " + compVal)
-    if (eVal.isDefined && compVal != intVal) throw new Exception("interpreted " + intVal + " compiled " + compVal)
+    if (eVal.isDefined && intVal != eVal.get) throw new Exception("for interpreted expected " + eVal.get + " but got " + intVal)
+    val stackVal = StackEval.eval(prog)
+    if (eVal.isDefined && stackVal != eVal.get) throw new Exception("for stack expected " + eVal.get + " but got " + stackVal)
+    val compVal = StateMachine.eval(prog)
+    if (eVal.isDefined && compVal != eVal.get) throw new Exception("for compiled expected " + eVal.get + " but got " + compVal)
+    if (eVal.isDefined && (stackVal != intVal || compVal != intVal || stackVal != compVal)) 
+      throw new Exception("interpreted " + intVal + " stack " + stackVal + " compiled " + compVal)
     println("value" + ": " + intVal)
     println("-----------------------------")
   }
