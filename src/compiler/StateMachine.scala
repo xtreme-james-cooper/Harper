@@ -3,20 +3,13 @@ package compiler
 import model.{ ZPat, Z, WildPat, VarPat, Var, Unitt, Unfold, UncaughtException, TrivPat, Triv, TLam, TAp, SPat, S, Raise, ProjR, ProjL, Pattern, Pairr, PairPat, Match, Let, Lam, InRPat, InR, InLPat, InL, Fold, Fix, Expr, Catch, Ap, Abort }
 import interpreter.Substitutor.subst
 
-sealed abstract class State(val isTermination : Boolean)
-case object EvalExpr extends State(false)
-case object Return extends State(true)
-case object Throw extends State(true)
-case object EvalRules extends State(false)
-case object EvalMatch extends State(false)
-
 object StateMachine {
 
   private var state : State = null
   private var expr : Expr = null
   private var stack : List[Stack] = null
   private var rules : List[(Pattern, Expr)] = null
-  private var comp : (Pattern, Expr) = null
+  private var pattern : Pattern = null
   private var bind : Map[String, Expr] = null
 
   def eval(e : Expr) : Expr = {
@@ -24,9 +17,9 @@ object StateMachine {
     expr = e
     stack = Nil
 
-    do {
+    while (!(stack.isEmpty && state.isTermination)) {
       doStep
-    } while (!stack.isEmpty || !state.isTermination)
+    }
 
     if (state == Throw)
       UncaughtException
@@ -156,7 +149,8 @@ object StateMachine {
     }
     case PairPatStk(p2, e2) => {
       push(Pair2PatStk(bind))
-      comp = (p2, e2)
+      pattern = p2
+      expr = e2
       state = EvalMatch
     }
     case Pair2PatStk(bind1) => bind = bind1 ++ bind
@@ -180,12 +174,12 @@ object StateMachine {
     case Nil => state = Throw
     case (p, b) :: rs => {
       push(PatStkRules(expr, b, rs))
-      comp = (p, expr)
+      pattern = p
       state = EvalMatch
     }
   }
 
-  private def evalMatch : Unit = comp match {
+  private def evalMatch : Unit = (pattern, expr) match {
     case (WildPat, _) => {
       bind = Map()
       state = Return
@@ -200,16 +194,27 @@ object StateMachine {
     }
     case (PairPat(p1, p2), Pairr(e1, e2)) => {
       push(PairPatStk(p2, e2))
-      comp = (p1, e1)
+      pattern = p1
+      expr = e1
     }
-    case (InLPat(p), InL(t, e)) => comp = (p, e)
-    case (InRPat(p), InR(t, e)) => comp = (p, e)
+    case (InLPat(p), InL(t, e)) => {
+      pattern = p
+      expr = e
+    }
+    case (InRPat(p), InR(t, e)) => {
+      pattern = p
+      expr = e
+    }
     case (ZPat, Z) => {
       bind = Map()
       state = Return
     }
-    case (SPat(p), S(e)) => comp = (p, e)
-    case _               => state = Throw
+    case (SPat(p), S(e)) => {
+      pattern = p
+      expr = e
+    }
+    case _ => state = Throw
   }
+
 
 }

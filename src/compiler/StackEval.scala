@@ -88,6 +88,7 @@ object StackEval {
     case Pair2PatStk(bind1) :: ss    => throw new Exception("pattern matching on stack during eval")
   }
 
+  //Covers both exception throwing and pattern-match-failure
   private def failExpr(ss : List[Stack]) : Expr = ss match {
     case Nil                         => UncaughtException
     case SStk :: ss                  => failExpr(ss)
@@ -105,9 +106,9 @@ object StackEval {
     case FoldStk(x : String) :: ss   => failExpr(ss)
     case UnfoldStk :: ss             => failExpr(ss)
     case CatchStk(e2) :: ss          => evalExpr(e2)(ss)
-    case PatStkRules(e, b, rs) :: ss => throw new Exception("pattern matching on stack during eval")
-    case PairPatStk(p2, e2) :: ss    => throw new Exception("pattern matching on stack during eval")
-    case Pair2PatStk(bind1) :: ss    => throw new Exception("pattern matching on stack during eval")
+    case PatStkRules(e, b, rs) :: ss => evalRules(e)(rs)(ss)
+    case PairPatStk(p2, e2) :: ss    => failExpr(ss)
+    case Pair2PatStk(bind1) :: ss    => failExpr(ss)
   }
 
   private def evalRules(e : Expr)(ss : List[(Pattern, Expr)])(out : List[Stack]) : Expr = ss match {
@@ -124,20 +125,13 @@ object StackEval {
     case (InRPat(p), InR(t, e))           => evalMatch(p, e)(ss)
     case (ZPat, Z)                        => returnMatch(Map())(ss)
     case (SPat(p), S(e))                  => evalMatch(p, e)(ss)
-    case _                                => failMatch(ss)
+    case _                                => failExpr(ss)
   }
 
   private def returnMatch(bind : Map[String, Expr])(ss : List[Stack]) : Expr = ss match {
     case PatStkRules(e, b, rs) :: ss => evalExpr(subst(bind)(b))(ss)
     case PairPatStk(p2, e2) :: ss    => evalMatch(p2, e2)(Pair2PatStk(bind) :: ss)
     case Pair2PatStk(bind1) :: ss    => returnMatch(bind1 ++ bind)(ss)
-    case _                           => throw new Exception("no pattern rules on stack")
-  }
-
-  private def failMatch(ss : List[Stack]) : Expr = ss match {
-    case PatStkRules(e, b, rs) :: ss => evalRules(e)(rs)(ss)
-    case PairPatStk(p2, e2) :: ss    => failMatch(ss)
-    case Pair2PatStk(bind1) :: ss    => failMatch(ss)
     case _                           => throw new Exception("no pattern rules on stack")
   }
 
