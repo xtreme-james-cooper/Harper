@@ -3,8 +3,18 @@ package compiler
 import model.{ ZPat, Z, WildPat, VarPat, Var, Unitt, Unfold, UncaughtException, TrivPat, Triv, TLam, TAp, SPat, S, Raise, ProjR, ProjL, Pattern, Pairr, PairPat, Match, Let, Lam, InRPat, InR, InLPat, InL, Fold, Fix, Expr, Catch, Ap, Abort }
 import interpreter.Substitutor.subst
 
+sealed abstract class State
+case object EvalExpr extends State
+case object ReturnExpr extends State
+case object FailExpr extends State
+case object EvalRules extends State
+case object EvalMatch extends State
+case object ReturnMatch extends State
+case object FailMatch extends State
+
 object StateMachine {
 
+  private var state : State = null
   private var expr : Expr = null
   private var stack : List[Stack] = null
   private var rules : List[(Pattern, Expr)] = null
@@ -12,12 +22,26 @@ object StateMachine {
   private var bind : Map[String, Expr] = null
 
   def eval(e : Expr) : Expr = {
+    state = EvalExpr
     expr = e
     stack = Nil
-    evalExpr
+    do {
+      doStep
+    } while (!stack.isEmpty)
+    expr
   }
 
-  private def evalExpr : Expr = expr match {
+  private def doStep : Unit = state match {
+    case EvalExpr    => evalExpr
+    case ReturnExpr  => returnExpr
+    case FailExpr    => failExpr
+    case EvalRules   => evalRules
+    case EvalMatch   => evalMatch
+    case ReturnMatch => returnMatch
+    case FailMatch   => failMatch
+  }
+
+  private def evalExpr : Unit = expr match {
     case Var(x) => throw new Exception("unsubstituted variable " + x)
     case Z      => returnExpr
     case S(e) => {
@@ -103,8 +127,8 @@ object StateMachine {
     case UncaughtException => failExpr
   }
 
-  private def returnExpr : Expr = stack match {
-    case Nil => expr
+  private def returnExpr : Unit = stack match {
+    case Nil => ()
     case SStk :: ss => {
       expr = S(expr)
       stack = ss
@@ -196,8 +220,8 @@ object StateMachine {
     case Pair2PatStk(bind1) :: ss    => throw new Exception("pattern matching on stack during eval")
   }
 
-  private def failExpr : Expr = stack match {
-    case Nil => UncaughtException
+  private def failExpr : Unit = stack match {
+    case Nil => expr = UncaughtException
     case SStk :: ss => {
       stack = ss
       failExpr
@@ -264,7 +288,7 @@ object StateMachine {
     case Pair2PatStk(bind1) :: ss    => throw new Exception("pattern matching on stack during eval")
   }
 
-  private def evalRules : Expr = rules match {
+  private def evalRules : Unit = rules match {
     case Nil => throw new Exception("no match found for " + expr)
     case (p, b) :: rs => {
       stack = PatStkRules(expr, b, rs) :: stack
@@ -273,7 +297,7 @@ object StateMachine {
     }
   }
 
-  private def evalMatch : Expr = comp match {
+  private def evalMatch : Unit = comp match {
     case (WildPat, _) => {
       bind = Map()
       returnMatch
@@ -310,7 +334,7 @@ object StateMachine {
     case _ => failMatch
   }
 
-  private def returnMatch : Expr = stack match {
+  private def returnMatch : Unit = stack match {
     case PatStkRules(e, b, rs) :: ss => {
       expr = subst(bind)(b)
       stack = ss
@@ -329,7 +353,7 @@ object StateMachine {
     case _ => throw new Exception("no pattern rules on stack")
   }
 
-  private def failMatch : Expr = stack match {
+  private def failMatch : Unit = stack match {
     case PatStkRules(e, b, rs) :: ss => {
       expr = e
       stack = ss
