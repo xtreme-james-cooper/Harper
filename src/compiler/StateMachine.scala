@@ -94,13 +94,13 @@ object StateMachine {
       expr = e
       evalExpr
     }
-    case Raise(t) => failExpr(stack)
+    case Raise(t) => failExpr
     case Catch(e1, e2) => {
       expr = e1
       stack = CatchStk(e2) :: stack
       evalExpr
     }
-    case UncaughtException => failExpr(stack)
+    case UncaughtException => failExpr
   }
 
   private def returnExpr : Expr = stack match {
@@ -196,22 +196,64 @@ object StateMachine {
     case Pair2PatStk(bind1) :: ss    => throw new Exception("pattern matching on stack during eval")
   }
 
-  private def failExpr(ss : List[Stack]) : Expr = ss match {
-    case Nil                        => UncaughtException
-    case SStk :: ss                 => failExpr(ss)
-    case LetStk(n, b) :: ss         => failExpr(ss)
-    case ApStk(e2 : Expr) :: ss     => failExpr(ss)
-    case Ap2Stk(x, b) :: ss         => failExpr(ss)
-    case PairrStk(e2 : Expr) :: ss  => failExpr(ss)
-    case Pairr2Stk(e1 : Expr) :: ss => failExpr(ss)
-    case ProjLStk :: ss             => failExpr(ss)
-    case ProjRStk :: ss             => failExpr(ss)
-    case AbortStk :: ss             => failExpr(ss)
-    case InLStk :: ss               => failExpr(ss)
-    case InRStk :: ss               => failExpr(ss)
-    case MatchStk(rs) :: ss         => failExpr(ss)
-    case FoldStk(x : String) :: ss  => failExpr(ss)
-    case UnfoldStk :: ss            => failExpr(ss)
+  private def failExpr : Expr = stack match {
+    case Nil => UncaughtException
+    case SStk :: ss => {
+      stack = ss
+      failExpr
+    }
+    case LetStk(n, b) :: ss => {
+      stack = ss
+      failExpr
+    }
+    case ApStk(e2 : Expr) :: ss => {
+      stack = ss
+      failExpr
+    }
+    case Ap2Stk(x, b) :: ss => {
+      stack = ss
+      failExpr
+    }
+    case PairrStk(e2 : Expr) :: ss => {
+      stack = ss
+      failExpr
+    }
+    case Pairr2Stk(e1 : Expr) :: ss => {
+      stack = ss
+      failExpr
+    }
+    case ProjLStk :: ss => {
+      stack = ss
+      failExpr
+    }
+    case ProjRStk :: ss => {
+      stack = ss
+      failExpr
+    }
+    case AbortStk :: ss => {
+      stack = ss
+      failExpr
+    }
+    case InLStk :: ss => {
+      stack = ss
+      failExpr
+    }
+    case InRStk :: ss => {
+      stack = ss
+      failExpr
+    }
+    case MatchStk(rs) :: ss => {
+      stack = ss
+      failExpr
+    }
+    case FoldStk(x : String) :: ss => {
+      stack = ss
+      failExpr
+    }
+    case UnfoldStk :: ss => {
+      stack = ss
+      failExpr
+    }
     case CatchStk(e2) :: ss => {
       expr = e2
       stack = ss
@@ -265,7 +307,7 @@ object StateMachine {
       comp = (p, e)
       evalMatch
     }
-    case _               => failMatch
+    case _ => failMatch
   }
 
   private def returnMatch : Expr = stack match {
