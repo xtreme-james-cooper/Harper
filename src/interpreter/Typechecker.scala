@@ -42,6 +42,9 @@ import model.Let
 import model.All
 import model.TLam
 import model.TAp
+import model.Raise
+import model.Catch
+import model.UncaughtException
 
 object Typechecker {
 
@@ -126,9 +129,18 @@ object Typechecker {
     case TLam(x, e) => All(x, typecheckExpr(sigma, delta + x)(e))
     case TAp(e, t) => typecheckExpr(sigma, delta)(e) match {
       case All(x, t2) => substT(x, t)(t2)
-      case _ => throw new Exception("type-application of non-type-function " + e)
+      case _          => throw new Exception("type-application of non-type-function " + e)
     }
-
+    case Raise(t) => {
+      verifyType(delta)(t)
+      t
+    }
+    case Catch(e1, e2) => {
+      val t = typecheckExpr(sigma, delta)(e1)
+      if (typecheckExpr(sigma, delta)(e2) == t) t
+      else throw new Exception("try/catch with incompatible types" + e1 + " " + e2)
+    }
+    case UncaughtException => throw new Exception("typechecking uncaught exception")
   }
 
   private def typecheckRules(sigma : Map[String, Type], delta : Set[String], rs : List[(Pattern, Expr)], t : Type) : Type = {

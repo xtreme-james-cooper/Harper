@@ -20,6 +20,7 @@ case object InRStk extends Stack("inR (-)")
 case class MatchStk(rs : List[(Pattern, Expr)]) extends Stack("case (-) of " + rs)
 case class FoldStk(x : String) extends Stack("fold : " + x + " . (-)")
 case object UnfoldStk extends Stack("unfold (-)")
+case class CatchStk(e2 : Expr) extends Stack("try (-) catch " + e2)
 
 case class RulesStack(e : Expr, b : Expr, rs : List[(Pattern, Expr)]) {
   override def toString : String = "(-) ~ " + e + " --> " + b + " || " + rs

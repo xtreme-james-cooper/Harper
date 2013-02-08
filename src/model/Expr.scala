@@ -24,3 +24,6 @@ case class Fold(x : String, t : Type, e : Expr) extends Expr("fold : " + x + " .
 case class Unfold(e : Expr) extends Expr("unfold " + e)
 case class TLam(x : String, e : Expr) extends Expr("/\\" + x + " . " + e)
 case class TAp(e : Expr, t : Type) extends Expr("[" + e + " " + t + "]")
+case class Raise(t : Type) extends Expr("raise : " + t)
+case class Catch(e1 : Expr, e2 : Expr) extends Expr("try " + e1 + " catch " + e2)
+case object UncaughtException extends Expr("<ERROR>")

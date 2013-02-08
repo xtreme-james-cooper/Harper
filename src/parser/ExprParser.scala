@@ -3,10 +3,8 @@ package parser
 import Parser.{ pLit, pIdent }
 import PatParser.rulesParser
 import TypeParser.typeParser
-import model.{ Z, Var, Unfold, Triv, S, ProjR, ProjL, Pairr, Match, Lam, InR, InL, Fold, Fix, Expr, Ap, Abort }
-import model.Let
-import model.TLam
-import model.TAp
+import model.{ Z, Var, Unfold, Triv, TLam, TAp, S, Raise, ProjR, ProjL, Pairr, Match, Let, Lam, InR, InL, Fold, Fix, Expr, Ap, Abort }
+import model.Catch
 
 object ExprParser {
 
@@ -34,14 +32,19 @@ object ExprParser {
     ({ case ((x, t), e) => Fold(x, t, e) })
   private val unfoldParser : Parser[Expr] = pLit("unfold") thenJ exprParser appl (e => Unfold(e))
   private val letParser : Parser[Expr] = pLit("let") thenJ pIdent thenK pLit("=") thenS exprParser thenK pLit("in") thenS exprParser appl
-  	({ case ((n, d), b) => Let(n, d, b)})
+    ({ case ((n, d), b) => Let(n, d, b) })
   private val tlamParser : Parser[Expr] =
     pLit("/") thenJ pLit("\\") thenJ pIdent thenK pLit(".") thenS exprParser appl ({ case (x, e) => TLam(x, e) })
   private val tapParser : Parser[Expr] =
     pLit("[") thenJ exprParser thenS typeParser thenK pLit("]") appl ({ case (e, t) => TAp(e, t) })
+  private val raiseParser : Parser[Expr] =
+    pLit("raise") thenJ pLit(":") thenJ typeParser appl ({ case t => Raise(t) })
+  private val catchParser : Parser[Expr] =
+    pLit("try") thenJ exprParser thenK pLit("catch") thenS exprParser appl ({ case (e1, e2) => Catch(e1, e2) })
 
   val exprParser : Parser[Expr] =
     varParser or zParser or sParser or lamParser or apParser or fixParser or trivParser or pairParser or projLParser or projRParser or
-      abortParser or inLParser or inRParser or matchParser or foldParser or unfoldParser or letParser or tlamParser or tapParser
+      abortParser or inLParser or inRParser or matchParser or foldParser or unfoldParser or letParser or tlamParser or tapParser or
+      raiseParser or catchParser
 
 }

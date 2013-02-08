@@ -29,6 +29,9 @@ import model.Let
 import model.All
 import model.TLam
 import model.TAp
+import model.Raise
+import model.Catch
+import model.UncaughtException
 
 object Substitutor {
 
@@ -56,19 +59,21 @@ object Substitutor {
       val newV : String = newVar
       Fix(newV, t, subst(bind + (y -> Var(newV)))(e))
     }
-    case Triv          => Triv
-    case Pairr(e1, e2) => Pairr(subst(bind)(e1), subst(bind)(e2))
-    case ProjL(e)      => ProjL(subst(bind)(e))
-    case ProjR(e)      => ProjR(subst(bind)(e))
-    case Abort(t, e)   => Abort(t, subst(bind)(e))
-    case InL(t, e)     => InL(t, subst(bind)(e))
-    case InR(t, e)     => InR(t, subst(bind)(e))
-    case Match(e, rs)  => Match(subst(bind)(e), rs.map({ case (p, e) => substRule(bind)(p, e) }))
-    case Fold(x, t, e) => Fold(x, t, subst(bind)(e))
-    case Unfold(e)     => Unfold(subst(bind)(e))
-    case TLam(y, e)    => TLam(y, subst(bind)(e))
-    case TAp(e, t)     => TAp(subst(bind)(e), t)
-
+    case Triv              => Triv
+    case Pairr(e1, e2)     => Pairr(subst(bind)(e1), subst(bind)(e2))
+    case ProjL(e)          => ProjL(subst(bind)(e))
+    case ProjR(e)          => ProjR(subst(bind)(e))
+    case Abort(t, e)       => Abort(t, subst(bind)(e))
+    case InL(t, e)         => InL(t, subst(bind)(e))
+    case InR(t, e)         => InR(t, subst(bind)(e))
+    case Match(e, rs)      => Match(subst(bind)(e), rs.map({ case (p, e) => substRule(bind)(p, e) }))
+    case Fold(x, t, e)     => Fold(x, t, subst(bind)(e))
+    case Unfold(e)         => Unfold(subst(bind)(e))
+    case TLam(y, e)        => TLam(y, subst(bind)(e))
+    case TAp(e, t)         => TAp(subst(bind)(e), t)
+    case Raise(t)          => Raise(t)
+    case Catch(e1, e2)     => Catch(subst(bind)(e1), subst(bind)(e2))
+    case UncaughtException => UncaughtException
   }
 
   private def substRule(bind : Map[String, Expr]) : (Pattern, Expr) => (Pattern, Expr) = (p, e) => {

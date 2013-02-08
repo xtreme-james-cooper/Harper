@@ -4,6 +4,7 @@ import interpreter.{ Typechecker, Evaluator }
 import compiler.Compiler
 import model.{ Z, Unitt, Type, TyVar, Triv, Sum, S, Rec, Prod, Pairr, Nat, Expr, Arr }
 import parser.ProgParser
+import model.UncaughtException
 
 object Main {
 
@@ -28,7 +29,16 @@ object Main {
       "let length = fix length:(mu t.(Unit+(Nat, t)) => Nat) in \\l:mu t.(Unit+(Nat, t)).case unfold l of { inL () => Z ; inR (n, l) => S((length l)) } in " +
       "(length ((cons Z) ((cons Z) nil)))", Nat, S(S(Z)))
     test("let id = /\\t.\\x:t.x in (([id Nat] Z), ([id Unit] ()))", Prod(Nat, Unitt), Pairr(Z, Triv))
-
+    test("try Z catch S(Z)", Nat, Z)
+    test("try raise:Nat catch S(Z)", Nat, S(Z))
+    test("let fail = \\x:Unit . raise:Nat in " +
+      "let baddub = fix double:(Nat=>Nat) in \\x:Nat.case x of {Z => (fail ()); S(k) => S(S((double k)))} in " +
+      "(baddub S(Z))", Nat, UncaughtException)
+    test("let fail = \\x:Unit . raise:Nat in " +
+      "let baddub = fix double:(Nat=>Nat) in \\x:Nat.case x of {Z => (fail ()); S(k) => S(S((double k)))} in " +
+      "try (baddub S(Z)) catch S(S(S(Z)))", Nat, S(S(S(Z))))
+    test("try raise:Nat catch raise:Nat", Nat, UncaughtException)
+    test("try abort:Nat raise:Void catch Z", Nat, Z)
   }
 
   def test(progs : String, eType : Type) : Unit = test(progs, eType, None)

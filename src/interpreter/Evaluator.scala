@@ -20,6 +20,9 @@ import model.Fold
 import model.Let
 import model.TLam
 import model.TAp
+import model.Raise
+import model.UncaughtException
+import model.Catch
 
 object Evaluator {
 
@@ -28,41 +31,80 @@ object Evaluator {
   private def evalExpr : Expr => Expr = {
     case Var(x)       => throw new Exception("unsubstituted variable " + x)
     case Z            => Z
-    case S(e)         => S(evalExpr(e))
+    case S(e)         => evalExpr(e) match {
+      case UncaughtException => UncaughtException
+      case v => S(v)
+    }
     case Lam(x, t, e) => Lam(x, t, e)
-    case Let(n, d, b) => evalExpr(subst(Map(n -> evalExpr(d)))(b))
+    case Let(n, d, b) => evalExpr(d) match {
+      case UncaughtException => UncaughtException
+      case v => evalExpr(subst(Map(n -> v))(b))
+    }
     case Ap(e1, e2) => evalExpr(e1) match {
-      case Lam(x, t, e) => evalExpr(subst(Map(x -> evalExpr(e2)))(e))
+      case Lam(x, t, e) => evalExpr(e2) match {
+        case UncaughtException => UncaughtException
+        case v2 => evalExpr(subst(Map(x -> v2))(e))
+      }
+      case UncaughtException => UncaughtException
       case _            => throw new Exception("application of non-function " + e1)
     }
     case Fix(x, t, e)  => evalExpr(subst(Map(x -> Fix(x, t, e)))(e))
     case Triv          => Triv
-    case Pairr(e1, e2) => Pairr(evalExpr(e1), evalExpr(e2))
+    case Pairr(e1, e2) => evalExpr(e1) match {
+      case UncaughtException => UncaughtException
+      case v1 => evalExpr(e2) match {
+        case UncaughtException => UncaughtException
+        case v2 => Pairr(v1, v2)
+      }
+    }
     case ProjL(e) => evalExpr(e) match {
       case Pairr(e1, e2) => e1
+      case UncaughtException => UncaughtException
       case _             => throw new Exception("projL of non-pair " + e)
     }
     case ProjR(e) => evalExpr(e) match {
       case Pairr(e1, e2) => e2
+      case UncaughtException => UncaughtException
       case _             => throw new Exception("projR of non-pair " + e)
     }
-    case Abort(t, e)   => Abort(t, evalExpr(e))
-    case InL(t, e)     => InL(t, evalExpr(e))
-    case InR(t, e)     => InR(t, evalExpr(e))
-    case Match(e, rs)  => evalRules(e)(rs)
-    case Fold(x, t, e) => Fold(x, t, evalExpr(e))
+    case Abort(t, e)   => evalExpr(e) match {
+      case UncaughtException => UncaughtException
+      case v => Abort(t, v)
+    }
+    case InL(t, e)     => evalExpr(e) match {
+      case UncaughtException => UncaughtException
+      case v => InL(t, v)
+    }
+    case InR(t, e)     => evalExpr(e) match {
+      case UncaughtException => UncaughtException
+      case v => InR(t, v)
+    }
+    case Match(e, rs)  => evalExpr(e) match {
+      case UncaughtException => UncaughtException
+      case v => evalRules(v)(rs)
+    }
+    case Fold(x, t, e) => evalExpr(e) match {
+      case UncaughtException => UncaughtException
+      case v => Fold(x, t, v)
+    }
     case Unfold(e) => evalExpr(e) match {
       case Fold(x, t, e) => e
+      case UncaughtException => UncaughtException
       case _             => throw new Exception("unfold of non-fold " + e)
     }
     case TLam(x, e) => evalExpr(e) //ignore types at runtime
     case TAp(e, t)  => evalExpr(e) //ignore types at runtime
-
+    case Raise(t)   => UncaughtException
+    case Catch(e1, e2) => evalExpr(e1) match {
+      case UncaughtException => evalExpr(e2)
+      case v                 => v
+    }
+    case UncaughtException => UncaughtException
   }
 
   private def evalRules(e : Expr) : List[(Pattern, Expr)] => Expr = {
     case Nil => throw new Exception("no match found for " + e)
-    case (p, b) :: rs => doMatch(p, evalExpr(e)) match {
+    case (p, b) :: rs => doMatch(p, e) match {
       case None       => evalRules(e)(rs)
       case Some(bind) => evalExpr(subst(bind)(b))
     }
