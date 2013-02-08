@@ -24,9 +24,9 @@ import model.Unitt
 
 object Compiler {
 
-  def eval : Expr => Expr = e => evalExpr(e)(Nil)
+  def eval(e : Expr) : Expr = evalExpr(e)(Nil)
 
-  private def evalExpr : Expr => List[Stack] => Expr = e => ss => e match {
+  private def evalExpr(e : Expr)(ss : List[Stack]) : Expr = e match {
     case Var(x)        => throw new Exception("unsubstituted variable " + x)
     case Z             => returnExpr(Z)(ss)
     case S(e)          => evalExpr(e)(SStk :: ss)
@@ -41,15 +41,14 @@ object Compiler {
     case Abort(t, e)   => evalExpr(e)(AbortStk :: ss)
     case InL(t, e)     => evalExpr(e)(InLStk :: ss)
     case InR(t, e)     => evalExpr(e)(InRStk :: ss)
-    case Match(e, rs)  => returnExpr(evalRules(e)(rs))(ss)
+    case Match(e, rs)  => evalExpr(e)(MatchStk(rs) :: ss)
     case Fold(x, t, e) => evalExpr(e)(FoldStk(x) :: ss)
     case Unfold(e)     => evalExpr(e)(UnfoldStk :: ss)
     case TLam(x, e)    => evalExpr(e)(ss) //ignore types at runtime
     case TAp(e, t)     => evalExpr(e)(ss) //ignore types at runtime
-
   }
 
-  private def returnExpr : Expr => List[Stack] => Expr = e => {
+  private def returnExpr(e : Expr)(ss : List[Stack]) : Expr = ss match {
     case Nil                => e
     case SStk :: ss         => returnExpr(S(e))(ss)
     case LetStk(n, b) :: ss => evalExpr(subst(Map(n -> e))(b))(ss)
@@ -71,6 +70,7 @@ object Compiler {
     case AbortStk :: ss            => returnExpr(Abort(Unitt, e))(ss)
     case InLStk :: ss              => returnExpr(InL(Unitt, e))(ss)
     case InRStk :: ss              => returnExpr(InR(Unitt, e))(ss)
+    case MatchStk(rs) :: ss        => returnExpr(evalRules(e)(rs))(ss) //TODO evalRules?
     case FoldStk(x : String) :: ss => returnExpr(Fold(x, Unitt, e))(ss)
     case UnfoldStk :: ss => e match {
       case Fold(x, t, e) => returnExpr(e)(ss)
@@ -78,37 +78,34 @@ object Compiler {
     }
   }
 
-  private def evalRules(e : Expr) : List[(Pattern, Expr)] => Expr = {
-    case Nil => throw new Exception("no match found for " + e)
-    case (p, b) :: rs => evalMatch(p, evalExpr(e)(Nil))(Nil) match { //TODO evalExpr
-      case None       => evalRules(e)(rs)
-      case Some(bind) => evalExpr(subst(bind)(b))(Nil) //TODO evalExpr
-    }
+  private def evalRules(e : Expr)(ss : List[(Pattern, Expr)]) : Expr = ss match {
+    case Nil          => throw new Exception("no match found for " + e)
+    case (p, b) :: rs => evalMatch(p, e)(Nil)(RulesStack(e, b, rs))
   }
 
-  private def evalMatch : (Pattern, Expr) => List[PatStack] => Option[Map[String, Expr]] = (p, e) => ss => (p, e) match {
-    case (WildPat, _)                     => returnMatch(Map())(ss)
-    case (VarPat(x), e)                   => returnMatch(Map(x -> e))(ss)
-    case (TrivPat, Triv)                  => returnMatch(Map())(ss)
-    case (PairPat(p1, p2), Pairr(e1, e2)) => evalMatch(p1, e1)(PairPatStk(p2, e2) :: ss)
-    case (InLPat(p), InL(t, e))           => evalMatch(p, e)(ss)
-    case (InRPat(p), InR(t, e))           => evalMatch(p, e)(ss)
-    case (ZPat, Z)                        => returnMatch(Map())(ss)
-    case (SPat(p), S(e))                  => evalMatch(p, e)(ss)
-    case _                                => failMatch(ss)
+  private def evalMatch(p : Pattern, e : Expr)(ss : List[PatStack])(rs : RulesStack) : Expr = (p, e) match {
+    case (WildPat, _)                     => returnMatch(Map())(ss)(rs)
+    case (VarPat(x), e)                   => returnMatch(Map(x -> e))(ss)(rs)
+    case (TrivPat, Triv)                  => returnMatch(Map())(ss)(rs)
+    case (PairPat(p1, p2), Pairr(e1, e2)) => evalMatch(p1, e1)(PairPatStk(p2, e2) :: ss)(rs)
+    case (InLPat(p), InL(t, e))           => evalMatch(p, e)(ss)(rs)
+    case (InRPat(p), InR(t, e))           => evalMatch(p, e)(ss)(rs)
+    case (ZPat, Z)                        => returnMatch(Map())(ss)(rs)
+    case (SPat(p), S(e))                  => evalMatch(p, e)(ss)(rs)
+    case _                                => failMatch(ss)(rs)
   }
 
-  private def returnMatch : Map[String, Expr] => List[PatStack] => Option[Map[String, Expr]] = bind => {
-    case Nil                      => Some(bind)
-    case PairPatStk(p2, e2) :: ss => evalMatch(p2, e2)(Pair2PatStk(bind) :: ss)
-    case Pair2PatStk(bind1) :: ss => returnMatch(bind1 ++ bind)(ss)
+  private def returnMatch(bind : Map[String, Expr])(ss : List[PatStack])(rs : RulesStack) : Expr = ss match {
+    case Nil                      => evalExpr(subst(bind)(rs.b))(Nil) //TODO evalExpr?
+    case PairPatStk(p2, e2) :: ss => evalMatch(p2, e2)(Pair2PatStk(bind) :: ss)(rs)
+    case Pair2PatStk(bind1) :: ss => returnMatch(bind1 ++ bind)(ss)(rs)
   }
 
-  //just pops stack; separate for if we ever stick the stacks together
-  private def failMatch : List[PatStack] => Option[Map[String, Expr]] = {
-    case Nil                      => None
-    case PairPatStk(p2, e2) :: ss => failMatch(ss)
-    case Pair2PatStk(bind1) :: ss => failMatch(ss)
+  //just pops stack; for if we ever need to fold the stacks together
+  private def failMatch(ss : List[PatStack])(rs : RulesStack) : Expr = ss match {
+    case Nil                      => evalRules(rs.e)(rs.rs)
+    case PairPatStk(p2, e2) :: ss => failMatch(ss)(rs)
+    case Pair2PatStk(bind1) :: ss => failMatch(ss)(rs)
   }
 
 }
