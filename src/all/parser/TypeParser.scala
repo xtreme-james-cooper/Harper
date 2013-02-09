@@ -1,8 +1,8 @@
-package parser
+package all.parser
 
 import Parser.{ pLit, pIdent }
-import model.{ Voidd, Unitt, Type, TyVar, Sum, Rec, Prod, Nat, Arr }
-import model.All
+import all.model.{ Voidd, Unitt, Type, TyVar, Sum, Rec, Prod, Nat, Arr }
+import all.model.All
 
 object TypeParser {
 

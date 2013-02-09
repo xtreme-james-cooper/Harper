@@ -1,6 +1,6 @@
-package parser
+package all.parser
 
-import model.Expr
+import all.model.Expr
 import ExprParser.exprParser
 
 object ProgParser {

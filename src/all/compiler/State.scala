@@ -1,4 +1,4 @@
-package compiler
+package all.compiler
 
 sealed abstract class State(val isTermination : Boolean)
 case object EvalExpr extends State(false)

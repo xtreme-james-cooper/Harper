@@ -1,4 +1,4 @@
-package model
+package all.model
 
 sealed abstract class Pattern(name : String, val freeVars : Set[String]) {
   override def toString : String = name

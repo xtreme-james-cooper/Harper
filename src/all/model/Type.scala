@@ -1,4 +1,4 @@
-package model
+package all.model
 
 sealed abstract class Type(name : String) {
   override def toString : String = name

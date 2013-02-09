@@ -1,4 +1,4 @@
-package parser
+package all.parser
 
 object Parser {
 

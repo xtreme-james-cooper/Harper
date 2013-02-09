@@ -1,37 +1,37 @@
-package interpreter
+package all.interpreter
 
-import model.{ Z, Var, Triv, S, ProjR, ProjL, Pairr, Lam, Fix, Expr, Ap }
-import model.Abort
-import model.InR
-import model.InL
-import model.Match
-import model.Pattern
-import model.SPat
-import model.TrivPat
-import model.InRPat
-import model.PairPat
-import model.InLPat
-import model.VarPat
-import model.WildPat
-import model.ZPat
-import model.Type
-import model.Nat
-import model.TyVar
-import model.Unitt
-import model.Arr
-import model.Rec
-import model.Voidd
-import model.Prod
-import model.Sum
-import model.Unfold
-import model.Fold
-import model.Let
-import model.All
-import model.TLam
-import model.TAp
-import model.Raise
-import model.Catch
-import model.UncaughtException
+import all.model.{ Z, Var, Triv, S, ProjR, ProjL, Pairr, Lam, Fix, Expr, Ap }
+import all.model.Abort
+import all.model.InR
+import all.model.InL
+import all.model.Match
+import all.model.Pattern
+import all.model.SPat
+import all.model.TrivPat
+import all.model.InRPat
+import all.model.PairPat
+import all.model.InLPat
+import all.model.VarPat
+import all.model.WildPat
+import all.model.ZPat
+import all.model.Type
+import all.model.Nat
+import all.model.TyVar
+import all.model.Unitt
+import all.model.Arr
+import all.model.Rec
+import all.model.Voidd
+import all.model.Prod
+import all.model.Sum
+import all.model.Unfold
+import all.model.Fold
+import all.model.Let
+import all.model.All
+import all.model.TLam
+import all.model.TAp
+import all.model.Raise
+import all.model.Catch
+import all.model.UncaughtException
 
 object Substitutor {
 

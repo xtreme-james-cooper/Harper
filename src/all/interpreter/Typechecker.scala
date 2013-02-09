@@ -1,6 +1,6 @@
-package interpreter
+package all.interpreter
 
-import model.{
+import all.model.{
   ZPat,
   Z,
   WildPat,
@@ -35,16 +35,16 @@ import model.{
   Ap,
   Abort
 }
-import model.Unfold
-import model.Fold
+import all.model.Unfold
+import all.model.Fold
 import Substitutor.substT
-import model.Let
-import model.All
-import model.TLam
-import model.TAp
-import model.Raise
-import model.Catch
-import model.UncaughtException
+import all.model.Let
+import all.model.All
+import all.model.TLam
+import all.model.TAp
+import all.model.Raise
+import all.model.Catch
+import all.model.UncaughtException
 
 object Typechecker {
 

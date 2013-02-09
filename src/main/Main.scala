@@ -1,11 +1,11 @@
-package src
+package main
 
-import interpreter.{ Typechecker, Evaluator }
-import compiler.StackEval
-import compiler.StateMachine
-import model.{ Z, Unitt, Type, TyVar, Triv, Sum, S, Rec, Prod, Pairr, Nat, Expr, Arr }
-import parser.ProgParser
-import model.UncaughtException
+import all.interpreter.{ Typechecker, Evaluator }
+import all.compiler.StackEval
+import all.compiler.StateMachine
+import all.model.{ Z, Unitt, Type, TyVar, Triv, Sum, S, Rec, Prod, Pairr, Nat, Expr, Arr }
+import all.parser.ProgParser
+import all.model.UncaughtException
 
 object Main {
 

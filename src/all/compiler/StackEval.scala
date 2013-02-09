@@ -1,29 +1,29 @@
-package compiler
+package all.compiler
 
-import model.{ Z, Var, Triv, S, ProjR, ProjL, Pairr, Lam, Fix, Expr, Ap }
-import model.InR
-import model.Match
-import model.InL
-import model.Abort
-import model.SPat
-import model.TrivPat
-import model.InRPat
-import model.PairPat
-import model.InLPat
-import model.VarPat
-import model.WildPat
-import model.ZPat
-import model.Pattern
-import interpreter.Substitutor.subst
-import model.Unfold
-import model.Fold
-import model.Let
-import model.TLam
-import model.TAp
-import model.Unitt
-import model.Raise
-import model.UncaughtException
-import model.Catch
+import all.model.{ Z, Var, Triv, S, ProjR, ProjL, Pairr, Lam, Fix, Expr, Ap }
+import all.model.InR
+import all.model.Match
+import all.model.InL
+import all.model.Abort
+import all.model.SPat
+import all.model.TrivPat
+import all.model.InRPat
+import all.model.PairPat
+import all.model.InLPat
+import all.model.VarPat
+import all.model.WildPat
+import all.model.ZPat
+import all.model.Pattern
+import all.interpreter.Substitutor.subst
+import all.model.Unfold
+import all.model.Fold
+import all.model.Let
+import all.model.TLam
+import all.model.TAp
+import all.model.Unitt
+import all.model.Raise
+import all.model.UncaughtException
+import all.model.Catch
 
 object StackEval {
 

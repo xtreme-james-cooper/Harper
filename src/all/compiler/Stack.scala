@@ -1,6 +1,6 @@
-package compiler
+package all.compiler
 
-import model.{ Type, Pattern, Expr }
+import all.model.{ Type, Pattern, Expr }
 
 sealed abstract class Stack(name : String) {
   override def toString : String = name
