@@ -1,7 +1,8 @@
 package all.parser
 
+import all.Parser
 import ExprParser.exprParser
-import Parser.{ pLit, pIdent }
+import all.Parser.{ pLit, pIdent }
 import all.model.{ ZPat, WildPat, VarPat, TrivPat, SPat, Pattern, PairPat, InRPat, InLPat, Expr }
 
 object PatParser {

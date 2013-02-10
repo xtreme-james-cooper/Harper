@@ -1,6 +1,7 @@
 package all.parser
 
-import Parser.{ pLit, pIdent }
+import all.Parser
+import all.Parser.{ pLit, pIdent }
 import PatParser.rulesParser
 import TypeParser.typeParser
 import all.model.{ Z, Var, Unfold, Triv, TLam, TAp, S, Raise, ProjR, ProjL, Pairr, Match, Let, Lam, InR, InL, Fold, Fix, Expr, Ap, Abort }

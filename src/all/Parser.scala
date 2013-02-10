@@ -1,4 +1,4 @@
-package all.parser
+package all
 
 object Parser {
 
@@ -21,6 +21,25 @@ object Parser {
     case tok :: toks => Nil
     case Nil         => List(((), Nil))
   })
+
+  def parse[A](s : String, parser : Parser[A]) : A = {
+
+    def tokenize(s : String) : List[String] = s.headOption match {
+      case None                      => Nil
+      case Some(c) if c.isWhitespace => tokenize(s.tail)
+      case Some(c) if c.isDigit      => s.takeWhile(_ isDigit) :: tokenize(s.dropWhile(_ isDigit))
+      case Some(c) if c.isLetter     => s.takeWhile(_ isLetterOrDigit) :: tokenize(s.dropWhile(_ isLetterOrDigit))
+      case Some(c)                   => c.toString :: tokenize(s.tail)
+    }
+
+    def firstFullParse(ps : List[(A, List[String])]) : A = ps match {
+      case Nil            => throw new Exception("no full parse of " + s)
+      case (p, Nil) :: ps => p
+      case (p, x) :: ps   => firstFullParse(ps)
+    }
+
+    firstFullParse(parser.run(tokenize(s)))
+  }
 
 }
 

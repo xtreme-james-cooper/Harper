@@ -4,12 +4,12 @@ import interpreter.{ Typechecker, Evaluator }
 import compiler.StackEval
 import compiler.StateMachine
 import model.{ Z, Unitt, Type, TyVar, Triv, Sum, S, Rec, Prod, Pairr, Nat, Expr, Arr }
-import parser.ProgParser
 import model.UncaughtException
+import all.parser.ExprParser
 
 object Main {
 
-  def main(args : Array[String]) : Unit = {
+  def runTests : Unit = {
 
     test("Z", Nat, Z)
     test("S(S(Z))", Nat, S(S(Z)))
@@ -48,7 +48,7 @@ object Main {
   def test(progs : String, eType : Type, eVal : Expr) : Unit = test(progs, eType, Some(eVal))
   def test(progs : String, eType : Type, eVal : Option[Expr]) : Unit = {
     println("prog: " + progs)
-    val prog = ProgParser.parse(progs)
+    val prog = Parser.parse(progs, ExprParser.exprParser)
     println("parse: " + prog)
     val typ = Typechecker.typecheck(prog)
     if (typ != eType) throw new Exception("expected " + eType + " but got " + typ)

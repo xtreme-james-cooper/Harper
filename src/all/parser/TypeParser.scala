@@ -1,6 +1,7 @@
 package all.parser
 
-import Parser.{ pLit, pIdent }
+import all.Parser
+import all.Parser.{ pLit, pIdent }
 import all.model.{ Voidd, Unitt, Type, TyVar, Sum, Rec, Prod, Nat, Arr }
 import all.model.All
 
