@@ -6,6 +6,7 @@ object Main {
     all.Main.runTests
     cha07.Main.runTests
     cha08.Main.runTests
+    cha09.Main.runTests
   }
 
 }
