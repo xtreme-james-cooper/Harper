@@ -35,7 +35,7 @@ object Main {
 
   def test(progs : String, eType : Type, eVal : Value) : Unit = {
     println("prog: " + progs)
-    val prog = parse(progs, ExprParser.exprParser)
+    val prog = parse(progs, ExprParser.exprParser).getOrElse(throw new Exception("no full parse of " + progs))
     println("parse: " + prog)
     val typ = Typechecker.typecheck(prog)
     if (typ != eType) throw new Exception("expected " + eType + " but got " + typ)

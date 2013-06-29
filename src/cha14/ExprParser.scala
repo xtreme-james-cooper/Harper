@@ -5,70 +5,220 @@ import main.Parser.{ pLit, pIdent, pNum }
 
 object ExprParser {
 
-  private val varTyParser : Parser[Type] = pIdent appl (x => VarTy(x))
-  private val numTyParser : Parser[Type] = pLit("Num") appl (_ => NumTy)
+  private val varTyParser : Parser[Type] = pIdent map (x => VarTy(x))
+  private val numTyParser : Parser[Type] = pLit("Num") map (_ => NumTy)
   private val arrTyParser : Parser[Type] =
-    pLit("(") thenJ tyParser thenK pLit("-") thenK pLit(">") thenS tyParser thenK pLit(")") appl ({ case (t1, t2) => ArrTy(t1, t2) })
+    for {
+      _ <- pLit("(")
+      t1 <- tyParser
+      _ <- pLit("-")
+      _ <- pLit(">")
+      t2 <- tyParser
+      _ <- pLit(")")
+    } yield ArrTy(t1, t2)
   private val prodParser : Parser[Type] =
-    pLit("(") thenJ tyParser thenK pLit(",") thenS tyParser thenK pLit(")") appl ({ case (t1, t2) => ProdTy(t1, t2) })
-  private val unitParser : Parser[Type] = pLit("Unit") appl (_ => UnitTy)
-  private val voidParser : Parser[Type] = pLit("Void") appl (_ => VoidTy)
+    for {
+      _ <- pLit("(")
+      t1 <- tyParser
+      _ <- pLit(",")
+      t2 <- tyParser
+      _ <- pLit(")")
+    } yield ProdTy(t1, t2)
+  private val unitParser : Parser[Type] = pLit("Unit") map (_ => UnitTy)
+  private val voidParser : Parser[Type] = pLit("Void") map (_ => VoidTy)
   private val sumParser : Parser[Type] =
-    pLit("(") thenJ tyParser thenK pLit("+") thenS tyParser thenK pLit(")") appl ({ case (t1, t2) => SumTy(t1, t2) })
+    for {
+      _ <- pLit("(")
+      t1 <- tyParser
+      _ <- pLit("+")
+      t2 <- tyParser
+      _ <- pLit(")")
+    } yield SumTy(t1, t2)
 
-  private val tyParser : Parser[Type] = numTyParser or arrTyParser or prodParser or unitParser or sumParser or voidParser or varTyParser
+  private val tyParser : Parser[Type] = numTyParser || arrTyParser || prodParser || unitParser || sumParser || voidParser || varTyParser
 
-  private val varParser : Parser[Expr] = pIdent appl (x => Var(x))
-  private val numParser : Parser[Expr] = pNum appl (n => (0 until n).foldLeft(Z : Expr)((k, _) => S(k)))
-  private val sParser : Parser[Expr] = pLit("S") thenJ pLit("(") thenJ exprParser thenK pLit(")") appl (e => S(e))
-  private val letParser : Parser[Expr] = pLit("let") thenJ pIdent thenK pLit("be") thenS exprParser thenK pLit("in") thenS exprParser appl
-    ({ case ((n, d), b) => Let(d, n, b) })
+  private val varParser : Parser[Expr] = pIdent map (x => Var(x))
+  private val numParser : Parser[Expr] = pNum map (n => (0 until n).foldLeft(Z : Expr)((k, _) => S(k)))
+  private val sParser : Parser[Expr] =
+    for {
+      _ <- pLit("S")
+      _ <- pLit("(")
+      e <- exprParser
+      _ <- pLit(")")
+    } yield S(e)
+  private val letParser : Parser[Expr] =
+    for {
+      _ <- pLit("let")
+      n <- pIdent
+      _ <- pLit("be")
+      d <- exprParser
+      _ <- pLit("in")
+      b <- exprParser
+    } yield Let(d, n, b)
   private val apParser : Parser[Expr] =
-    pLit("(") thenJ exprParser thenS exprParser thenK pLit(")") appl ({ case (e1, e2) => Ap(e1, e2) })
+    for {
+      _ <- pLit("(")
+      e1 <- exprParser
+      e2 <- exprParser
+      _ <- pLit(")")
+    } yield Ap(e1, e2)
   private val fundefParser : Parser[Expr] =
-    pLit("fun") thenJ pIdent thenK pLit("(") thenS pIdent thenK pLit(":") thenS tyParser thenK pLit(")") thenK pLit(":") thenS tyParser thenK pLit("=") thenS
-      exprParser thenK pLit("in") thenS exprParser appl ({ case (((((f, x), t1), t2), e2), e) => Let(Fix(ArrTy(t1, t2), f, (Lam(t1, x, e2))), f, e) })
+    for {
+      _ <- pLit("fun")
+      f <- pIdent
+      _ <- pLit("(")
+      x <- pIdent
+      _ <- pLit(":")
+      t1 <- tyParser
+      _ <- pLit(")")
+      _ <- pLit(":")
+      t2 <- tyParser
+      _ <- pLit("=")
+      e2 <- exprParser
+      _ <- pLit("in")
+      e <- exprParser
+    } yield Let(Fix(ArrTy(t1, t2), f, (Lam(t1, x, e2))), f, e)
   private val lamParser : Parser[Expr] =
-    pLit("\\") thenJ pIdent thenK pLit(":") thenS tyParser thenK pLit(".") thenS exprParser appl ({ case ((x, t), e) => Lam(t, x, e) })
+    for {
+      _ <- pLit("\\")
+      x <- pIdent
+      _ <- pLit(":")
+      t <- tyParser
+      _ <- pLit(".")
+      e <- exprParser
+    } yield Lam(t, x, e)
   private val fixParser : Parser[Expr] =
-    pLit("fix") thenJ pIdent thenK pLit(":") thenS tyParser thenK pLit("is") thenS exprParser appl ({ case ((x, t), e) => Fix(t, x, e) })
+    for {
+      _ <- pLit("fix")
+      x <- pIdent
+      _ <- pLit(":")
+      t <- tyParser
+      _ <- pLit("is")
+      e <- exprParser
+    } yield Fix(t, x, e)
   private val pairParser : Parser[Expr] =
-    pLit("(") thenJ exprParser thenK pLit(",") thenS exprParser thenK pLit(")") appl ({ case (e1, e2) => Pair(e1, e2) })
-  private val prlParser : Parser[Expr] = pLit("projl") thenJ exprParser appl (e => PrL(e))
-  private val prrParser : Parser[Expr] = pLit("projr") thenJ exprParser appl (e => PrR(e))
-  private val trivParser : Parser[Expr] = pLit("(") thenJ pLit(")") appl (_ => Triv)
+    for {
+      _ <- pLit("(")
+      e1 <- exprParser
+      _ <- pLit(",")
+      e2 <- exprParser
+      _ <- pLit(")")
+    } yield Pair(e1, e2)
+  private val prlParser : Parser[Expr] =
+    for {
+      _ <- pLit("projl")
+      e <- exprParser
+    } yield PrL(e)
+  private val prrParser : Parser[Expr] =
+    for {
+      _ <- pLit("projr")
+      e <- exprParser
+    } yield PrR(e)
+  private val trivParser : Parser[Expr] =
+    for {
+      _ <- pLit("(")
+      _ <- pLit(")")
+    } yield Triv
   private val abortParser : Parser[Expr] =
-    pLit("abort") thenJ pLit(":") thenJ tyParser thenK pLit("(") thenS exprParser thenK pLit(")") appl ({ case (t, e) => Abort(t, e) })
+    for {
+      _ <- pLit("abort")
+      _ <- pLit(":")
+      t <- tyParser
+      _ <- pLit("(")
+      e <- exprParser
+      _ <- pLit(")")
+    } yield Abort(t, e)
   private val inlParser : Parser[Expr] =
-    pLit("inl") thenJ pLit(":") thenJ tyParser thenK pLit("(") thenS exprParser thenK pLit(")") appl ({ case (t, e) => InL(t, e) })
+    for {
+      _ <- pLit("inl")
+      _ <- pLit(":")
+      t <- tyParser
+      _ <- pLit("(")
+      e <- exprParser
+      _ <- pLit(")")
+    } yield InL(t, e)
   private val inrParser : Parser[Expr] =
-    pLit("inr") thenJ pLit(":") thenJ tyParser thenK pLit("(") thenS exprParser thenK pLit(")") appl ({ case (t, e) => InR(t, e) })
+    for {
+      _ <- pLit("inr")
+      _ <- pLit(":")
+      t <- tyParser
+      _ <- pLit("(")
+      e <- exprParser
+      _ <- pLit(")")
+    } yield InR(t, e)
   private val matchParser : Parser[Expr] =
-    pLit("case") thenJ exprParser thenK pLit("of") thenK pLit("{") thenS rulesParser thenK pLit("}") appl
-      ({ case (e, rs) => Match(e, rs) })
+    for {
+      _ <- pLit("case")
+      e <- exprParser
+      _ <- pLit("of")
+      _ <- pLit("{")
+      rs <- rulesParser
+      _ <- pLit("}")
+    } yield Match(e, rs)
   private val genericParser : Parser[Expr] =
-    pLit("map") thenJ pLit(":") thenJ pLit("(") thenJ pIdent thenK pLit(".") thenS tyParser thenK pLit(")") thenS
-      pIdent thenK pLit(":") thenS tyParser thenK pLit(".") thenS exprParser thenS exprParser appl
-      ({ case (((((tx, t), x), xt), e0), e) => Generic(tx, t, x, xt, e0, e) })
+    for { 
+      _ <- pLit("map") 
+      _ <- pLit(":") 
+      _ <- pLit("(") 
+      tx <- pIdent 
+      _ <- pLit(".") 
+      t <- tyParser 
+      _ <- pLit(")")
+      x <- pIdent
+      _ <- pLit(":")
+      xt <- tyParser 
+      _ <- pLit(".")
+      e0 <- exprParser
+      e <- exprParser 
+    } yield Generic(tx, t, x, xt, e0, e)
 
   val exprParser : Parser[Expr] =
-    varParser or numParser or sParser or letParser or apParser or fundefParser or lamParser or fixParser or pairParser or
-      prlParser or prrParser or trivParser or abortParser or inlParser or inrParser or matchParser or genericParser
+    varParser || numParser || sParser || letParser || apParser || fundefParser || lamParser || fixParser || pairParser ||
+      prlParser || prrParser || trivParser || abortParser || inlParser || inrParser || matchParser || genericParser
 
-  private val wildParser : Parser[Pattern] = pLit("_") appl (x => WildPat)
-  private val varPatParser : Parser[Pattern] = pIdent appl (x => VarPat(x))
-  private val zParser : Parser[Pattern] = pLit("Z") appl (s => ZPat)
-  private val sPatParser : Parser[Pattern] = pLit("S") thenJ pLit("(") thenJ patternParser thenK pLit(")") appl (e => SPat(e))
-  private val trivPatParser : Parser[Pattern] = pLit("(") thenK pLit(")") appl (x => TrivPat)
-  private val pairPatParser : Parser[Pattern] = pLit("(") thenJ patternParser thenK pLit(",") thenS patternParser thenK pLit(")") appl
-    ({ case (t1, t2) => PairPat(t1, t2) })
-  private val inLParser : Parser[Pattern] = pLit("inl") thenJ patternParser appl (e => InLPat(e))
-  private val inRParser : Parser[Pattern] = pLit("inr") thenJ patternParser appl (e => InRPat(e))
+  private val wildParser : Parser[Pattern] = pLit("_") map (_ => WildPat)
+  private val varPatParser : Parser[Pattern] = pIdent map (x => VarPat(x))
+  private val zParser : Parser[Pattern] = pLit("Z") map (_ => ZPat)
+  private val sPatParser : Parser[Pattern] =
+    for {
+      _ <- pLit("S")
+      _ <- pLit("(")
+      e <- patternParser
+      _ <- pLit(")")
+    } yield SPat(e)
+  private val trivPatParser : Parser[Pattern] =
+    for {
+      _ <- pLit("(")
+      _ <- pLit(")")
+    } yield TrivPat
+  private val pairPatParser : Parser[Pattern] = 
+    for {
+      _ <- pLit("(")
+      p1 <- patternParser 
+      _ <- pLit(",") 
+      p2 <- patternParser 
+      _ <- pLit(")")
+    } yield PairPat(p1, p2)
+  private val inLParser : Parser[Pattern] = 
+    for {
+      _ <- pLit("inl")
+      e <- patternParser
+    } yield InLPat(e)
+  private val inRParser : Parser[Pattern] = 
+    for {
+      _ <- pLit("inr")
+      e <- patternParser
+    } yield InRPat(e)
 
   private val patternParser : Parser[Pattern] =
-    wildParser or varPatParser or zParser or sPatParser or trivPatParser or pairPatParser or inLParser or inRParser
+    wildParser || varPatParser || zParser || sPatParser || trivPatParser || pairPatParser || inLParser || inRParser
 
-  private val ruleParser : Parser[(Pattern, Expr)] = patternParser thenK pLit("=") thenK pLit(">") thenS exprParser
+  private val ruleParser : Parser[(Pattern, Expr)] = for {
+    p <- patternParser
+    _ <- pLit("=")
+    _ <- pLit(">")
+    e <- exprParser
+  } yield (p, e)
 
   val rulesParser : Parser[List[(Pattern, Expr)]] = ruleParser intersperse pLit("|")
 
