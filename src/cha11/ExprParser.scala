@@ -1,7 +1,7 @@
 package cha11
 
-import all.Parser
-import all.Parser.{ pLit, pIdent, pNum }
+import main.Parser
+import main.Parser.{ pLit, pIdent, pNum }
 
 object ExprParser {
 

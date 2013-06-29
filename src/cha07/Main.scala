@@ -1,6 +1,6 @@
 package cha07
 
-import all.Parser.parse
+import main.Parser.parse
 
 object Main {
 
