@@ -1,19 +1,19 @@
 package cha07
 
 import main.Parser
-import main.Parser.{ pLit, pIdent, pNum }
+import main.Parser.{ pLit, pIdent, pNum, pSat }
 
 object ExprParser {
 
-  private val varParser : Parser[Expr] = pIdent map (x => Var(x))
-  private val numParser : Parser[Expr] = pNum map (n => Num(n))
-  private val strParser : Parser[Expr] =
+  val varParser : Parser[Expr] = pIdent map (x => Var(x))
+  val numParser : Parser[Expr] = pNum map (n => Num(n))
+  val strParser : Parser[Expr] =
     for {
       _ <- pLit("\"")
-      e <- pIdent
+      e <- pSat(_ => true)
       _ <- pLit("\"")
     } yield Str(e)
-  private val plusParser : Parser[Expr] =
+  val plusParser : Parser[Expr] =
     for {
       _ <- pLit("(")
       e1 <- exprParser
@@ -21,7 +21,7 @@ object ExprParser {
       e2 <- exprParser
       _ <- pLit(")")
     } yield Plus(e1, e2)
-  private val timesParser : Parser[Expr] =
+  val timesParser : Parser[Expr] =
     for {
       _ <- pLit("(")
       e1 <- exprParser
@@ -29,7 +29,7 @@ object ExprParser {
       e2 <- exprParser
       _ <- pLit(")")
     } yield Times(e1, e2)
-  private val catParser : Parser[Expr] =
+  val catParser : Parser[Expr] =
     for {
       _ <- pLit("(")
       e1 <- exprParser
@@ -37,13 +37,13 @@ object ExprParser {
       e2 <- exprParser
       _ <- pLit(")")
     } yield Cat(e1, e2)
-  private val lenParser : Parser[Expr] =
-    for { 
+  val lenParser : Parser[Expr] =
+    for {
       _ <- pLit("|")
       e <- exprParser
       _ <- pLit("|")
     } yield Len(e)
-  private val letParser : Parser[Expr] =
+  val letParser : Parser[Expr] =
     for {
       _ <- pLit("let")
       n <- pIdent
