@@ -6,3 +6,5 @@ bin/
 book.pdf
 
 .cache
+
+*.thy~

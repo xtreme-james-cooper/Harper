@@ -43,6 +43,9 @@ by (induction env, simp)
 lemma [simp]: "lookup (strip_binding env k) k = None"
 by (induction env, simp)
 
+lemma [simp]: "k ~= k' ==> lookup (strip_binding env k) k' = lookup env k'"
+by (induction env, simp)
+
 lemma [simp]: "k ~= k' ==> extend (strip_binding env k) k' v = strip_binding (extend env k' v) k"
 by (induction env, auto)
 

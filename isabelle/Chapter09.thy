@@ -84,41 +84,46 @@ by (induction env e t rule: typecheck.induct, simp_all)
 
 lemma add_vars_by_unstrip: "typecheck (strip_binding env x) e t ==>
        x ~: free_vars e ==> x ~: bound_vars e ==> typecheck env e t"
-sorry
+proof (induction "strip_binding env x" e t arbitrary: env rule: typecheck.induct)
+case tvar
+  thus ?case by simp
+next case tzer
+  thus ?case by simp
+next case tsuc
+  thus ?case by simp
+next case trec
+  thus ?case by simp
+next case tlam
+  thus ?case by simp
+next case (tapp e1 t2 t e2 env)
+  hence "typecheck env e1 (Arr t2 t)" by simp
+  moreover from tapp have "typecheck env e2 t2" by simp
+  ultimately show ?case by simp
+qed
 
 lemma [simp]: "typecheck (extend (strip_binding env n) x t') e t ==> lookup env n = Some t' ==> 
           n ~: free_vars e ==> n ~: bound_vars e ==> 
               typecheck env (swap_var e n x) t"
 proof (induction "extend (strip_binding env n) x t'" e t arbitrary: env rule: typecheck.induct)
-case (tvar v t)
-  thus ?case sorry
+case tvar
+  thus ?case by auto
 next case tzer
   thus ?case by simp
 next case tsuc
   thus ?case by simp
 next case (trec e e0 t z y e1)
-  from trec have Y: "n ~= y" by simp
-  from trec have Z: "n ~= z" by simp
   thus ?case 
   proof (cases "x = y | x = z")
   case True 
-    hence xyz: "x = y | x = z" by simp
-    have "typecheck (extend (extend env z Nat) y t) e1 t" 
-    proof (cases "x = y")
-    case True
-      from trec have "typecheck (extend (extend (extend (strip_binding env n) x t') z Nat) y t) e1 t" by simp
-
-      have "typecheck (extend (extend env z Nat) y t) e1 t" sorry
-      thus ?thesis by simp
-    next case False
-      with xyz have X: "x = z" by simp
-      with trec have "typecheck (extend (extend (strip_binding env n) z Nat) y t) e1 t" by simp
-      have "typecheck (extend (extend env z Nat) y t) e1 t" sorry
-      thus ?thesis by simp
-    qed
-    with trec True show ?thesis by simp
+    with trec have X: "typecheck (strip_binding (extend (extend env z Nat) y t) n) e1 t" by (cases "x = y", simp_all)
+    have "typecheck (strip_binding (extend (extend env z Nat) y t) n) e1 t ==>
+            n ~: free_vars e1 ==> n ~: bound_vars e1 ==> typecheck (extend (extend env z Nat) y t) e1 t" by (rule add_vars_by_unstrip)
+    with trec X True show ?thesis by simp
   next case False
-    have "typecheck (extend (extend env z Nat) y t) (swap_var e1 n x) t" sorry
+    hence "x ~= z" by simp
+    moreover from False have "x ~= y" by simp
+    moreover with trec have "extend (extend (extend (strip_binding env n) z Nat) y t) x t' = extend (strip_binding (extend (extend env z Nat) y t) n) x t'" by simp
+    ultimately have "extend (extend (extend (strip_binding env n) x t') z Nat) y t = ..." by simp
     with trec False show ?thesis by simp
   qed
 next case (tlam y r b t)
@@ -146,6 +151,9 @@ next case tzer
 next case tsuc
   thus ?case by simp
 next case trec
+
+
+
   thus ?case sorry
 next case (tlam y r b t)
   thus ?case
@@ -155,10 +163,11 @@ next case (tlam y r b t)
   next case False
     def z == "get_free_var (free_vars b Un free_vars e' Un bound_vars b Un bound_vars e')"
     def w == "get_free_var ({z} Un free_vars b Un free_vars e' Un bound_vars b Un bound_vars e')"
-
     from tlam have "typecheck (extend (extend env x t') y r) b t" by simp
     from tlam have "!!envp ep. extend (extend env x t') y r = extend envp x t' \<Longrightarrow> typecheck envp ep t' \<Longrightarrow> typecheck envp (subst b ep x) t" by simp
     from tlam have "typecheck env e' t'" by simp
+
+
 
     hence "typecheck (extend env w r) (swap_var (swap_var (subst b (swap_var e' z y) x) w y) y z) t" sorry
     with False show ?thesis by (simp add: Let_def z_def w_def)
