@@ -45,6 +45,26 @@ where "swap_var (Var v) n x = Var (if v = x then n else v)"
     | "swap_var (Lam t y b) n x = Lam t y (if x = y then b else swap_var b n x)"
     | "swap_var (Ap e1 e2) n x = Ap (swap_var e1 n x) (swap_var e2 n x)"
 
+lemma [simp]: "n ~: bound_vars e ==> 
+        free_vars (swap_var e n x) = free_vars e - {x} Un (if x : free_vars e then {n} else {})"
+proof (induction e)
+case Var
+  thus ?case by simp
+next case Zero
+  thus ?case by simp
+next case Suc
+  thus ?case by simp
+next case (Rec e0 z y e1 e)
+  thus ?case by (cases "x = y | x = z", auto)
+next case Lam
+  thus ?case by auto
+next case Ap
+  thus ?case by auto
+qed
+
+lemma [simp]: "bound_vars (swap_var e n x) = bound_vars e"
+by (induction e, simp_all)
+
 lemma [simp]: "size (swap_var e n x) = size e"
 by (induction e, simp_all)
 
@@ -59,6 +79,34 @@ where "subst (Var v) e x = (if v = x then e else Var v)"
                in let w = get_free_var ({z} Un free_vars b Un free_vars e Un bound_vars b Un bound_vars e)
                in Lam t w (swap_var (swap_var (subst b (swap_var e z y) x) w y) y z))"
     | "subst (Ap e1 e2) e x = Ap (subst e1 e x) (subst e2 e x)"
+
+lemma [simp]: "free_vars (subst e n x) = free_vars e - {x} Un (if x : free_vars e then free_vars n else {})"
+proof (induction e arbitrary: n)
+case Var
+  thus ?case by simp
+next case Zero
+  thus ?case by simp
+next case Suc
+  thus ?case by simp
+next case (Rec e0 z y e1 e)
+  thus ?case sorry
+next case (Lam t y b)
+  thus ?case
+  proof (cases "x = y")
+  case True
+    thus ?thesis by simp
+  next case False
+    def z == "get_free_var (free_vars b Un free_vars n Un bound_vars b Un bound_vars n)"
+    def w == "get_free_var ({z} Un free_vars b Un free_vars n Un bound_vars b Un bound_vars n)"
+    from Lam have "!!np. free_vars (subst b (swap_var n z y) x) = free_vars b - {x} \<union> (if x \<in> free_vars b then free_vars (swap_var n z y) else {})" by simp
+
+    have "y ~: bound_vars (subst b (swap_var n z y) x)" sorry 
+    moreover have "free_vars (swap_var (subst b (swap_var n z y) x) w y) - {z} Un (if z : free_vars (swap_var (subst b (swap_var n z y) x) w y) then {y} else {}) - {w} = free_vars b - {y} - {x} \<union> (if x \<in> free_vars b - {y} then free_vars n else {})" sorry
+    ultimately show ?thesis by (simp add: Let_def z_def w_def)
+  qed
+next case Ap
+  thus ?case by auto
+qed
 
 inductive typecheck :: "(var, type) assoc => expr => type => bool"
 where tvar [simp]: "lookup env v = Some t ==> typecheck env (Var v) t"
@@ -167,9 +215,12 @@ next case (tlam y r b t)
     from tlam have "!!envp ep. extend (extend env x t') y r = extend envp x t' \<Longrightarrow> typecheck envp ep t' \<Longrightarrow> typecheck envp (subst b ep x) t" by simp
     from tlam have "typecheck env e' t'" by simp
 
-
-
-    hence "typecheck (extend env w r) (swap_var (swap_var (subst b (swap_var e' z y) x) w y) y z) t" sorry
+    have "typecheck (extend (strip_binding (extend env w r) y) z t') (swap_var (subst b (swap_var e' z y) x) w y) t" sorry
+    moreover have "lookup (extend env w r) y = Some t'" sorry
+    moreover have "w ~: bound_vars (subst b (swap_var e' z y) x)" sorry
+    moreover have "y ~: free_vars (subst b (swap_var e' z y) x) - {y} Un (if y : free_vars (subst b (swap_var e' z y) x) then {w} else {})" sorry
+    moreover have "y ~: bound_vars (subst b (swap_var e' z y) x)" sorry
+    ultimately have "typecheck (extend env w r) (swap_var (swap_var (subst b (swap_var e' z y) x) w y) y z) t" by simp
     with False show ?thesis by (simp add: Let_def z_def w_def)
   qed
 next case (tapp e1 t2 t e2)
