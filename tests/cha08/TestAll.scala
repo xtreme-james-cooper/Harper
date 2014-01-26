@@ -1,8 +1,10 @@
 package cha08
 
+import org.junit.Assert._
+import org.junit.Test
 import main.Parser.parse
 
-object Main {
+class TestAll {
 
   def runTests : Unit = {
     test("3", NumTy, NumVal(3))
@@ -21,16 +23,13 @@ object Main {
   }
 
   def test(progs : String, eType : Type, eVal : Value) : Unit = {
-    println("prog: " + progs)
-    val prog = parse(progs, ExprParser.exprParser).getOrElse(throw new Exception("no full parse of " + progs))
-    println("parse: " + prog)
-    val typ = Typechecker.typecheck(prog)
-    if (typ != eType) throw new Exception("expected " + eType + " but got " + typ)
-    println("type: " + typ)
-    val intVal = Evaluator.evalExpr(prog)
-    if (intVal != eVal) throw new Exception("for interpreted expected " + eVal + " but got " + intVal)
-    println("value" + ": " + intVal)
-    println("-----------------------------")
+    parse(progs, ExprParser.exprParser) match {
+      case None => fail
+      case Some(prog) => {
+        assertEquals(eType, Typechecker.typecheck(prog))
+        assertEquals(eVal, Evaluator.evalExpr(prog))
+      }
+    }
   }
 
 }

@@ -25,7 +25,7 @@ object Evaluator {
     "var-" + varTag
   }
 
-  private def subst(v : Value, x : String) : Expr => Expr = {
+  def subst(v : Value, x : String) : Expr => Expr = {
     case Var(y)        => if (x == y) v.toExpr else Var(y)
     case Str(s)        => Str(s)
     case Num(n)        => Num(n)
@@ -44,7 +44,7 @@ object Evaluator {
     case Ap(e1, e2) => Ap(subst(v, x)(e1), subst(v, x)(e2))
   }
 
-  private def rename(x : String, y : String) : Expr => Expr = {
+  def rename(x : String, y : String) : Expr => Expr = {
     case Var(z)        => if (z == x) Var(y) else Var(z)
     case Str(s)        => Str(s)
     case Num(n)        => Num(n)

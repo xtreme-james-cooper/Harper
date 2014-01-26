@@ -1,13 +1,13 @@
 package cha08
 
 import main.Parser
-import main.Parser.{ pLit, pIdent, pNum }
+import main.Parser.{ pLit, pIdent, pNum, pSat }
 
 object ExprParser {
 
-  private val numTyParser : Parser[Type] = pLit("Num") map (_ => NumTy)
-  private val strTyParser : Parser[Type] = pLit("Str") map (_ => StrTy)
-  private val arrTyParser : Parser[Type] =
+  val numTyParser : Parser[Type] = pLit("Num") map (_ => NumTy)
+  val strTyParser : Parser[Type] = pLit("Str") map (_ => StrTy)
+  val arrTyParser : Parser[Type] =
     for {
       _ <- pLit("(")
       t1 <- tyParser
@@ -17,17 +17,17 @@ object ExprParser {
       _ <- pLit(")")
     } yield ArrTy(t1, t2)
 
-  private val tyParser : Parser[Type] = numTyParser || strTyParser || arrTyParser
+  val tyParser : Parser[Type] = numTyParser || strTyParser || arrTyParser
 
-  private val varParser : Parser[Expr] = pIdent map (x => Var(x))
-  private val numParser : Parser[Expr] = pNum map (n => Num(n))
-  private val strParser : Parser[Expr] =
+  val varParser : Parser[Expr] = pIdent map (x => Var(x))
+  val numParser : Parser[Expr] = pNum map (n => Num(n))
+  val strParser : Parser[Expr] =
     for {
       _ <- pLit("\"")
-      e <- pIdent
+      e <- pSat(_ => true)
       _ <- pLit("\"")
     } yield Str(e)
-  private val plusParser : Parser[Expr] =
+  val plusParser : Parser[Expr] =
     for {
       _ <- pLit("(")
       e1 <- exprParser
@@ -35,7 +35,7 @@ object ExprParser {
       e2 <- exprParser
       _ <- pLit(")")
     } yield Plus(e1, e2)
-  private val timesParser : Parser[Expr] =
+  val timesParser : Parser[Expr] =
     for {
       _ <- pLit("(")
       e1 <- exprParser
@@ -43,7 +43,7 @@ object ExprParser {
       e2 <- exprParser
       _ <- pLit(")")
     } yield Times(e1, e2)
-  private val catParser : Parser[Expr] =
+  val catParser : Parser[Expr] =
     for {
       _ <- pLit("(")
       e1 <- exprParser
@@ -51,13 +51,13 @@ object ExprParser {
       e2 <- exprParser
       _ <- pLit(")")
     } yield Cat(e1, e2)
-  private val lenParser : Parser[Expr] =
+  val lenParser : Parser[Expr] =
     for {
       _ <- pLit("|")
       e <- exprParser
       _ <- pLit("|")
     } yield Len(e)
-  private val letParser : Parser[Expr] =
+  val letParser : Parser[Expr] =
     for {
       _ <- pLit("let")
       n <- pIdent
@@ -66,14 +66,14 @@ object ExprParser {
       _ <- pLit("in")
       b <- exprParser
     } yield Let(d, n, b)
-  private val apParser : Parser[Expr] =
+  val apParser : Parser[Expr] =
     for {
       _ <- pLit("(")
       e1 <- exprParser
       e2 <- exprParser
       _ <- pLit(")")
     } yield Ap(e1, e2)
-  private val fundefParser : Parser[Expr] =
+  val fundefParser : Parser[Expr] =
     for {
       _ <- pLit("fun")
       f <- pIdent
@@ -87,7 +87,7 @@ object ExprParser {
       _ <- pLit("in")
       e <- exprParser
     } yield Let(Lam(t, x, e2), f, e)
-  private val lamParser : Parser[Expr] =
+  val lamParser : Parser[Expr] =
     for {
       _ <- pLit("\\")
       x <- pIdent
