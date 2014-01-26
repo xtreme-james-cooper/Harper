@@ -1,140 +1,75 @@
 theory Chapter09
-imports Vars AssocList
+imports AssocList
 begin
-
-type_synonym type_env = "(var, type) assoc"
 
 datatype type = Nat | Arr type type
 
 datatype expr = 
-  Var var 
+  Var nat 
 | Zero
-| Suc expr
-| Rec expr var var expr expr
-| Lam type var expr
+| Succ expr
+| Rec expr expr expr
+| Lam type expr
 | Ap expr expr
 
-primrec free_vars :: "expr => var set"
-where "free_vars (Var v) = {v}"
-    | "free_vars Zero = {}"
-    | "free_vars (Suc n) = free_vars n"
-    | "free_vars (Rec e0 x y e1 e) = free_vars e0 Un free_vars e Un (free_vars e1 - {x, y})"
-    | "free_vars (Lam t x b) = free_vars b - {x}"
-    | "free_vars (Ap e1 e2) = free_vars e1 Un free_vars e2"
+primrec incr_from :: "nat => expr => expr"
+where "incr_from n (Var v) = Var (if v < n then v else Suc v)"
+    | "incr_from n Zero = Zero"
+    | "incr_from n (Succ e) = Succ (incr_from n e)"
+    | "incr_from n (Rec e0 e1 et) = Rec (incr_from n e0) (incr_from (Suc (Suc n)) e1) (incr_from n et)"
+    | "incr_from n (Lam t b) = Lam t (incr_from (Suc n) b)"
+    | "incr_from n (Ap e1 e2) = Ap (incr_from n e1) (incr_from n e2)"
 
-lemma [simp]: "finite (free_vars e)"
-by (induction e, simp_all)
-
-primrec bound_vars :: "expr => var set"
-where "bound_vars (Var v) = {}"
-    | "bound_vars Zero = {}"
-    | "bound_vars (Suc n) = bound_vars n"
-    | "bound_vars (Rec e0 x y e1 e) = {x, y} Un bound_vars e0 Un bound_vars e Un bound_vars e1"
-    | "bound_vars (Lam t x b) = {x} Un bound_vars b"
-    | "bound_vars (Ap e1 e2) = bound_vars e1 Un bound_vars e2"
-
-lemma [simp]: "finite (bound_vars e)"
-by (induction e, simp_all)
-
-primrec swap_var :: "expr => var => var => expr"
-where "swap_var (Var v) n x = Var (if v = x then n else v)"
-    | "swap_var Zero n x = Zero"
-    | "swap_var (Suc e) n x = Suc (swap_var e n x)"
-    | "swap_var (Rec e0 z y e1 e) n x = 
-          Rec (swap_var e0 n x) z y (if x = y | x = z then e1 else swap_var e1 n x) (swap_var e n x)"
-    | "swap_var (Lam t y b) n x = Lam t y (if x = y then b else swap_var b n x)"
-    | "swap_var (Ap e1 e2) n x = Ap (swap_var e1 n x) (swap_var e2 n x)"
-
-lemma [simp]: "n ~: bound_vars e ==> 
-        free_vars (swap_var e n x) = free_vars e - {x} Un (if x : free_vars e then {n} else {})"
-proof (induction e)
-case Var
-  thus ?case by simp
-next case Zero
-  thus ?case by simp
-next case Suc
-  thus ?case by simp
-next case (Rec e0 z y e1 e)
-  thus ?case by (cases "x = y | x = z", auto)
-next case Lam
-  thus ?case by auto
-next case Ap
-  thus ?case by auto
-qed
-
-lemma [simp]: "bound_vars (swap_var e n x) = bound_vars e"
-by (induction e, simp_all)
-
-lemma [simp]: "size (swap_var e n x) = size e"
-by (induction e, simp_all)
-
-primrec subst :: "expr => expr => var => expr"
+primrec subst :: "expr => expr => nat => expr"
 where "subst (Var v) e x = (if v = x then e else Var v)"
     | "subst Zero e x = Zero"
-    | "subst (Suc n) e x = Suc (subst n e x)"
-    | "subst (Rec e0 z y e1 et) e x = Rec (subst e0 e x) z y (subst e1 e x) (subst et e x)"
-    | "subst (Lam t y b) e x = (
-          if x = y then Lam t y b
-          else let z = get_free_var (free_vars b Un free_vars e Un bound_vars b Un bound_vars e)
-               in let w = get_free_var ({z} Un free_vars b Un free_vars e Un bound_vars b Un bound_vars e)
-               in Lam t w (swap_var (swap_var (subst b (swap_var e z y) x) w y) y z))"
+    | "subst (Succ n) e x = Succ (subst n e x)"
+    | "subst (Rec e0 e1 et) e x = Rec (subst e0 e x) (subst e1 (incr_from 0 (incr_from 0 e)) (Suc (Suc x))) (subst et e x)"
+    | "subst (Lam t b) e x = Lam t (subst b (incr_from 0 e) (Suc x))"
     | "subst (Ap e1 e2) e x = Ap (subst e1 e x) (subst e2 e x)"
 
-lemma [simp]: "free_vars (subst e n x) = free_vars e - {x} Un (if x : free_vars e then free_vars n else {})"
-proof (induction e arbitrary: n)
-case Var
-  thus ?case by simp
-next case Zero
-  thus ?case by simp
-next case Suc
-  thus ?case by simp
-next case (Rec e0 z y e1 e)
-  thus ?case sorry
-next case (Lam t y b)
-  thus ?case
-  proof (cases "x = y")
-  case True
-    thus ?thesis by simp
-  next case False
-    def z == "get_free_var (free_vars b Un free_vars n Un bound_vars b Un bound_vars n)"
-    def w == "get_free_var ({z} Un free_vars b Un free_vars n Un bound_vars b Un bound_vars n)"
-    from Lam have "!!np. free_vars (subst b (swap_var n z y) x) = free_vars b - {x} \<union> (if x \<in> free_vars b then free_vars (swap_var n z y) else {})" by simp
-
-    have "y ~: bound_vars (subst b (swap_var n z y) x)" sorry 
-    moreover have "free_vars (swap_var (subst b (swap_var n z y) x) w y) - {z} Un (if z : free_vars (swap_var (subst b (swap_var n z y) x) w y) then {y} else {}) - {w} = free_vars b - {y} - {x} \<union> (if x \<in> free_vars b - {y} then free_vars n else {})" sorry
-    ultimately show ?thesis by (simp add: Let_def z_def w_def)
-  qed
-next case Ap
-  thus ?case by auto
-qed
-
-inductive typecheck :: "(var, type) assoc => expr => type => bool"
+inductive typecheck :: "(nat, type) assoc => expr => type => bool"
 where tvar [simp]: "lookup env v = Some t ==> typecheck env (Var v) t"
     | tzer [simp]: "typecheck env Zero Nat"    
-    | tsuc [simp]: "typecheck env n Nat ==> typecheck env (Suc n) Nat"
+    | tsuc [simp]: "typecheck env n Nat ==> typecheck env (Succ n) Nat"
     | trec [simp]: "typecheck env e Nat ==> typecheck env e0 t ==> 
-                        typecheck (extend (extend env x Nat) y t) e1 t ==> 
-                            typecheck env (Rec e0 x y e1 e) t"
-    | tlam [simp]: "typecheck (extend env x r) e t ==> typecheck env (Lam r x e) (Arr r t)"
+                        typecheck (extend_at (extend_at env 0 Nat) 0 t) e1 t ==> 
+                            typecheck env (Rec e0 e1 e) t"
+    | tlam [simp]: "typecheck (extend_at env 0 r) e t ==> typecheck env (Lam r e) (Arr r t)"
     | tapp [simp]: "typecheck env e1 (Arr t2 t) ==> typecheck env e2 t2 ==> 
                         typecheck env (Ap e1 e2) t"
 
 inductive_cases [elim!]: "typecheck e (Var x) t"
 inductive_cases [elim!]: "typecheck e Zero t"
-inductive_cases [elim!]: "typecheck e (Suc x) t"
-inductive_cases [elim!]: "typecheck e (Rec x y z w a) t"
-inductive_cases [elim!]: "typecheck e (Lam x y z) t"
+inductive_cases [elim!]: "typecheck e (Succ x) t"
+inductive_cases [elim!]: "typecheck e (Rec x y z) t"
+inductive_cases [elim!]: "typecheck e (Lam x y) t"
 inductive_cases [elim!]: "typecheck e (Ap x y) t"
 
-lemma [simp]: "typecheck env e t ==> x ~: free_vars e ==> x ~: bound_vars e ==>
-                  typecheck (extend env x t') e t"
-by (induction env e t rule: typecheck.induct, simp_all)
-
-lemma add_vars_by_unstrip: "typecheck (strip_binding env x) e t ==>
-       x ~: free_vars e ==> x ~: bound_vars e ==> typecheck env e t"
-proof (induction "strip_binding env x" e t arbitrary: env rule: typecheck.induct)
+lemma [simp]: "typecheck env e t ==> typecheck (extend_at env n k) (incr_from n e) t"
+proof (induction env e t arbitrary: n rule: typecheck.induct)
 case tvar
   thus ?case by simp
+next case tzer
+  thus ?case by simp
+next case tsuc
+  thus ?case by simp
+next case (trec env e e0 t e1)
+  hence "typecheck (extend_at (extend_at (extend_at env 0 type.Nat) 0 t) (Suc (Suc n)) k) (incr_from (Suc (Suc n)) e1) t" by simp
+  with trec show ?case by (simp add: extend_at_swap)
+next case (tlam env r b t)
+  hence "typecheck (extend_at (extend_at env 0 r) (Suc n) k) (incr_from (Suc n) b) t" by simp
+  thus ?case by (simp add: extend_at_swap)
+next case (tapp env e1 t2 t e2)
+  from tapp have "typecheck (extend_at env n k) (incr_from n e1) (Arr t2 t)" by simp
+  moreover from tapp have "typecheck (extend_at env n k) (incr_from n e2) t2" by simp
+  ultimately show ?case by simp
+qed
+
+lemma typecheck_subst: "typecheck (extend env x t') e t ==> typecheck env e' t' ==> typecheck env (subst e e' x) t"
+proof (induction "extend env x t'" e t arbitrary: env e' x rule: typecheck.induct)
+case tvar
+  thus ?case by auto
 next case tzer
   thus ?case by simp
 next case tsuc
@@ -143,86 +78,6 @@ next case trec
   thus ?case by simp
 next case tlam
   thus ?case by simp
-next case (tapp e1 t2 t e2 env)
-  hence "typecheck env e1 (Arr t2 t)" by simp
-  moreover from tapp have "typecheck env e2 t2" by simp
-  ultimately show ?case by simp
-qed
-
-lemma [simp]: "typecheck (extend (strip_binding env n) x t') e t ==> lookup env n = Some t' ==> 
-          n ~: free_vars e ==> n ~: bound_vars e ==> 
-              typecheck env (swap_var e n x) t"
-proof (induction "extend (strip_binding env n) x t'" e t arbitrary: env rule: typecheck.induct)
-case tvar
-  thus ?case by auto
-next case tzer
-  thus ?case by simp
-next case tsuc
-  thus ?case by simp
-next case (trec e e0 t z y e1)
-  thus ?case 
-  proof (cases "x = y | x = z")
-  case True 
-    with trec have X: "typecheck (strip_binding (extend (extend env z Nat) y t) n) e1 t" by (cases "x = y", simp_all)
-    have "typecheck (strip_binding (extend (extend env z Nat) y t) n) e1 t ==>
-            n ~: free_vars e1 ==> n ~: bound_vars e1 ==> typecheck (extend (extend env z Nat) y t) e1 t" by (rule add_vars_by_unstrip)
-    with trec X True show ?thesis by simp
-  next case False
-    hence "x ~= z" by simp
-    moreover from False have "x ~= y" by simp
-    moreover with trec have "extend (extend (extend (strip_binding env n) z Nat) y t) x t' = extend (strip_binding (extend (extend env z Nat) y t) n) x t'" by simp
-    ultimately have "extend (extend (extend (strip_binding env n) x t') z Nat) y t = ..." by simp
-    with trec False show ?thesis by simp
-  qed
-next case (tlam y r b t)
-  thus ?case
-  proof (cases "x = y")
-  case True 
-    have "typecheck (strip_binding (extend env y r) n) b t ==> n ~: free_vars b ==> n ~: bound_vars b ==> typecheck (extend env y r) b t" by (rule add_vars_by_unstrip)
-    with tlam True show ?thesis by simp
-  next case False
-    with tlam False show ?thesis by (cases "n = x", simp_all)
-  qed
-next case (tapp e1 t2 t e2)
-  from tapp have "typecheck env (swap_var e1 n x) (Arr t2 t)" by simp
-  moreover from tapp have "typecheck env (swap_var e2 n x) t2" by simp
-  ultimately show ?case by simp
-qed
-
-lemma typecheck_subst: "typecheck (extend env x t') e t ==> typecheck env e' t' ==> 
-          typecheck env (subst e e' x) t"
-proof (induction "extend env x t'" e t arbitrary: env e' rule: typecheck.induct)
-case tvar
-  thus ?case by auto
-next case tzer
-  thus ?case by simp
-next case tsuc
-  thus ?case by simp
-next case trec
-
-
-
-  thus ?case sorry
-next case (tlam y r b t)
-  thus ?case
-  proof (cases "x = y")
-  case True
-    with tlam show ?thesis by simp
-  next case False
-    def z == "get_free_var (free_vars b Un free_vars e' Un bound_vars b Un bound_vars e')"
-    def w == "get_free_var ({z} Un free_vars b Un free_vars e' Un bound_vars b Un bound_vars e')"
-    from tlam have "typecheck (extend (extend env x t') y r) b t" by simp
-    from tlam have "!!envp ep. extend (extend env x t') y r = extend envp x t' \<Longrightarrow> typecheck envp ep t' \<Longrightarrow> typecheck envp (subst b ep x) t" by simp
-    from tlam have "typecheck env e' t'" by simp
-
-    have "typecheck (extend (strip_binding (extend env w r) y) z t') (swap_var (subst b (swap_var e' z y) x) w y) t" sorry
-    moreover have "lookup (extend env w r) y = Some t'" sorry
-    moreover have "w ~: bound_vars (subst b (swap_var e' z y) x)" sorry
-    moreover have "y ~: free_vars (subst b (swap_var e' z y) x) - {y} Un (if y : free_vars (subst b (swap_var e' z y) x) then {w} else {})" sorry
-    moreover have "y ~: bound_vars (subst b (swap_var e' z y) x)" sorry
-    ultimately have "typecheck (extend env w r) (swap_var (swap_var (subst b (swap_var e' z y) x) w y) y z) t" by simp
-    with False show ?thesis by (simp add: Let_def z_def w_def)
-  qed
 next case (tapp e1 t2 t e2)
   from tapp have "typecheck env (subst e1 e' x) (Arr t2 t)" by simp
   moreover from tapp have "typecheck env (subst e2 e' x) t2" by simp
