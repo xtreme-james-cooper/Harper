@@ -17,15 +17,16 @@ where "free_vars (Var v) = {v}"
     | "free_vars Zero = {}"
     | "free_vars (Succ e) = free_vars e"
     | "free_vars (Rec e0 e1 et) = free_vars e0 Un free_vars et Un 
-          ((%x. case x of 0 => undefined | Suc 0 => undefined | Suc (Suc k) => k) ` (free_vars e1 - {0, 1}))"
-    | "free_vars (Lam t b) = (%x. case x of 0 => undefined | Suc k => k) ` (free_vars b - {0})"
+          ((%x. case x of Suc (Suc k) => k) ` (free_vars e1 - {0, 1}))"
+    | "free_vars (Lam t b) = (%x. case x of Suc k => k) ` (free_vars b - {0})"
     | "free_vars (Ap e1 e2) = free_vars e1 Un free_vars e2"
 
-lemma lam_frees: "(n : free_vars (Lam r b)) = (Suc n : free_vars b)" 
+(* "(n : free_vars (Lam t b)) = (Suc n : free_vars b)" *)
+lemma [simp]: "(n : (%x. case x of Suc k => k) ` (free_vars b - {0})) = (Suc n : free_vars b)" 
 proof auto
   fix x
   assume "x : free_vars b"
-     and "Suc (case x of 0 => undefined | Suc k => k) ~: free_vars b"
+     and "Suc (case x of Suc k => k) ~: free_vars b"
   thus "x = 0" by (cases x, simp_all)
 next
   assume "Suc n : free_vars b"
@@ -33,7 +34,8 @@ next
   ultimately show "n \<in> nat_case undefined (\<lambda>k. k) ` (free_vars b - {0})" by blast
 qed
 
-lemma rec_frees: "(n : free_vars (Rec e0 e1 e)) = (n : free_vars e0 | n : free_vars e | Suc (Suc n) : free_vars e1)"
+(* "(n : free_vars (Rec e0 e1 e)) = (n : free_vars e0 | n : free_vars e | Suc (Suc n) : free_vars e1)" *)
+lemma [simp]: "(n : (%x. case x of Suc (Suc k) => k) ` (free_vars e1 - {0, 1})) = (Suc (Suc n) : free_vars e1)"
 proof auto
   fix x
   assume B: "Suc (Suc (case x of Suc (Suc k) => k)) ~: free_vars e1"
@@ -46,12 +48,8 @@ proof auto
   qed
 next
   assume "Suc (Suc n) : free_vars e1"
-     and "n ~: free_vars e0"
-     and "n ~: nat_case undefined (nat_case undefined (%k. k)) ` (free_vars e1 - {0, Suc 0})"
-  moreover have "n = nat_case undefined (nat_case undefined (%k. k)) (Suc (Suc n)) ==> 
-          (Suc (Suc n)):(free_vars e1 - {0, Suc 0}) ==> 
-              n : nat_case undefined (nat_case undefined (%k. k))`(free_vars e1 - {0, Suc 0})" by blast
-  ultimately show "n : free_vars e" by simp
+  moreover have "n = nat_case undefined (nat_case undefined (%k. k)) (Suc (Suc n))" by simp
+  ultimately show "n : nat_case undefined (nat_case undefined (%k. k)) ` (free_vars e1 - {0, Suc 0})" by blast
 qed
 
 primrec incr_from :: "nat => expr => expr"
@@ -61,6 +59,59 @@ where "incr_from n (Var v) = Var (if v < n then v else Suc v)"
     | "incr_from n (Rec e0 e1 et) = Rec (incr_from n e0) (incr_from (Suc (Suc n)) e1) (incr_from n et)"
     | "incr_from n (Lam t b) = Lam t (incr_from (Suc n) b)"
     | "incr_from n (Ap e1 e2) = Ap (incr_from n e1) (incr_from n e2)"
+
+lemma [simp]: "free_vars (incr_from n e) = (%v. if v < n then v else Suc v) ` free_vars e"
+proof (induction e arbitrary: n)
+case Var
+  thus ?case by simp
+next case Zero
+  thus ?case by simp
+next case Succ
+  thus ?case by simp
+next case (Rec e0 e1 e)
+
+
+
+
+  thus ?case sorry
+next case (Lam t b)
+  thus ?case 
+  proof auto
+    fix xa
+    assume "0 < xa" and "xa < Suc n"
+    thus "(case xa of Suc k => k) < n" by (cases xa, simp_all)
+  next
+    fix v
+    assume "!!n. free_vars (incr_from n b) = free_vars b Int {v. v < n} Un Suc ` (free_vars b Int {v. ~ v < n})"
+       and "v \<notin> Suc ` (nat_case undefined (\<lambda>k. k) ` (free_vars b - {0}) \<inter> {v. \<not> v < n})"
+       and "v \<in> free_vars b"
+       and "\<not> v < Suc n"
+    thus "Suc v : free_vars b" sorry
+  next
+    fix v
+    assume "!!n. free_vars (incr_from n b) = free_vars b Int {v. v < n} Un Suc ` (free_vars b Int {v. ~ v < n})"
+       and "v \<notin> Suc ` (nat_case undefined (\<lambda>k. k) ` (free_vars b - {0}) \<inter> {v. \<not> v < n})"
+       and "v \<in> free_vars b"
+       and "\<not> v < Suc n"
+    thus False sorry
+  next
+    fix xa
+    assume "!!n. free_vars (incr_from n b) = free_vars b Int {v. v < n} Un Suc ` (free_vars b Int {v. ~ v < n})"
+       and "xa \<in> free_vars b"
+       and "(case xa of Suc k \<Rightarrow> k) \<notin> nat_case undefined (\<lambda>k. k) ` (free_vars b \<inter> {v. v < Suc n} \<union> Suc ` (free_vars b \<inter> {v. \<not> v < Suc n}) - {0})"
+       and "(case xa of Suc k \<Rightarrow> k) < n"
+    thus "xa = 0" sorry
+  next 
+    fix xa
+    assume "!!n. free_vars (incr_from n b) = free_vars b Int {v. v < n} Un Suc ` (free_vars b Int {v. ~ v < n})"
+       and "xa \<in> free_vars b"
+       and "Suc (case xa of Suc k \<Rightarrow> k) \<notin> nat_case undefined (\<lambda>k. k) ` (free_vars b \<inter> {v. v < Suc n} \<union> Suc ` (free_vars b \<inter> {v. \<not> v < Suc n}) - {0})"
+       and "\<not> (case xa of Suc k \<Rightarrow> k) < n"
+    thus "xa = 0" sorry 
+  qed
+next case Ap
+  thus ?case by auto
+qed
 
 primrec sub_from :: "nat => expr => expr"
 where "sub_from n (Var v) = Var (if v < n then v else if v = n then undefined else v - 1)"
@@ -87,11 +138,27 @@ next case Zero
 next case Succ
   thus ?case by simp
 next case (Rec e0 e1 e)
-  thus ?case sorry
+  have "(if x \<in> free_vars e0 then free_vars e0 - {x} \<union> free_vars e' else free_vars e0) Un (if x \<in> free_vars e then free_vars e - {x} \<union> free_vars e' else free_vars e) Un 
+          ((%x. case x of Suc (Suc k) => k) ` ((if (Suc (Suc x)) \<in> free_vars e1 then free_vars e1 - {(Suc (Suc x))} \<union> free_vars (incr_from 0 (incr_from 0 e')) else free_vars e1) - {0, 1})) =
+                (if x \<in> free_vars e0 | x : free_vars e | x : ((%x. case x of Suc (Suc k) => k) ` (free_vars e1 - {0, 1})) 
+                 then free_vars e0 Un free_vars e Un ((%x. case x of Suc (Suc k) => k) ` (free_vars e1 - {0, 1})) - {x} \<union> free_vars e' 
+                 else free_vars e0 Un free_vars e Un ((%x. case x of Suc (Suc k) => k) ` (free_vars e1 - {0, 1})))" sorry
+  with Rec show ?case by simp
 next case (Lam t b)
-  thus ?case sorry
-next case (Ap e1 e2)
-  thus ?case sorry
+  thus ?case 
+  proof (cases "Suc x : free_vars b", auto)
+    fix xa::nat
+    assume "0 < xa"
+    thus "xa = Suc (case xa of Suc k => k)" by (cases xa, simp_all)
+  next
+    fix xa
+    assume "xa : free_vars e'"
+    hence "Suc xa : free_vars b - {Suc x} Un Suc ` free_vars e' - {0}" by simp
+    moreover have "xa = nat_case undefined (%k. k) (Suc xa)" by simp
+    ultimately show "xa : nat_case undefined (%k. k) ` (free_vars b - {Suc x} Un Suc ` free_vars e' - {0})" by blast
+  qed
+next case Ap
+  thus ?case by auto
 qed
 
 inductive typecheck :: "(nat, type) assoc => expr => type => bool"
@@ -155,10 +222,13 @@ next case tsuc
   thus ?case by simp
 next case (trec e e0 t e1)
   from trec have "n ~: free_vars (Rec e0 e1 e)" by simp
-  hence "Suc (Suc n) ~: free_vars e1" apply (auto simp add: rec_frees) sorry
+
+
+
+  hence "Suc (Suc n) ~: free_vars e1" apply (auto) sorry
   with trec show ?case by (simp add: extend_at_swap)
 next case (tlam r b t)
-  thus ?case apply (simp add: extend_at_swap lam_frees) sorry
+  thus ?case by (simp add: extend_at_swap)
 next case (tapp e1 t2 t e2)
   from tapp have "typecheck env (sub_from n e1) (Arr t2 t)" by simp
   moreover from tapp have "typecheck env (sub_from n e2) t2" by simp
@@ -220,6 +290,7 @@ next case eap2
 next case (eap3 e2 r b)
   hence "typecheck (extend_at env 0 r) b t & typecheck env e2 r" by (auto simp add: inv_app inv_lam)
   hence "typecheck (extend_at env 0 r) b t" by simp
+
 
   moreover have "typecheck (extend_at env 0 k) e2 r" sorry
   ultimately have "typecheck (extend_at env 0 k) (subst b e2 0) t" by simp
