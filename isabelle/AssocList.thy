@@ -66,14 +66,8 @@ by (induction env, cases x, simp_all)
 lemma [simp]: "v < n ==> lookup (extend_at env n k) v = lookup env v" 
 by (induction env, cases v, simp_all)
 
-lemma [simp]: "v >= n ==> lookup (extend_at env n k) (Suc v) = lookup env v" 
+lemma [simp]: "v > n ==> lookup (extend_at env n k) v = lookup env (v - 1)" 
 by (induction env, cases v, simp_all)
-
-lemma [simp]: "extend_at empty_map n k = extend empty_map n k"
-apply (simp add: empty_map_def)
-apply (cases n)
-apply auto
-sorry
 
 lemma extend_at_swap: "extend_at (extend_at env 0 r) (Suc n) k = extend_at (extend_at env n k) 0 r"
 proof (induction env)
@@ -126,5 +120,13 @@ case (ASSOC f)
     ((\<lambda>kp. case kp of 0 \<Rightarrow> if 0 = 0 then Some r else f kp | Suc kpp \<Rightarrow> if Suc kpp < 0 then f kp else if Suc kpp = 0 then Some r else f kpp)(Suc x \<mapsto> k))" sorry
   thus ?case by auto
 qed
+
+lemma [simp]: "extend (extend_at env n k') n k = extend_at env n k"
+apply (induction env) apply simp
+sorry
+
+lemma [simp]: "lookup env (case x of 0 => undefined | Suc k => k) = lookup (extend_at env 0 r) x" 
+apply (induction env) apply (cases x) apply simp defer apply simp
+sorry
 
 end
