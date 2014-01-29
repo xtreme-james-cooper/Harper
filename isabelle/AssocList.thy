@@ -116,17 +116,38 @@ qed
 lemma [simp]: "extend_at (extend env x k) 0 r = extend (extend_at env 0 r) (Suc x) k"
 proof (induction env)
 case (ASSOC f)
-  have "(\<lambda>kp. case kp of 0 \<Rightarrow> if 0 = 0 then Some r else (f(x \<mapsto> k)) kp | Suc kpp \<Rightarrow> if Suc kpp < 0 then (f(x \<mapsto> k)) kp else if Suc kpp = 0 then Some r else (f(x \<mapsto> k)) kpp) =
-    ((\<lambda>kp. case kp of 0 \<Rightarrow> if 0 = 0 then Some r else f kp | Suc kpp \<Rightarrow> if Suc kpp < 0 then f kp else if Suc kpp = 0 then Some r else f kpp)(Suc x \<mapsto> k))" sorry
+  have "ALL y. (\<lambda>kp. case kp of 0 \<Rightarrow> if (0::nat) = 0 then Some r else (f(x \<mapsto> k)) kp | Suc kpp \<Rightarrow> if Suc kpp < 0 then (f(x \<mapsto> k)) kp else if Suc kpp = 0 then Some r else (f(x \<mapsto> k)) kpp) y =
+    ((\<lambda>kp. case kp of 0 \<Rightarrow> if (0::nat) = 0 then Some r else f kp | Suc kpp \<Rightarrow> if Suc kpp < 0 then f kp else if Suc kpp = 0 then Some r else f kpp)(Suc x \<mapsto> k)) y"
+  proof auto
+    fix y
+    assume "y \<noteq> Suc x"
+    thus "(case y of 0 \<Rightarrow> Some r | Suc kpp \<Rightarrow> if Suc kpp < 0 then (f(x \<mapsto> k)) y else if Suc kpp = 0 then Some r else (f(x \<mapsto> k)) kpp) =
+        (case y of 0 \<Rightarrow> Some r | Suc kpp \<Rightarrow> if Suc kpp < 0 then f y else if Suc kpp = 0 then Some r else f kpp)" by (cases y, auto)
+  qed
   thus ?case by auto
 qed
 
 lemma [simp]: "extend (extend_at env n k') n k = extend_at env n k"
-apply (induction env) apply simp
-sorry
-
-lemma [simp]: "lookup env (case x of 0 => undefined | Suc k => k) = lookup (extend_at env 0 r) x" 
-apply (induction env) apply (cases x) apply simp defer apply simp
-sorry
+proof (induction env)
+case (ASSOC f)
+  have "ALL x. ((\<lambda>kp. case kp of 0 \<Rightarrow> if n = 0 then Some k' else f kp | Suc kpp \<Rightarrow> if Suc kpp < n then f kp else if Suc kpp = n then Some k' else f kpp)(n \<mapsto> k)) x =
+    (\<lambda>kp. case kp of 0 \<Rightarrow> if n = 0 then Some k else f kp | Suc kpp \<Rightarrow> if Suc kpp < n then f kp else if Suc kpp = n then Some k else f kpp) x"
+  proof auto
+    fix x::nat
+    assume "0 < x"
+    thus "(case x of 0 \<Rightarrow> Some k' | Suc kpp \<Rightarrow> if Suc kpp < 0 then f x else if Suc kpp = 0 then Some k' else f kpp) =
+        (case x of 0 \<Rightarrow> Some k | Suc kpp \<Rightarrow> if Suc kpp < 0 then f x else if Suc kpp = 0 then Some k else f kpp)" by (cases x, auto)
+  next
+    assume "0 < n"
+    thus "Some k = (case n of 0 \<Rightarrow> f n | Suc kpp \<Rightarrow> if Suc kpp < n then f n else if Suc kpp = n then Some k else f kpp)" by (cases n, auto)
+  next
+    fix x
+    assume "0 < n"
+       and "x \<noteq> n"
+    thus "(case x of 0 \<Rightarrow> f x | Suc kpp \<Rightarrow> if Suc kpp < n then f x else if Suc kpp = n then Some k' else f kpp) =
+        (case x of 0 \<Rightarrow> f x | Suc kpp \<Rightarrow> if Suc kpp < n then f x else if Suc kpp = n then Some k else f kpp)" by (cases x, auto)
+  qed
+  thus ?case by auto
+qed
 
 end
