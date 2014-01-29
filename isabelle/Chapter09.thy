@@ -69,16 +69,18 @@ next case Zero
 next case Succ
   thus ?case by simp
 next case (Rec e0 e1 e)
+  from Rec have "!!nn. free_vars (incr_from nn e1) = (\<lambda>v. if v < nn then v else Suc v) ` free_vars e1" by simp
 
 
-
-
-  thus ?case sorry
+  have "((\<lambda>v. if v < n then v else Suc v) ` free_vars e0) Un ((\<lambda>v. if v < n then v else Suc v) ` free_vars e) Un ((%x. case x of Suc (Suc k) => k) ` (free_vars (incr_from (Suc (Suc n)) e1) - {0, 1})) = 
+            (\<lambda>v. if v < n then v else Suc v) ` (free_vars e0 Un free_vars e Un ((%x. case x of Suc (Suc k) => k) ` (free_vars e1 - {0, 1})))" sorry
+  with Rec show ?case by simp
 next case (Lam t b)
+  
 
-
-
-  thus ?case sorry
+  have "nat_case undefined (\<lambda>k. k) ` (((\<lambda>v. if v < Suc n then v else Suc v) ` free_vars b) - {0}) 
+          = (\<lambda>v. if v < n then v else Suc v) ` nat_case undefined (\<lambda>k. k) ` (free_vars b - {0})" apply auto sorry
+  with Lam show ?case by simp
 next case Ap
   thus ?case by auto
 qed
@@ -195,10 +197,13 @@ next case tsuc
   thus ?case by simp
 next case (trec e e0 t e1)
   from trec have "n ~: (%x. case x of Suc (Suc k) => k) ` (free_vars e1 - {0, 1})" by simp
+  hence "Suc (Suc n) ~: free_vars e1" 
+  apply auto 
 
 
 
-  hence "Suc (Suc n) ~: free_vars e1" apply (auto) sorry
+
+  sorry
   with trec show ?case by (simp add: extend_at_swap)
 next case (tlam r b t)
   thus ?case by (simp add: extend_at_swap)
@@ -232,7 +237,7 @@ where "safe_subst e e' = sub_from 0 (subst e (incr_from 0 e') 0)"
 lemma [simp]: "typecheck (extend_at env 0 t') e t ==> typecheck env e' t' ==> typecheck env (safe_subst e e') t"
 proof (simp add: safe_subst_def)
   assume "typecheck (extend_at env 0 t') e t"
-     and A: "typecheck env e' t'"
+     and "typecheck env e' t'"
   moreover have "0 ~: (if 0 : free_vars e then free_vars e - {0} Un free_vars (incr_from 0 e') else free_vars e)" by (cases "0 : free_vars e", auto)
   ultimately show "typecheck env (sub_from 0 (subst e (incr_from 0 e') 0)) t" by simp
 qed
@@ -258,15 +263,12 @@ lemma canonical_nat: "typecheck env e Nat ==> is_val e ==> e = Zero | (EX v. typ
 by (induction e, auto)
 
 lemma tc_can_nat: "typecheck env e Nat ==> is_val e ==> typecheck env' e Nat"
-
-
-
-
-
-
-
-
-sorry
+proof -
+  assume "typecheck env e Nat"
+     and "is_val e"
+  hence "e = Zero | (EX v. typecheck env v Nat & is_val v & e = Succ v)" by (simp add: canonical_nat)
+  thus "typecheck env' e Nat" by (induction e, simp_all add: canonical_nat)
+qed
 
 lemma canonical_arr: "typecheck env e (Arr t1 t2) ==> is_val e ==> (EX v. e = Lam t1 v & typecheck (extend_at env 0 t1) v t2)"
 by (induction e, auto)
@@ -299,29 +301,86 @@ next case tzer
   thus ?case by simp
 next case (tsuc env n)
   thus ?case 
-  proof (cases "is_val n")
+  proof (cases "is_val n", auto)
+    fix x
+    assume "eval n x"
+    hence "eval (Succ n) (Succ x)" by simp
+    thus "EX y. eval (Succ n) y " by auto
+  qed
+next case (trec env e e0 t e1)
+  thus ?case
+  proof (cases "is_val e")
   case True
+    have "EX x. eval (Rec e0 e1 e) x"
+    proof (cases "e = Zero")
+    case True
+      def e0' == e0
+      have "eval (Rec e0 e1 Zero) e0'" by (simp add: e0'_def)
+      with True show ?thesis by auto
+    next case False
+      from trec True have "e = Zero | (EX v. typecheck env v Nat & is_val v & e = Succ v)" by (simp add: canonical_nat)
+      with False have "EX v. typecheck env v Nat & is_val v & e = Succ v" by simp
+      thus ?thesis
+      proof auto
+        fix v
+        assume "is_val v"
+        hence "eval (Rec e0 e1 (Succ v)) (safe_subst (safe_subst e1 v) (Rec e0 e1 v))" by simp
+        thus "EX x. eval (Rec e0 e1 (Succ v)) x" by auto
+      qed
+    qed
     thus ?thesis by simp
   next case False
-    from tsuc False have "\<exists>a. eval n a" by simp
-
-
-
-    hence "\<exists>a. eval (Succ n) (Succ a)" sorry
-    thus ?thesis by auto
+    with trec have "\<exists>a. eval e a" by simp
+    thus ?thesis
+    proof auto
+      fix a
+      assume "eval e a"
+      hence "eval (Rec e0 e1 e) (Rec e0 e1 a)" by simp
+      thus "EX x. eval (Rec e0 e1 e) x" by auto
+    qed
   qed
-next case trec
-
-
-
-  thus ?case sorry
 next case tlam
   thus ?case by simp
-next case tapp
-
-
-
-  thus ?case sorry
+next case (tapp env e1 t2 t e2)
+  from tapp have "typecheck env e1 (Arr t2 t)" by simp
+  from tapp have "typecheck env e2 t2" by simp
+  from tapp have "is_val e2 \<or> (\<exists>a. eval e2 a)" by simp
+  thus ?case
+  proof (cases "is_val e1")
+  case True
+    with tapp have "EX v. e1 = Lam t2 v & typecheck (extend_at env 0 t2) v t" by (simp add: canonical_arr)
+    hence e1_is_lam: "EX v. e1 = Lam t2 v" by auto
+    thus ?thesis 
+    proof (cases "is_val e2")
+    case True
+      with e1_is_lam show ?thesis
+      proof auto
+        fix v
+        assume "is_val e2"
+        hence "eval (Ap (Lam t2 v) e2) (safe_subst v e2)" by simp
+        thus "EX x. eval (Ap (Lam t2 v) e2) x" by auto
+      qed
+    next case False
+      with tapp have "\<exists>a. eval e2 a" by simp
+      thus ?thesis
+      proof auto
+        fix a
+        assume "eval e2 a"
+        moreover from True have "is_val e1" by simp
+        ultimately have "eval (Ap e1 e2) (Ap e1 a)" by simp
+        thus "EX x. eval (Ap e1 e2) x" by auto
+      qed
+    qed
+  next case False
+    with tapp have "\<exists>a. eval e1 a" by simp
+    thus ?thesis
+    proof auto
+      fix a
+      assume "eval e1 a"
+      hence "eval (Ap e1 e2) (Ap a e2)" by simp
+      thus "EX x. eval (Ap e1 e2) x" by auto
+    qed
+  qed
 qed 
 
 
