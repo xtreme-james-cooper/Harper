@@ -8,9 +8,10 @@ datatype expr =
   Var nat 
 | Zero
 | Succ expr
-| Rec expr expr expr
+| IsZ expr expr expr
 | Lam type expr
 | Ap expr expr
+| Fix type expr
 
 definition redr_set :: "nat set => nat set"
 where "redr_set xs = (%n. case n of 0 => undefined | Suc n => n) ` (xs - {0})"
@@ -31,17 +32,19 @@ primrec free_vars :: "expr => nat set"
 where "free_vars (Var v) = {v}"
     | "free_vars Zero = {}"
     | "free_vars (Succ e) = free_vars e"
-    | "free_vars (Rec e0 e1 et) = free_vars e0 Un free_vars et Un redr_set (redr_set (free_vars e1))"
+    | "free_vars (IsZ e0 e1 et) = free_vars e0 Un free_vars et Un redr_set (free_vars e1)"
     | "free_vars (Lam t b) = redr_set (free_vars b)"
     | "free_vars (Ap e1 e2) = free_vars e1 Un free_vars e2"
+    | "free_vars (Fix t b) = redr_set (free_vars b)"
 
 primrec incr_from :: "nat => expr => expr"
 where "incr_from n (Var v) = Var (if v < n then v else Suc v)"
     | "incr_from n Zero = Zero"
     | "incr_from n (Succ e) = Succ (incr_from n e)"
-    | "incr_from n (Rec e0 e1 et) = Rec (incr_from n e0) (incr_from (Suc (Suc n)) e1) (incr_from n et)"
+    | "incr_from n (IsZ e0 e1 et) = IsZ (incr_from n e0) (incr_from (Suc n) e1) (incr_from n et)"
     | "incr_from n (Lam t b) = Lam t (incr_from (Suc n) b)"
     | "incr_from n (Ap e1 e2) = Ap (incr_from n e1) (incr_from n e2)"
+    | "incr_from n (Fix t b) = Fix t (incr_from (Suc n) b)"
 
 lemma [simp]: "free_vars (incr_from n e) = (%v. if v < n then v else Suc v) ` free_vars e"
 proof (induction e arbitrary: n)
@@ -51,14 +54,14 @@ next case Zero
   thus ?case by simp
 next case Succ
   thus ?case by simp
-next case (Rec e0 e1 e)
+next case (IsZ e0 e1 e)
   thus ?case
   proof auto
-    fix x
-    show "x ~: Suc ` ((free_vars e0 Un free_vars e Un redr_set (redr_set (free_vars e1))) Int {v. ~ v < n}) ==> Suc x : free_vars e1 ==> x < Suc n" by (cases x, auto)
+    fix xa
+    show "xa ~: Suc ` ((free_vars e0 Un free_vars e Un redr_set (free_vars e1)) Int {v. ~ v < n}) ==> xa : free_vars e1 ==> ~ xa < Suc n ==> xa : free_vars e0" by (cases xa, auto)
   next
-    fix x
-    show "x ~: Suc ` ((free_vars e0 Un free_vars e Un redr_set (redr_set (free_vars e1))) Int {v. ~ v < n}) ==> Suc x : free_vars e1 ==> x < Suc n" by (cases x, auto)
+    fix xa
+    show "xa ~: Suc ` ((free_vars e0 Un free_vars e Un redr_set (free_vars e1)) Int {v. ~ v < n}) ==> xa : free_vars e1 ==> ~ xa < Suc n ==> False" by (cases xa, auto)
   qed
 next case (Lam t b)
   thus ?case
@@ -71,23 +74,34 @@ next case (Lam t b)
   qed
 next case Ap
   thus ?case by auto
+next case (Fix t b)
+  thus ?case
+  proof auto
+    fix xa
+    show "xa ~: Suc ` (redr_set (free_vars b) Int {v. ~ v < n}) ==> xa : free_vars b ==> ~ xa < Suc n ==> Suc xa : free_vars b" by (cases xa, simp_all)
+  next
+    fix xa
+    show "xa ~: Suc ` (redr_set (free_vars b) Int {v. ~ v < n}) ==> xa : free_vars b ==> ~ xa < Suc n ==> False" by (cases xa, simp_all)
+  qed
 qed
 
 primrec sub_from :: "nat => expr => expr"
 where "sub_from n (Var v) = Var (if v < n then v else if v = n then undefined else v - 1)"
     | "sub_from n Zero = Zero"
     | "sub_from n (Succ e) = Succ (sub_from n e)"
-    | "sub_from n (Rec e0 e1 et) = Rec (sub_from n e0) (sub_from (Suc (Suc n)) e1) (sub_from n et)"
+    | "sub_from n (IsZ e0 e1 et) = IsZ (sub_from n e0) (sub_from (Suc n) e1) (sub_from n et)"
     | "sub_from n (Lam t b) = Lam t (sub_from (Suc n) b)"
     | "sub_from n (Ap e1 e2) = Ap (sub_from n e1) (sub_from n e2)"
+    | "sub_from n (Fix t b) = Fix t (sub_from (Suc n) b)"
 
 primrec subst :: "expr => expr => nat => expr"
 where "subst (Var v) e x = (if v = x then e else Var v)"
     | "subst Zero e x = Zero"
     | "subst (Succ n) e x = Succ (subst n e x)"
-    | "subst (Rec e0 e1 et) e x = Rec (subst e0 e x) (subst e1 (incr_from 0 (incr_from 0 e)) (Suc (Suc x))) (subst et e x)"
+    | "subst (IsZ e0 e1 et) e x = IsZ (subst e0 e x) (subst e1 (incr_from 0 e) (Suc x)) (subst et e x)"
     | "subst (Lam t b) e x = Lam t (subst b (incr_from 0 e) (Suc x))"
     | "subst (Ap e1 e2) e x = Ap (subst e1 e x) (subst e2 e x)"
+    | "subst (Fix t b) e x = Fix t (subst b (incr_from 0 e) (Suc x))"
 
 definition safe_subst :: "expr => expr => expr"
 where "safe_subst e e' = sub_from 0 (subst e (incr_from 0 e') 0)"
@@ -100,31 +114,35 @@ where tvar [simp]: "lookup env v = Some t ==> typecheck env (Var v) t"
     | tzer [simp]: "typecheck env Zero Nat"    
     | tsuc [simp]: "typecheck env n Nat ==> typecheck env (Succ n) Nat"
     | trec [simp]: "typecheck env e Nat ==> typecheck env e0 t ==> 
-                        typecheck (extend_at (extend_at env 0 t) 0 Nat) e1 t ==> 
-                            typecheck env (Rec e0 e1 e) t"
+                        typecheck (extend_at env 0 Nat) e1 t ==> 
+                            typecheck env (IsZ e0 e1 e) t"
     | tlam [simp]: "typecheck (extend_at env 0 r) e t ==> typecheck env (Lam r e) (Arr r t)"
     | tapp [simp]: "typecheck env e1 (Arr t2 t) ==> typecheck env e2 t2 ==> 
                         typecheck env (Ap e1 e2) t"
+    | tfix [simp]: "typecheck (extend_at env 0 t) b t ==> typecheck env (Fix t b) t"
 
 inductive_cases [elim!]: "typecheck e (Var x) t"
 inductive_cases [elim!]: "typecheck e Zero t"
 inductive_cases [elim!]: "typecheck e (Succ x) t"
-inductive_cases [elim!]: "typecheck e (Rec x y z) t"
+inductive_cases [elim!]: "typecheck e (IsZ x y z) t"
 inductive_cases [elim!]: "typecheck e (Lam x y) t"
 inductive_cases [elim!]: "typecheck e (Ap x y) t"
+inductive_cases [elim!]: "typecheck e (Fix x y) t"
 
 lemma inv_var: "typecheck env (Var v) t ==> lookup env v = Some t" 
-by (induction env "Var v" t rule: typecheck.induct, simp)
+by auto
 lemma inv_zer: "typecheck env Zero t ==> t = Nat" 
-by (induction env Zero t rule: typecheck.induct, simp)
+by auto
 lemma inv_suc: "typecheck env (Succ n) t ==> t = Nat & typecheck env n Nat"
-by (induction env "Succ n" t rule: typecheck.induct, simp)
-lemma inv_rec: "typecheck env (Rec e0 e1 e) t ==> typecheck env e Nat & typecheck env e0 t & typecheck (extend_at (extend_at env 0 t) 0 Nat) e1 t"
-by (induction env "Rec e0 e1 e" t rule: typecheck.induct, simp)
+by auto
+lemma inv_rec: "typecheck env (IsZ e0 e1 e) t ==> typecheck env e Nat & typecheck env e0 t & typecheck (extend_at env 0 Nat) e1 t"
+by auto
 lemma inv_lam: "typecheck env (Lam r e) t ==> EX t'. t = Arr r t' & typecheck (extend_at env 0 r) e t'"
-by (induction env "Lam r e" t rule: typecheck.induct, simp)
+by auto
 lemma inv_app: "typecheck env (Ap e1 e2) t ==> EX t2. typecheck env e1 (Arr t2 t) & typecheck env e2 t2"
-by (induction env "Ap e1 e2" t rule: typecheck.induct, auto)
+by auto
+lemma inv_fix: "typecheck env (Fix r b) t ==> t = r & typecheck (extend_at env 0 t) b t"
+by auto
                         
 lemma [simp]: "typecheck env e t ==> typecheck (extend_at env n k) (incr_from n e) t"
 proof (induction env e t arbitrary: n rule: typecheck.induct)
@@ -135,7 +153,7 @@ next case tzer
 next case tsuc
   thus ?case by simp
 next case (trec env e e0 t e1)
-  hence "typecheck (extend_at (extend_at (extend_at env 0 t) 0 Nat) (Suc (Suc n)) k) (incr_from (Suc (Suc n)) e1) t" by simp
+  hence "typecheck (extend_at (extend_at env 0 Nat) (Suc n) k) (incr_from (Suc n) e1) t" by simp
   with trec show ?case by (simp add: extend_at_swap)
 next case (tlam env r b t)
   hence "typecheck (extend_at (extend_at env 0 r) (Suc n) k) (incr_from (Suc n) b) t" by simp
@@ -144,6 +162,9 @@ next case (tapp env e1 t2 t e2)
   from tapp have "typecheck (extend_at env n k) (incr_from n e1) (Arr t2 t)" by simp
   moreover from tapp have "typecheck (extend_at env n k) (incr_from n e2) t2" by simp
   ultimately show ?case by simp
+next case (tfix env t b)
+  hence "typecheck (extend_at (extend_at env 0 t) (Suc n) k) (incr_from (Suc n) b) t" by simp
+  thus ?case by (simp add: extend_at_swap)
 qed
 
 lemma [simp]: "typecheck (extend_at env n k) e t ==> n ~: free_vars e ==> typecheck env (sub_from n e) t"
@@ -155,15 +176,17 @@ next case tzer
 next case tsuc
   thus ?case by simp
 next case (trec e e0 t e1)
-  moreover hence "Suc (Suc n) ~: free_vars e1" by auto
-  moreover have "extend_at (extend_at (extend_at env n k) 0 t) 0 Nat = extend_at (extend_at (extend_at env 0 t) 0 Nat) (Suc (Suc n)) k" by (simp add: extend_at_swap)
+  moreover hence "Suc n ~: free_vars e1" by auto
+  moreover have "extend_at (extend_at env n k) 0 Nat = extend_at (extend_at env 0 Nat) (Suc n) k" by (simp add: extend_at_swap)
   ultimately show ?case by simp
-next case (tlam r b t)
+next case tlam
   thus ?case by (simp add: extend_at_swap)
 next case (tapp e1 t2 t e2)
   from tapp have "typecheck env (sub_from n e1) (Arr t2 t)" by simp
   moreover from tapp have "typecheck env (sub_from n e2) t2" by simp
   ultimately show ?case by simp
+next case tfix
+  thus ?case by (simp add: extend_at_swap)
 qed
 
 lemma [simp]: "typecheck (extend env x t') e t ==> typecheck env e' t' ==> typecheck env (subst e e' x) t"
@@ -182,6 +205,8 @@ next case (tapp e1 t2 t e2)
   from tapp have "typecheck env (subst e1 e' x) (Arr t2 t)" by simp
   moreover from tapp have "typecheck env (subst e2 e' x) t2" by simp
   ultimately show ?case by simp
+next case tfix
+  thus ?case by simp
 qed 
 
 lemma [simp]: "typecheck (extend_at env 0 t') e t ==> typecheck env e' t' ==> typecheck env (safe_subst e e') t"
@@ -196,18 +221,20 @@ primrec is_val :: "expr => bool"
 where "is_val (Var v) = False"
     | "is_val Zero = True"
     | "is_val (Succ n) = is_val n"
-    | "is_val (Rec e0 e1 et) = False"
+    | "is_val (IsZ e0 e1 et) = False"
     | "is_val (Lam t b) = True"
     | "is_val (Ap e1 e2) = False"
+    | "is_val (Fix t b) = False"
 
 inductive eval :: "expr => expr => bool"
 where esuc [simp]: "eval n n' ==> eval (Succ n) (Succ n')"
     | eap1 [simp]: "eval e1 e1' ==> eval (Ap e1 e2) (Ap e1' e2)"
     | eap2 [simp]: "is_val e1 ==> eval e2 e2' ==> eval (Ap e1 e2) (Ap e1 e2')"
     | eap3 [simp]: "is_val e2 ==> eval (Ap (Lam t b) e2) (safe_subst b e2)"
-    | erc1 [simp]: "eval e e' ==> eval (Rec e0 e1 e) (Rec e0 e1 e')"
-    | erc2 [simp]: "eval (Rec e0 e1 Zero) e0"
-    | erc3 [simp]: "is_val e ==> eval (Rec e0 e1 (Succ e)) (safe_subst (safe_subst e1 e) (Rec e0 e1 e))"
+    | eiz1 [simp]: "eval e e' ==> eval (IsZ e0 e1 e) (IsZ e0 e1 e')"
+    | eiz2 [simp]: "eval (IsZ e0 e1 Zero) e0"
+    | eiz3 [simp]: "is_val e ==> eval (IsZ e0 e1 (Succ e)) (safe_subst e1 e)"
+    | efix [simp]: "eval (Fix t b) (safe_subst b (Fix t b))"
 
 lemma canonical_nat: "typecheck env e Nat ==> is_val e ==> e = Zero | (EX v. typecheck env v Nat & is_val v & e = Succ v)"
 by (induction e, auto)
@@ -234,13 +261,14 @@ next case eap2
   thus ?case by auto
 next case eap3
   thus ?case by auto
-next case erc1
+next case eiz1
   thus ?case by auto
-next case erc2
+next case eiz2
   thus ?case by auto
-next case (erc3 e e0 e1)
-  moreover hence "typecheck (extend_at env 0 t) (safe_subst e1 e) t" by (auto simp add: tc_can_nat)
-  ultimately show ?case by auto
+next case eiz3
+  thus ?case by auto
+next case efix
+  thus ?case by auto
 qed
 
 theorem progress: "typecheck env e t ==> env = empty_map ==> is_val e | (EX e'. eval e e')"
@@ -261,11 +289,11 @@ next case (trec env e e0 t e1)
   thus ?case
   proof (cases "is_val e")
   case True
-    have "EX x. eval (Rec e0 e1 e) x"
+    have "EX x. eval (IsZ e0 e1 e) x"
     proof (cases "e = Zero")
     case True
       def e0' == e0
-      have "eval (Rec e0 e1 Zero) e0'" by (simp add: e0'_def)
+      have "eval (IsZ e0 e1 Zero) e0'" by (simp add: e0'_def)
       with True show ?thesis by auto
     next case False
       from trec True have "e = Zero | (EX v. typecheck env v Nat & is_val v & e = Succ v)" by (simp add: canonical_nat)
@@ -274,8 +302,8 @@ next case (trec env e e0 t e1)
       proof auto
         fix v
         assume "is_val v"
-        hence "eval (Rec e0 e1 (Succ v)) (safe_subst (safe_subst e1 v) (Rec e0 e1 v))" by simp
-        thus "EX x. eval (Rec e0 e1 (Succ v)) x" by auto
+        hence "eval (IsZ e0 e1 (Succ v)) (safe_subst e1 v)" by simp
+        thus "EX x. eval (IsZ e0 e1 (Succ v)) x" by auto
       qed
     qed
     thus ?thesis by simp
@@ -285,8 +313,8 @@ next case (trec env e e0 t e1)
     proof auto
       fix a
       assume "eval e a"
-      hence "eval (Rec e0 e1 e) (Rec e0 e1 a)" by simp
-      thus "EX x. eval (Rec e0 e1 e) x" by auto
+      hence "eval (IsZ e0 e1 e) (IsZ e0 e1 a)" by simp
+      thus "EX x. eval (IsZ e0 e1 e) x" by auto
     qed
   qed
 next case tlam
@@ -331,6 +359,10 @@ next case (tapp env e1 t2 t e2)
       thus "EX x. eval (Ap e1 e2) x" by auto
     qed
   qed
+next case (tfix env t b)
+  def b' == "safe_subst b (Fix t b)"
+  have "eval (Fix t b) b'" by (simp add: b'_def)
+  thus ?case by auto
 qed 
 
 end
