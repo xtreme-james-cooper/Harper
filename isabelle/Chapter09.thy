@@ -52,12 +52,23 @@ next case Zero
 next case Succ
   thus ?case by simp
 next case (Rec e0 e1 e)
-
-  with Rec show ?case by simp sorry
+  thus ?case
+  proof auto
+    fix x
+    show "x ~: Suc ` ((free_vars e0 Un free_vars e Un redr_set (redr_set (free_vars e1))) Int {v. ~ v < n}) ==> Suc x : free_vars e1 ==> x < Suc n" by (cases x, auto)
+  next
+    fix x
+    show "x ~: Suc ` ((free_vars e0 Un free_vars e Un redr_set (redr_set (free_vars e1))) Int {v. ~ v < n}) ==> Suc x : free_vars e1 ==> x < Suc n" by (cases x, auto)
+  qed
 next case (Lam t b)
-
-
-  with Lam show ?case by simp sorry
+  thus ?case
+  proof auto
+    fix xa
+    show "xa ~: Suc ` (redr_set (free_vars b) Int {v. ~ v < n}) ==> xa : free_vars b ==> ~ xa < Suc n ==> Suc xa : free_vars b" by (cases xa, simp_all)
+  next
+    fix xa
+    show "xa ~: Suc ` (redr_set (free_vars b) Int {v. ~ v < n}) ==> xa : free_vars b ==> ~ xa < Suc n ==> False" by (cases xa, simp_all)
+  qed
 next case Ap
   thus ?case by auto
 qed
