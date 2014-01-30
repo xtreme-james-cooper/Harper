@@ -113,7 +113,7 @@ where "sub_from n (Var v) = Var (if v < n then v else if v = n then undefined el
     | "sub_from n (Lam t b) = Lam t (sub_from (Suc n) b)"
     | "sub_from n (Ap e1 e2) = Ap (sub_from n e1) (sub_from n e2)"
     | "sub_from n (Fix t b) = Fix t (sub_from (Suc n) b)"
-    | "sub_from n Triv = Zero"
+    | "sub_from n Triv = Triv"
     | "sub_from n (Pair e1 e2) = Pair (sub_from n e1) (sub_from n e2)"
     | "sub_from n (ProjL e) = ProjL (sub_from n e)"
     | "sub_from n (ProjR e) = ProjR (sub_from n e)"
@@ -213,10 +213,12 @@ next case ttrv
   thus ?case by simp
 next case tpar
   thus ?case by simp
-next case tprl
-  thus ?case by simp sorry
-next case tprr
-  thus ?case by simp sorry
+next case (tprl env e t1 t2)
+  hence "typecheck (extend_at env n k) (incr_from n e) (Prod t1 t2)" by simp
+  thus ?case by simp 
+next case (tprr env e t1 t2)
+  hence "typecheck (extend_at env n k) (incr_from n e) (Prod t1 t2)" by simp
+  thus ?case by simp
 qed
 
 lemma [simp]: "typecheck (extend_at env n k) e t ==> n ~: free_vars e ==> typecheck env (sub_from n e) t"
@@ -240,13 +242,15 @@ next case (tapp e1 t2 t e2)
 next case tfix
   thus ?case by (simp add: extend_at_swap)
 next case ttrv
-  thus ?case by simp sorry
+  thus ?case by simp
 next case tpar
   thus ?case by simp
-next case tprl
-  thus ?case by simp sorry
-next case tprr
-  thus ?case by simp sorry
+next case (tprl e t1 t2)
+  hence "typecheck env (sub_from n e) (Prod t1 t2)" by simp
+  thus ?case by simp
+next case (tprr e t1 t2)
+  hence "typecheck env (sub_from n e) (Prod t1 t2)" by simp
+  thus ?case by simp
 qed
 
 lemma [simp]: "typecheck (extend env x t') e t ==> typecheck env e' t' ==> typecheck env (subst e e' x) t"
@@ -271,10 +275,12 @@ next case ttrv
   thus ?case by simp
 next case tpar
   thus ?case by simp
-next case tprl
-  thus ?case by simp sorry
-next case tprr
-  thus ?case by simp sorry
+next case (tprl e t1 t2)
+  hence "typecheck env (subst e e' x) (Prod t1 t2)" by simp
+  thus ?case by simp
+next case (tprr e t1 t2)
+  hence "typecheck env (subst e e' x) (Prod t1 t2)" by simp
+  thus ?case by simp
 qed 
 
 lemma [simp]: "typecheck (extend_at env 0 t') e t ==> typecheck env e' t' ==> typecheck env (safe_subst e e') t"
@@ -331,7 +337,7 @@ by (induction e, auto)
 lemma canonical_unit: "typecheck env e Unit ==> is_val e ==> e = Triv"
 by (induction e, auto)
 
-lemma canonical_prod: "typecheck env e (Prod t1 t2) ==> is_val e ==> (EX e1 e2. e = Pair e1 e2 & typecheck env e1 t1 & typecheck env e2 t2)"
+lemma canonical_prod: "typecheck env e (Prod t1 t2) ==> is_val e ==> (EX e1 e2. e = Pair e1 e2 & typecheck env e1 t1 & typecheck env e2 t2 & is_val e1 & is_val e2)"
 by (induction e, auto)
 
 theorem preservation: "eval e e' ==> typecheck env e t ==> typecheck env e' t"
@@ -357,12 +363,16 @@ next case epa1
   thus ?case by auto
 next case epa2
   thus ?case by auto
-next case epl1
-  thus ?case by auto sorry
+next case (epl1 e e')
+  hence "!!t2. typecheck env e (Prod t t2) ==> typecheck env e' (Prod t t2)" by simp
+  with epl1 have "EX t2. typecheck env e' (Prod t t2)" by auto
+  thus ?case by auto
 next case epl2
   thus ?case by auto
-next case epr1
-  thus ?case by auto sorry
+next case (epr1 e e')
+  hence "!!t1. typecheck env e (Prod t1 t) ==> typecheck env e' (Prod t1 t)" by simp
+  with epr1 have "EX t1. typecheck env e' (Prod t1 t)" by auto
+  thus ?case by auto
 next case epr2
   thus ?case by auto
 qed
@@ -461,12 +471,83 @@ next case (tfix env t b)
   thus ?case by auto
 next case ttrv
   thus ?case by simp
-next case tpar
-  thus ?case by simp sorry
-next case tprl
-  thus ?case by simp sorry
-next case tprr
-  thus ?case by simp sorry
+next case (tpar env e1 t1 e2 t2)
+  thus ?case
+  proof (cases "is_val e1")
+  case True
+    hence X: "is_val e1" by simp
+    thus ?thesis
+    proof (cases "is_val e2")
+    case True
+      with X show ?thesis by simp  
+    next case False
+      with tpar have "EX a. eval e2 a" by simp
+      hence "EX a. eval (Pair e1 e2) a"
+      proof auto
+        fix e2'
+        assume "eval e2 e2'"
+        with True have "eval (Pair e1 e2) (Pair e1 e2')" by simp
+        thus "EX a. eval (Pair e1 e2) a" by auto
+      qed
+      thus ?thesis by simp  
+    qed
+  next case False
+    with tpar have "EX a. eval e1 a" by simp
+    hence "EX a. eval (Pair e1 e2) a"
+    proof auto
+      fix e1'
+      assume "eval e1 e1'"
+      hence "eval (Pair e1 e2) (Pair e1' e2)" by simp
+      thus "EX a. eval (Pair e1 e2) a" by auto
+    qed
+    with False show ?thesis by simp
+  qed
+next case (tprl env e t1 t2)
+  thus ?case
+  proof (cases "is_val e")
+  case True
+    with tprl have "EX e1 e2. e = Pair e1 e2 & typecheck env e1 t1 & typecheck env e2 t2 & is_val e1 & is_val e2" by (simp add: canonical_prod)
+    thus ?thesis
+    proof auto
+      fix e1 e2
+      assume "is_val e1"
+         and "is_val e2"
+      hence "eval (ProjL (Pair e1 e2)) e1" by simp
+      thus "EX a. eval (ProjL (Pair e1 e2)) a" by auto
+    qed
+  next case False
+    with tprl have "EX a. eval e a" by simp
+    thus ?thesis
+    proof auto
+      fix a
+      assume "eval e a"
+      hence "eval (ProjL e) (ProjL a)" by simp
+      thus "EX a. eval (ProjL e) a" by auto
+    qed
+  qed
+next case (tprr env e t1 t2)
+  thus ?case
+  proof (cases "is_val e")
+  case True
+    with tprr have "EX e1 e2. e = Pair e1 e2 & typecheck env e1 t1 & typecheck env e2 t2 & is_val e1 & is_val e2" by (simp add: canonical_prod)
+    thus ?thesis
+    proof auto
+      fix e1 e2
+      assume "is_val e1"
+         and "is_val e2"
+      hence "eval (ProjR (Pair e1 e2)) e2" by simp
+      thus "EX a. eval (ProjR (Pair e1 e2)) a" by auto
+    qed
+  next case False
+    with tprr have "EX a. eval e a" by simp
+    thus ?thesis
+    proof auto
+      fix a
+      assume "eval e a"
+      hence "eval (ProjR e) (ProjR a)" by simp
+      thus "EX a. eval (ProjR e) a" by auto
+    qed
+  qed
 qed 
 
 end
