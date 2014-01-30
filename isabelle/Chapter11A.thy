@@ -2,7 +2,7 @@ theory Chapter11A
 imports AssocList
 begin
 
-datatype type = Nat | Arr type type
+datatype type = Nat | Arr type type | Unit | Prod type type
 
 datatype expr = 
   Var nat 
@@ -12,6 +12,10 @@ datatype expr =
 | Lam type expr
 | Ap expr expr
 | Fix type expr
+| Triv
+| Pair expr expr
+| ProjL expr
+| ProjR expr
 
 definition redr_set :: "nat set => nat set"
 where "redr_set xs = (%n. case n of 0 => undefined | Suc n => n) ` (xs - {0})"
@@ -36,6 +40,10 @@ where "free_vars (Var v) = {v}"
     | "free_vars (Lam t b) = redr_set (free_vars b)"
     | "free_vars (Ap e1 e2) = free_vars e1 Un free_vars e2"
     | "free_vars (Fix t b) = redr_set (free_vars b)"
+    | "free_vars Triv = {}"
+    | "free_vars (Pair e1 e2) = free_vars e1 Un free_vars e2"
+    | "free_vars (ProjL e) = free_vars e"
+    | "free_vars (ProjR e) = free_vars e"
 
 primrec incr_from :: "nat => expr => expr"
 where "incr_from n (Var v) = Var (if v < n then v else Suc v)"
@@ -45,6 +53,10 @@ where "incr_from n (Var v) = Var (if v < n then v else Suc v)"
     | "incr_from n (Lam t b) = Lam t (incr_from (Suc n) b)"
     | "incr_from n (Ap e1 e2) = Ap (incr_from n e1) (incr_from n e2)"
     | "incr_from n (Fix t b) = Fix t (incr_from (Suc n) b)"
+    | "incr_from n Triv = Triv"
+    | "incr_from n (Pair e1 e2) = Pair (incr_from n e1) (incr_from n e2)"
+    | "incr_from n (ProjL e) = ProjL (incr_from n e)"
+    | "incr_from n (ProjR e) = ProjR (incr_from n e)"
 
 lemma [simp]: "free_vars (incr_from n e) = (%v. if v < n then v else Suc v) ` free_vars e"
 proof (induction e arbitrary: n)
@@ -83,6 +95,14 @@ next case (Fix t b)
     fix xa
     show "xa ~: Suc ` (redr_set (free_vars b) Int {v. ~ v < n}) ==> xa : free_vars b ==> ~ xa < Suc n ==> False" by (cases xa, simp_all)
   qed
+next case Triv
+  thus ?case by simp
+next case Pair
+  thus ?case by auto
+next case ProjL
+  thus ?case by simp
+next case ProjR
+  thus ?case by simp
 qed
 
 primrec sub_from :: "nat => expr => expr"
@@ -93,6 +113,10 @@ where "sub_from n (Var v) = Var (if v < n then v else if v = n then undefined el
     | "sub_from n (Lam t b) = Lam t (sub_from (Suc n) b)"
     | "sub_from n (Ap e1 e2) = Ap (sub_from n e1) (sub_from n e2)"
     | "sub_from n (Fix t b) = Fix t (sub_from (Suc n) b)"
+    | "sub_from n Triv = Zero"
+    | "sub_from n (Pair e1 e2) = Pair (sub_from n e1) (sub_from n e2)"
+    | "sub_from n (ProjL e) = ProjL (sub_from n e)"
+    | "sub_from n (ProjR e) = ProjR (sub_from n e)"
 
 primrec subst :: "expr => expr => nat => expr"
 where "subst (Var v) e x = (if v = x then e else Var v)"
@@ -102,6 +126,10 @@ where "subst (Var v) e x = (if v = x then e else Var v)"
     | "subst (Lam t b) e x = Lam t (subst b (incr_from 0 e) (Suc x))"
     | "subst (Ap e1 e2) e x = Ap (subst e1 e x) (subst e2 e x)"
     | "subst (Fix t b) e x = Fix t (subst b (incr_from 0 e) (Suc x))"
+    | "subst Triv e x = Triv"
+    | "subst (Pair e1 e2) e x = Pair (subst e1 e x) (subst e2 e x)"
+    | "subst (ProjL n) e x = ProjL (subst n e x)"
+    | "subst (ProjR n) e x = ProjR (subst n e x)"
 
 definition safe_subst :: "expr => expr => expr"
 where "safe_subst e e' = sub_from 0 (subst e (incr_from 0 e') 0)"
@@ -120,6 +148,10 @@ where tvar [simp]: "lookup env v = Some t ==> typecheck env (Var v) t"
     | tapp [simp]: "typecheck env e1 (Arr t2 t) ==> typecheck env e2 t2 ==> 
                         typecheck env (Ap e1 e2) t"
     | tfix [simp]: "typecheck (extend_at env 0 t) b t ==> typecheck env (Fix t b) t"
+    | ttrv [simp]: "typecheck env Triv Unit"
+    | tpar [simp]: "typecheck env e1 t1 ==> typecheck env e2 t2 ==> typecheck env (Pair e1 e2) (Prod t1 t2)"
+    | tprl [simp]: "typecheck env e (Prod t1 t2) ==> typecheck env (ProjL e) t1"
+    | tprr [simp]: "typecheck env e (Prod t1 t2) ==> typecheck env (ProjR e) t2"
 
 inductive_cases [elim!]: "typecheck e (Var x) t"
 inductive_cases [elim!]: "typecheck e Zero t"
@@ -128,6 +160,10 @@ inductive_cases [elim!]: "typecheck e (IsZ x y z) t"
 inductive_cases [elim!]: "typecheck e (Lam x y) t"
 inductive_cases [elim!]: "typecheck e (Ap x y) t"
 inductive_cases [elim!]: "typecheck e (Fix x y) t"
+inductive_cases [elim!]: "typecheck e Triv t"
+inductive_cases [elim!]: "typecheck e (Pair x y) t"
+inductive_cases [elim!]: "typecheck e (ProjL x) t"
+inductive_cases [elim!]: "typecheck e (ProjR x) t"
 
 lemma inv_var: "typecheck env (Var v) t ==> lookup env v = Some t" 
 by auto
@@ -142,6 +178,14 @@ by auto
 lemma inv_app: "typecheck env (Ap e1 e2) t ==> EX t2. typecheck env e1 (Arr t2 t) & typecheck env e2 t2"
 by auto
 lemma inv_fix: "typecheck env (Fix r b) t ==> t = r & typecheck (extend_at env 0 t) b t"
+by auto
+lemma inv_tri: "typecheck env Triv t ==> t = Unit" 
+by auto
+lemma inv_par: "typecheck env (Pair e1 e2) t ==> (EX t1 t2. typecheck env e1 t1 & typecheck env e2 t2 & t = Prod t1 t2)"
+by auto
+lemma inv_prl: "typecheck env (ProjL e) t ==> (EX t2. typecheck env e (Prod t t2))"
+by auto
+lemma inv_prr: "typecheck env (ProjR e) t ==> (EX t1. typecheck env e (Prod t1 t))"
 by auto
                         
 lemma [simp]: "typecheck env e t ==> typecheck (extend_at env n k) (incr_from n e) t"
@@ -165,6 +209,14 @@ next case (tapp env e1 t2 t e2)
 next case (tfix env t b)
   hence "typecheck (extend_at (extend_at env 0 t) (Suc n) k) (incr_from (Suc n) b) t" by simp
   thus ?case by (simp add: extend_at_swap)
+next case ttrv
+  thus ?case by simp
+next case tpar
+  thus ?case by simp
+next case tprl
+  thus ?case by simp sorry
+next case tprr
+  thus ?case by simp sorry
 qed
 
 lemma [simp]: "typecheck (extend_at env n k) e t ==> n ~: free_vars e ==> typecheck env (sub_from n e) t"
@@ -187,6 +239,14 @@ next case (tapp e1 t2 t e2)
   ultimately show ?case by simp
 next case tfix
   thus ?case by (simp add: extend_at_swap)
+next case ttrv
+  thus ?case by simp sorry
+next case tpar
+  thus ?case by simp
+next case tprl
+  thus ?case by simp sorry
+next case tprr
+  thus ?case by simp sorry
 qed
 
 lemma [simp]: "typecheck (extend env x t') e t ==> typecheck env e' t' ==> typecheck env (subst e e' x) t"
@@ -207,6 +267,14 @@ next case (tapp e1 t2 t e2)
   ultimately show ?case by simp
 next case tfix
   thus ?case by simp
+next case ttrv
+  thus ?case by simp
+next case tpar
+  thus ?case by simp
+next case tprl
+  thus ?case by simp sorry
+next case tprr
+  thus ?case by simp sorry
 qed 
 
 lemma [simp]: "typecheck (extend_at env 0 t') e t ==> typecheck env e' t' ==> typecheck env (safe_subst e e') t"
@@ -225,6 +293,10 @@ where "is_val (Var v) = False"
     | "is_val (Lam t b) = True"
     | "is_val (Ap e1 e2) = False"
     | "is_val (Fix t b) = False"
+    | "is_val Triv = True"
+    | "is_val (Pair e1 e2) = (is_val e1 & is_val e2)"
+    | "is_val (ProjL e) = False"
+    | "is_val (ProjR e) = False"
 
 inductive eval :: "expr => expr => bool"
 where esuc [simp]: "eval n n' ==> eval (Succ n) (Succ n')"
@@ -235,6 +307,12 @@ where esuc [simp]: "eval n n' ==> eval (Succ n) (Succ n')"
     | eiz2 [simp]: "eval (IsZ e0 e1 Zero) e0"
     | eiz3 [simp]: "is_val e ==> eval (IsZ e0 e1 (Succ e)) (safe_subst e1 e)"
     | efix [simp]: "eval (Fix t b) (safe_subst b (Fix t b))"
+    | epa1 [simp]: "eval e1 e1' ==> eval (Pair e1 e2) (Pair e1' e2)"
+    | epa2 [simp]: "is_val e1 ==> eval e2 e2' ==> eval (Pair e1 e2) (Pair e1 e2')"
+    | epl1 [simp]: "eval e e' ==> eval (ProjL e) (ProjL e')"
+    | epl2 [simp]: "is_val e1 ==> is_val e2 ==> eval (ProjL (Pair e1 e2)) e1"
+    | epr1 [simp]: "eval e e' ==> eval (ProjR e) (ProjR e')"
+    | epr2 [simp]: "is_val e1 ==> is_val e2 ==> eval (ProjR (Pair e1 e2)) e2"
 
 lemma canonical_nat: "typecheck env e Nat ==> is_val e ==> e = Zero | (EX v. typecheck env v Nat & is_val v & e = Succ v)"
 by (induction e, auto)
@@ -248,6 +326,12 @@ proof -
 qed
 
 lemma canonical_arr: "typecheck env e (Arr t1 t2) ==> is_val e ==> (EX v. e = Lam t1 v & typecheck (extend_at env 0 t1) v t2)"
+by (induction e, auto)
+
+lemma canonical_unit: "typecheck env e Unit ==> is_val e ==> e = Triv"
+by (induction e, auto)
+
+lemma canonical_prod: "typecheck env e (Prod t1 t2) ==> is_val e ==> (EX e1 e2. e = Pair e1 e2 & typecheck env e1 t1 & typecheck env e2 t2)"
 by (induction e, auto)
 
 theorem preservation: "eval e e' ==> typecheck env e t ==> typecheck env e' t"
@@ -268,6 +352,18 @@ next case eiz2
 next case eiz3
   thus ?case by auto
 next case efix
+  thus ?case by auto
+next case epa1
+  thus ?case by auto
+next case epa2
+  thus ?case by auto
+next case epl1
+  thus ?case by auto sorry
+next case epl2
+  thus ?case by auto
+next case epr1
+  thus ?case by auto sorry
+next case epr2
   thus ?case by auto
 qed
 
@@ -363,6 +459,14 @@ next case (tfix env t b)
   def b' == "safe_subst b (Fix t b)"
   have "eval (Fix t b) b'" by (simp add: b'_def)
   thus ?case by auto
+next case ttrv
+  thus ?case by simp
+next case tpar
+  thus ?case by simp sorry
+next case tprl
+  thus ?case by simp sorry
+next case tprr
+  thus ?case by simp sorry
 qed 
 
 end
