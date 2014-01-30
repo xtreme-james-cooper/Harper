@@ -12,44 +12,28 @@ datatype expr =
 | Lam type expr
 | Ap expr expr
 
-definition sub_one :: "nat => nat"
-where "sub_one n = (case n of 0 => undefined | Suc n => n)"
+definition redr_set :: "nat set => nat set"
+where "redr_set xs = (%n. case n of 0 => undefined | Suc n => n) ` (xs - {0})"
 
-lemma [simp]: "sub_one (Suc n) = n"
-by (simp add: sub_one_def)
-
-lemma [simp]: "n > 0 ==> Suc (sub_one n) = n"
-by (cases n, simp_all)
+lemma [simp]: "(n : redr_set xs) = (Suc n : xs)" 
+proof (auto simp add: redr_set_def)
+  fix x
+  assume "x : xs"
+     and "Suc (case x of Suc n => n) ~: xs"
+  thus "x = 0" by (cases x, simp_all)
+next
+  assume "Suc n : xs"
+  hence "n = (case Suc n of Suc n => n) ==> n : (%x. case x of Suc n => n)`(xs - {0})" by blast
+  thus "n : (%x. case x of Suc n => n) ` (xs - {0})" by simp
+qed
 
 primrec free_vars :: "expr => nat set"
 where "free_vars (Var v) = {v}"
     | "free_vars Zero = {}"
     | "free_vars (Succ e) = free_vars e"
-    | "free_vars (Rec e0 e1 et) = free_vars e0 Un free_vars et Un (sub_one ` sub_one ` (free_vars e1 - {0, 1}))"
-    | "free_vars (Lam t b) = sub_one ` (free_vars b - {0})"
+    | "free_vars (Rec e0 e1 et) = free_vars e0 Un free_vars et Un redr_set (redr_set (free_vars e1))"
+    | "free_vars (Lam t b) = redr_set (free_vars b)"
     | "free_vars (Ap e1 e2) = free_vars e1 Un free_vars e2"
-
-(* "(n : free_vars (Lam t b)) = (Suc n : free_vars b)" *)
-(* "(n : free_vars (Rec e0 e1 e)) = (n : free_vars e0 | n : free_vars e | Suc (Suc n) : free_vars e1)" *)
-lemma [simp]: "(n : sub_one ` (xs - {0})) = (Suc n : xs)" 
-proof auto
-  fix x
-  assume "x : xs"
-     and "Suc (sub_one x) ~: xs"
-  thus "x = 0" by (cases x, simp_all)
-next
-  assume "Suc n : xs"
-  moreover have "n = sub_one (Suc n)" by simp
-  ultimately show "n \<in> sub_one ` (xs - {0})" by blast
-qed
-
-lemma [simp]: "Suc n : xs ==> n : sub_one ` xs"
-proof -
-  assume "Suc n : xs"
-  hence "n = sub_one (Suc n) ==> n : sub_one`xs" by blast
-  moreover have "n = sub_one (Suc n)" by simp
-  ultimately show ?thesis by simp
-qed
 
 primrec incr_from :: "nat => expr => expr"
 where "incr_from n (Var v) = Var (if v < n then v else Suc v)"
@@ -68,56 +52,12 @@ next case Zero
 next case Succ
   thus ?case by simp
 next case (Rec e0 e1 e)
-  have "sub_one ` sub_one ` ((%v. if v < (Suc (Suc n)) then v else Suc v) ` free_vars e1 - {0, 1}) = (%v. if v < n then v else Suc v) ` sub_one ` sub_one ` (free_vars e1 - {0, 1})" 
-  proof auto 
-    fix xb
-    show "0 < xb \<Longrightarrow> xb \<noteq> Suc 0 \<Longrightarrow> sub_one (sub_one xb) \<notin> Suc ` (sub_one ` sub_one ` (free_vars e1 - {0, Suc 0}) \<inter> {v. \<not> v < n}) \<Longrightarrow> xb \<in> free_vars e1 \<Longrightarrow> xb < Suc (Suc n) \<Longrightarrow> sub_one (sub_one xb) < n" 
 
-    sorry
-  next
-    show "\<And>v. sub_one v \<notin> Suc ` (sub_one ` sub_one ` (free_vars e1 - {0, Suc 0}) \<inter> {v. \<not> v < n}) \<Longrightarrow>
-        v \<in> free_vars e1 \<Longrightarrow> \<not> v < Suc (Suc n) \<Longrightarrow> sub_one v \<in> sub_one ` sub_one ` (free_vars e1 - {0, Suc 0})" 
-
-    sorry
-  next
-    fix v
-    show "sub_one v \<notin> Suc ` (sub_one ` sub_one ` (free_vars e1 - {0, Suc 0}) \<inter> {v. \<not> v < n}) \<Longrightarrow> v \<in> free_vars e1 \<Longrightarrow> \<not> v < Suc (Suc n) \<Longrightarrow> sub_one v < n" 
-
-
-    sorry
-  next 
-    show "\<And>xb. xb \<in> free_vars e1 \<Longrightarrow>
-         sub_one (sub_one xb) \<notin> sub_one ` sub_one ` (free_vars e1 \<inter> {v. v < Suc (Suc n)} \<union> Suc ` (free_vars e1 \<inter> {v. \<not> v < Suc (Suc n)}) - {0, Suc 0}) \<Longrightarrow>
-         0 < xb \<Longrightarrow> sub_one (sub_one xb) < n \<Longrightarrow> xb = Suc 0" 
-
-    sorry
-  next
-    show " \<And>xb. xb \<in> free_vars e1 \<Longrightarrow>
-         Suc (sub_one (sub_one xb)) \<notin> sub_one ` sub_one ` (free_vars e1 \<inter> {v. v < Suc (Suc n)} \<union> Suc ` (free_vars e1 \<inter> {v. \<not> v < Suc (Suc n)}) - {0, Suc 0}) \<Longrightarrow>
-         0 < xb \<Longrightarrow> \<not> sub_one (sub_one xb) < n \<Longrightarrow> xb = Suc 0 " 
-
-    sorry
-  qed
-  with Rec show ?case by auto
+  with Rec show ?case by simp sorry
 next case (Lam t b)
-  have "sub_one ` ((%v. if v < Suc n then v else Suc v) ` free_vars b - {0}) = (%v. if v < n then v else Suc v) ` sub_one ` (free_vars b - {0})" 
-  proof auto
-    fix xa
-    show "0 < xa ==> xa < Suc n ==> sub_one xa < n" by (cases xa, simp_all)
-  next
-    fix v
-    show "v ~: Suc ` (sub_one ` (free_vars b - {0}) Int {v. ~ v < n}) ==> v : free_vars b ==> ~ v < Suc n ==> Suc v : free_vars b" by (cases v, auto)  
-  next 
-    fix v
-    show "v ~: Suc ` (sub_one ` (free_vars b - {0}) Int {v. ~ v < n}) ==> v : free_vars b ==> ~ v < Suc n ==> False" by (cases v, auto)    
-  next  
-    fix xa
-    show "xa \<in> free_vars b ==> Suc (sub_one xa) ~: free_vars b ==> xa = 0" by (cases xa, auto)
-  next
-    fix xa
-    show "xa : free_vars b ==> Suc (Suc (sub_one xa)) ~: Suc ` (free_vars b Int {v. ~ v < Suc n}) ==> ~ sub_one xa < n ==> xa = 0" by (cases xa, auto)
-  qed
-  with Lam show ?case by simp
+
+
+  with Lam show ?case by simp sorry
 next case Ap
   thus ?case by auto
 qed
@@ -138,28 +78,11 @@ where "subst (Var v) e x = (if v = x then e else Var v)"
     | "subst (Lam t b) e x = Lam t (subst b (incr_from 0 e) (Suc x))"
     | "subst (Ap e1 e2) e x = Ap (subst e1 e x) (subst e2 e x)"
 
+definition safe_subst :: "expr => expr => expr"
+where "safe_subst e e' = sub_from 0 (subst e (incr_from 0 e') 0)"
+
 lemma [simp]: "free_vars (subst e e' x) = (if x : free_vars e then free_vars e - {x} Un free_vars e' else free_vars e)"
-proof (induction e arbitrary: e' x)
-case Var
-  thus ?case by simp
-next case Zero
-  thus ?case by simp
-next case Succ
-  thus ?case by simp
-next case (Rec e0 e1 e)
-
-
-
-  have "(if x \<in> free_vars e0 then free_vars e0 - {x} \<union> free_vars e' else free_vars e0) 
-     Un (if x \<in> free_vars e then free_vars e - {x} \<union> free_vars e' else free_vars e)
-     Un (sub_one ` sub_one ` (free_vars (subst e1 (incr_from 0 (incr_from 0 e')) (Suc (Suc x))) - {0, 1})) 
-          = (if x \<in> free_vars (Rec e0 e1 e) then free_vars (Rec e0 e1 e) - {x} \<union> free_vars e' else free_vars (Rec e0 e1 e))" sorry
-  with Rec show ?case by simp
-next case (Lam t b)
-  thus ?case by auto
-next case Ap
-  thus ?case by auto
-qed
+by (induction e arbitrary: e' x, auto)
 
 inductive typecheck :: "(nat, type) assoc => expr => type => bool"
 where tvar [simp]: "lookup env v = Some t ==> typecheck env (Var v) t"
@@ -249,9 +172,6 @@ next case (tapp e1 t2 t e2)
   moreover from tapp have "typecheck env (subst e2 e' x) t2" by simp
   ultimately show ?case by simp
 qed 
-
-definition safe_subst :: "expr => expr => expr"
-where "safe_subst e e' = sub_from 0 (subst e (incr_from 0 e') 0)"
 
 lemma [simp]: "typecheck (extend_at env 0 t') e t ==> typecheck env e' t' ==> typecheck env (safe_subst e e') t"
 proof (simp add: safe_subst_def)
