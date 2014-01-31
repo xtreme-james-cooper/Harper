@@ -121,8 +121,22 @@ next case InL
   thus ?case by simp
 next case InR
   thus ?case by simp
-next case Case
-  thus ?case by simp sorry
+next case (Case e el er)
+  thus ?case
+  proof auto
+    fix xa
+    show "xa ~: Suc ` ((free_vars e Un redr_set (free_vars el) Un redr_set (free_vars er)) Int {v. ~ v < n}) ==> 
+            xa : free_vars el ==> ~ xa < Suc n ==> xa : free_vars e" by (cases xa, simp_all)
+  next
+    fix xa
+    show "xa ~: Suc ` ((free_vars e Un redr_set (free_vars el) Un redr_set (free_vars er)) Int {v. ~ v < n}) ==> xa : free_vars el ==> ~ xa < Suc n ==> False" by (cases xa, simp_all)
+  next
+    fix xa
+    show "xa ~: Suc ` ((free_vars e Un redr_set (free_vars el) Un redr_set (free_vars er)) Int {v. ~ v < n}) ==> xa : free_vars er ==> ~ xa < Suc n ==> xa : free_vars e" by (cases xa, simp_all)
+  next
+    fix xa
+    show "xa ~: Suc ` ((free_vars e Un redr_set (free_vars el) Un redr_set (free_vars er)) Int {v. ~ v < n}) ==> xa : free_vars er ==> ~ xa < Suc n ==> False" by (cases xa, simp_all)
+  qed
 qed
 
 primrec sub_from :: "nat => expr => expr"
@@ -137,10 +151,10 @@ where "sub_from n (Var v) = Var (if v < n then v else if v = n then undefined el
     | "sub_from n (Pair e1 e2) = Pair (sub_from n e1) (sub_from n e2)"
     | "sub_from n (ProjL e) = ProjL (sub_from n e)"
     | "sub_from n (ProjR e) = ProjR (sub_from n e)"
-    | "sub_from n (Abort t e) = ProjL (sub_from n e)"
-    | "sub_from n (InL t t' e) = ProjL (sub_from n e)"
-    | "sub_from n (InR t t' e) = ProjL (sub_from n e)"
-    | "sub_from n (Case e el er) = ProjL (sub_from n e)"
+    | "sub_from n (Abort t e) = Abort t (sub_from n e)"
+    | "sub_from n (InL t t' e) = InL t t' (sub_from n e)"
+    | "sub_from n (InR t t' e) = InR t t' (sub_from n e)"
+    | "sub_from n (Case e el er) = Case (sub_from n e) (sub_from (Suc n) el) (sub_from (Suc n) er)"
 
 primrec subst :: "expr => expr => nat => expr"
 where "subst (Var v) e x = (if v = x then e else Var v)"
@@ -270,8 +284,11 @@ next case tinl
   thus ?case by simp
 next case tinr
   thus ?case by simp
-next case tcse
-  thus ?case by simp sorry
+next case (tcse env e t1 t2 el t er)
+  hence "typecheck (extend_at env n k) (incr_from n e) (Sum t1 t2)" by simp 
+  moreover from tcse have "typecheck (extend_at (extend_at env 0 t1) (Suc n) k) (incr_from (Suc n) el) t" by simp
+  moreover from tcse have "typecheck (extend_at (extend_at env 0 t2) (Suc n) k) (incr_from (Suc n) er) t" by simp
+  ultimately show ?case by (simp add: extend_at_swap)
 qed
 
 lemma [simp]: "typecheck (extend_at env n k) e t ==> n ~: free_vars e ==> typecheck env (sub_from n e) t"
@@ -305,13 +322,16 @@ next case (tprr e t1 t2)
   hence "typecheck env (sub_from n e) (Prod t1 t2)" by simp
   thus ?case by simp
 next case tabt
-  thus ?case by simp sorry
+  thus ?case by simp
 next case tinl
-  thus ?case by simp sorry
+  thus ?case by simp
 next case tinr
-  thus ?case by simp sorry
-next case tcse
-  thus ?case by simp sorry
+  thus ?case by simp
+next case (tcse e t1 t2 el t er)
+  hence "typecheck env (sub_from n e) (Sum t1 t2)" by simp 
+  moreover from tcse have "typecheck (extend_at env 0 t1) (sub_from (Suc n) el) t" by (simp add: extend_at_swap)
+  moreover from tcse have "typecheck (extend_at env 0 t2) (sub_from (Suc n) er) t" by (simp add: extend_at_swap)
+  ultimately show ?case by simp
 qed
 
 lemma [simp]: "typecheck (extend env x t') e t ==> typecheck env e' t' ==> typecheck env (subst e e' x) t"
@@ -348,8 +368,11 @@ next case tinl
   thus ?case by simp
 next case tinr
   thus ?case by simp
-next case tcse
-  thus ?case by simp sorry
+next case (tcse e t1 t2 el t er)
+  hence "typecheck env (subst e e' x) (Sum t1 t2)" by (simp add: extend_at_swap) 
+  moreover from tcse have "typecheck (extend_at env 0 t1) (subst el (incr_from 0 e') (Suc x)) t" by (simp add: extend_at_swap) 
+  moreover from tcse have "typecheck (extend_at env 0 t2) (subst er (incr_from 0 e') (Suc x)) t" by (simp add: extend_at_swap) 
+  ultimately show ?case by simp
 qed 
 
 lemma [simp]: "typecheck (extend_at env 0 t') e t ==> typecheck env e' t' ==> typecheck env (safe_subst e e') t"
@@ -402,14 +425,6 @@ where esuc [simp]: "eval n n' ==> eval (Succ n) (Succ n')"
 lemma canonical_nat: "typecheck env e Nat ==> is_val e ==> e = Zero | (EX v. typecheck env v Nat & is_val v & e = Succ v)"
 by (induction e, auto)
 
-lemma tc_can_nat: "typecheck env e Nat ==> is_val e ==> typecheck env' e Nat"
-proof -
-  assume "typecheck env e Nat"
-     and "is_val e"
-  hence "e = Zero | (EX v. typecheck env v Nat & is_val v & e = Succ v)" by (simp add: canonical_nat)
-  thus "typecheck env' e Nat" by (induction e, simp_all add: canonical_nat)
-qed
-
 lemma canonical_arr: "typecheck env e (Arr t1 t2) ==> is_val e ==> (EX v. e = Lam t1 v & typecheck (extend_at env 0 t1) v t2)"
 by (induction e, auto)
 
@@ -419,10 +434,11 @@ by (induction e, auto)
 lemma canonical_prod: "typecheck env e (Prod t1 t2) ==> is_val e ==> (EX e1 e2. e = Pair e1 e2 & typecheck env e1 t1 & typecheck env e2 t2 & is_val e1 & is_val e2)"
 by (induction e, auto)
 
-lemma canonical_void: "typecheck env e Void ==> is_val e ==> False"
+lemma canonical_void: "typecheck env e Void ==> ~ is_val e"
 by (induction e, auto)
 
-lemma canonical_sum: "typecheck env e (Sum t1 t2) ==> is_val e ==> (EX e'. (e = InL t1 t2 e' & typecheck env e' t1) | (e = InR t1 t2 e' & typecheck env e' t2))"
+lemma canonical_sum: "typecheck env e (Sum t1 t2) ==> is_val e ==> 
+      (EX e'. (e = InL t1 t2 e' & is_val e' & typecheck env e' t1)) | (EX e'. (e = InR t1 t2 e' & is_val e' & typecheck env e' t2))"
 by (induction e, auto)
 
 theorem preservation: "eval e e' ==> typecheck env e t ==> typecheck env e' t"
@@ -645,14 +661,57 @@ next case (tprr env e t1 t2)
       thus "EX a. eval (ProjR e) a" by auto
     qed
   qed
-next case tabt
-  thus ?case by simp sorry
-next case tinl
-  thus ?case by simp sorry
-next case tinr
-  thus ?case by simp sorry
-next case tcse
-  thus ?case by simp sorry
+next case (tabt env e t)
+  thus ?case
+  proof (cases "is_val e", auto simp add: canonical_void)
+    fix x
+    assume "eval e x"
+    hence "eval (Abort t e) (Abort t x)" by simp
+    thus "EX x. eval (Abort t e) x" by auto
+  qed
+next case (tinl env e t1 t2)
+  thus ?case 
+  proof (cases "is_val e", auto)
+    fix x
+    assume "eval e x"
+    hence "eval (InL t1 t2 e) (InL t1 t2 x)" by simp
+    thus "EX y. eval (InL t1 t2 e) y " by auto
+  qed
+next case (tinr env e t2 t1)
+  thus ?case 
+  proof (cases "is_val e", auto)
+    fix x
+    assume "eval e x"
+    hence "eval (InR t1 t2 e) (InR t1 t2 x)" by simp
+    thus "EX y. eval (InR t1 t2 e) y " by auto
+  qed
+next case (tcse env e t1 t2 el t er)
+  thus ?case
+  proof (cases "is_val e")
+  case True
+    with tcse have "(EX e'. e = InL t1 t2 e' & is_val e' & typecheck env e' t1) | (EX e'. e = InR t1 t2 e' & is_val e' & typecheck env e' t2)" by (simp add: canonical_sum)
+    thus ?thesis
+    proof (cases "EX e'. e = InL t1 t2 e'", auto)
+      fix e'
+      assume "is_val e'" 
+      hence "EX x. eval (Case (InL t1 t2 e') el er) (safe_subst el e')" by simp
+      thus "EX x. eval (Case (InL t1 t2 e') el er) x" by auto
+    next
+      fix e'
+      assume "is_val e'" 
+      hence "EX x. eval (Case (InR t1 t2 e') el er) (safe_subst er e')" by simp
+      thus "EX x. eval (Case (InR t1 t2 e') el er) x" by auto
+    qed
+  next case False
+    with tcse have "EX a. eval e a" by simp
+    thus ?thesis
+    proof auto
+      fix a
+      assume "eval e a"
+      hence "eval (Case e el er) (Case e el er)" by simp
+      thus "EX x. eval (Case e el er) x" by auto
+    qed
+  qed
 qed 
 
 end
