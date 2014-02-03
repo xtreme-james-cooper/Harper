@@ -12,7 +12,7 @@ datatype type =
 
 datatype patn =
   Wild
-| Var
+| PVar
 | PTriv
 | PPair patn patn
 | PInL patn
@@ -20,7 +20,7 @@ datatype patn =
 
 primrec vars_count :: "patn => nat"
 where "vars_count Wild = 0"
-    | "vars_count Var = 1"
+    | "vars_count PVar = 1"
     | "vars_count PTriv = 0"
     | "vars_count (PPair p1 p2) = vars_count p1 + vars_count p2"
     | "vars_count (PInL p) = vars_count p"
