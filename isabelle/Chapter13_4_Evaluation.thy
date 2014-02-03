@@ -66,32 +66,23 @@ next case einl
 next case einr
   thus ?case by auto
 next case (emt1 e e' rs)
-  hence "EX t1. typecheck env e t1 & typecheck_rules env rs t1 t" by auto
+  hence "EX t1 c. typecheck env e t1 & typecheck_rules env rs t1 t c" by auto
   thus ?case
   proof auto
-    fix t1
+    fix t1 c
     assume "typecheck env e t1"
-       and "typecheck_rules env rs t1 t"
+       and "typecheck_rules env rs t1 t c"
     moreover with emt1 have "typecheck env e' t1" by simp
-    ultimately show "typecheck env (Match e' rs) t" by simp
+    ultimately show "typecheck env (Match e' rs) t" by simp sorry
   qed
 next case (emt2 e s p e2 rs)
-  hence "EX t1 ts. typecheck env e t1 & types_from_pat p t1 ts & typecheck (extend_env ts env) e2 t & typecheck_rules env rs t1 t" by auto
-  thus ?case
-  proof auto
-    fix t1 ts
-    assume "typecheck env e t1"
-       and "types_from_pat p t1 ts"
-       and A: "typecheck (extend_env ts env) e2 t"
-    hence "is_val e ==> (EX s. typecheck_subst env s ts & matches s p e) | no_match e p" by simp
-    with emt2 A show "typecheck env (apply_subst s e2) t" by simp
-  qed
+  thus ?case by simp sorry
 next case emt3
-  thus ?case by auto
+  thus ?case by auto sorry
 qed
 
 theorem progress: "typecheck env e t ==> env = empty_map ==> is_val e | (EX e'. eval e e')"
-proof (induct rule: typecheck.induct)
+proof (induction env e t rule: typecheck_typecheck_rules_typecheck_rule.inducts)
 case tvar
   thus ?case by auto
 next case tzer
