@@ -2,7 +2,7 @@ theory Chapter13_3_Evaluation
 imports Chapter13_2_Typechecking
 begin
 
-primrec is_val :: "expr => bool"
+fun is_val :: "expr => bool"
 where "is_val (Var v) = False"
     | "is_val Zero = True"
     | "is_val (Succ n) = is_val n"
@@ -35,15 +35,18 @@ lemma canonical_void: "typecheck env e Void ==> ~ is_val e"
 by (induction e, auto)
 
 lemma canonical_sum: "typecheck env e (Sum t1 t2) ==> is_val e ==> 
-      (EX e'. (e = InL t1 t2 e' & is_val e' & typecheck env e' t1)) | (EX e'. (e = InR t1 t2 e' & is_val e' & typecheck env e' t2))"
+      (EX e'. e = InL t1 t2 e' & is_val e' & typecheck env e' t1) | (EX e'. e = InR t1 t2 e' & is_val e' & typecheck env e' t2)"
 by (induction e, auto)
 
 inductive typecheck_subst :: "(nat, type) assoc => expr list => type list => bool"
-where [simp]: "typecheck_subst env [] []"
-    | [simp]: "typecheck env e t ==> typecheck_subst env es ts ==> typecheck_subst env (e # es) (t # ts)"
+where tsubn [simp]: "typecheck_subst env [] []"
+    | tsubc [simp]: "typecheck env e t ==> typecheck_subst env es ts ==> typecheck_subst env (e # es) (t # ts)"
 
 inductive_cases [elim!]: "typecheck_subst e [] t"
 inductive_cases [elim!]: "typecheck_subst e (x # y) t"
+
+lemma [simp]: "typecheck_subst env e1 t1 ==> typecheck_subst env e2 t2 ==> typecheck_subst env (e1 @ e2) (t1 @ t2)"
+by (induction env e1 t1 rule: typecheck_subst.induct, simp_all)
 
 inductive matches :: "expr list => patn => expr => bool"
 where [simp]: "matches [] Wild e"
@@ -68,20 +71,81 @@ where [simp]: "no_match e1 p1 ==> no_match (Pair e1 e2) (PPair p1 p2)"
     | [simp]: "no_match (InR t t' e) (PInL p)"
     | [simp]: "no_match e p ==> no_match (InR t t' e) (PInR p)"
 
+lemma [simp]: "no_match (Pair e1 e2) (PPair p1 p2) ==> no_match e1 p1 | no_match e2 p2"
+by (auto, induction "Pair e1 e2" "PPair p1 p2" rule: no_match.induct, auto)
+
+lemma [simp]: "no_match (InL t t' e) (PInL p) = no_match e p"
+by (auto, induction "InL t t' e" "PInL p" rule: no_match.induct, simp)
+
+lemma [simp]: "no_match (InR t t' e) (PInR p) = no_match e p"
+by (auto, induction "InR t t' e" "PInR p" rule: no_match.induct, simp)
+
 lemma "types_from_pat p t ts ==> typecheck env e t ==> is_val e ==> (EX s. typecheck_subst env s ts & matches s p e) | no_match e p"
-proof (induction p t ts rule: types_from_pat.induct)
-case (tpwld t')
-  thus ?case by auto sorry
-next case (tpvar t')
-  thus ?case by auto sorry
+proof (induction p t ts arbitrary: e rule: types_from_pat.induct)
+case tpwld
+  have "typecheck_subst env [] [] & matches [] Wild e" by simp
+  hence "EX s. typecheck_subst env s [] & matches s Wild e" by (rule exI)
+  thus ?case by simp
+next case (tpvar t)
+  hence "typecheck_subst env [e] [t] & matches [e] PVar e" by simp
+  hence "EX s. typecheck_subst env s [t] & matches s PVar e" by (rule exI)
+  thus ?case by simp
 next case tptrv
-  thus ?case by auto sorry
+  hence "e = Triv" by (simp add: canonical_unit)
+  hence "typecheck_subst env [] [] & matches [] PTriv e" by simp
+  hence "EX s. typecheck_subst env s [] \<and> matches s PTriv e" by (rule exI)
+  thus ?case by simp
 next case (tppar p1 t1 ts1 p2 t2 ts2)
-  thus ?case by auto sorry
+  hence "(EX e1 e2. e = Pair e1 e2 & typecheck env e1 t1 & typecheck env e2 t2 & is_val e1 & is_val e2)" by (simp add: canonical_prod)
+  with tppar show ?case
+  proof auto
+    fix e1 e2 s1 s2
+    assume "!!e. typecheck env e t1 ==> is_val e ==> (EX s. typecheck_subst env s ts1 & matches s p1 e) | no_match e p1"
+       and "typecheck env e1 t1"
+       and "is_val e1"
+    hence A: "(EX s. typecheck_subst env s ts1 & matches s p1 e1) | no_match e1 p1" by auto
+    assume "!!e. typecheck env e t2 ==> is_val e ==> (EX s. typecheck_subst env s ts2 & matches s p2 e) | no_match e p2"
+       and "typecheck env e2 t2"
+       and "is_val e2"
+    hence B: "(EX s. typecheck_subst env s ts2 & matches s p2 e2) | no_match e2 p2" by auto
+    assume C: "~ no_match (Pair e1 e2) (PPair p1 p2)"
+    from A C have "EX s. typecheck_subst env s ts1 & matches s p1 e1" by auto
+    moreover from B C have "EX s. typecheck_subst env s ts2 & matches s p2 e2" by auto
+    ultimately show "EX s. typecheck_subst env s (ts1 @ ts2) & matches s (PPair p1 p2) (Pair e1 e2)"
+    proof auto
+      fix s1 s2
+      assume "typecheck_subst env s1 ts1"
+         and "matches s1 p1 e1"
+         and "typecheck_subst env s2 ts2"
+         and "matches s2 p2 e2"
+      hence "typecheck_subst env (s1 @ s2) (ts1 @ ts2) & matches (s1 @ s2) (PPair p1 p2) (Pair e1 e2)" by simp
+      thus "EX s. typecheck_subst env s (ts1 @ ts2) & matches s (PPair p1 p2) (Pair e1 e2)" by auto
+    qed
+  qed
 next case (tpinl p t1 ts t2)
-  thus ?case by auto sorry
+  from tpinl have "(EX e'. e = InL t1 t2 e' & is_val e' & typecheck env e' t1) | (EX e'. e = InR t1 t2 e' & is_val e' & typecheck env e' t2)" by (simp add: canonical_sum)
+  with tpinl show ?case
+  proof (cases "EX e'. e = InL t1 t2 e'", auto)
+    fix e'
+    assume "!!e. typecheck env e t1 ==> is_val e ==> (EX s. typecheck_subst env s ts & matches s p e) | no_match e p"
+       and "~ no_match e' p"
+       and "is_val e'"
+       and "typecheck env e' t1"
+    hence "EX s. typecheck_subst env s ts & matches s p e'" by auto
+    thus "EX s. typecheck_subst env s ts & matches s (PInL p) (InL t1 t2 e')" by auto
+  qed
 next case (tpinr p t2 ts t1)
-  thus ?case by auto sorry
+  from tpinr have "(EX e'. e = InL t1 t2 e' & is_val e' & typecheck env e' t1) | (EX e'. e = InR t1 t2 e' & is_val e' & typecheck env e' t2)" by (simp add: canonical_sum)
+  with tpinr show ?case
+  proof (cases "EX e'. e = InR t1 t2 e'", auto)
+    fix e'
+    assume "!!e. typecheck env e t2 ==> is_val e ==> (EX s. typecheck_subst env s ts & matches s p e) | no_match e p"
+       and "~ no_match e' p"
+       and "is_val e'"
+       and "typecheck env e' t2"
+    hence "EX s. typecheck_subst env s ts & matches s p e'" by auto
+    thus "EX s. typecheck_subst env s ts & matches s (PInR p) (InR t1 t2 e')" by auto
+  qed
 qed
 
 inductive eval :: "expr => expr => bool"
