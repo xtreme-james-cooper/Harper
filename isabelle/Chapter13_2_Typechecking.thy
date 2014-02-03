@@ -230,4 +230,28 @@ qed
 lemma [simp]: "typecheck (extend_at env 0 t') e t ==> typecheck env e' t' ==> typecheck env (safe_subst e e') t"
 by (simp add: safe_subst_def)
 
+inductive typecheck_subst :: "(nat, type) assoc => expr list => type list => bool"
+where tsubn [simp]: "typecheck_subst env [] []"
+    | tsubc [simp]: "typecheck env e t ==> typecheck_subst env es ts ==> typecheck_subst env (e # es) (t # ts)"
+
+inductive_cases [elim!]: "typecheck_subst e [] t"
+inductive_cases [elim!]: "typecheck_subst e (x # y) t"
+
+lemma [simp]: "typecheck_subst env e1 t1 ==> typecheck_subst env e2 t2 ==> typecheck_subst env (e1 @ e2) (t1 @ t2)"
+by (induction env e1 t1 rule: typecheck_subst.induct, simp_all)
+
+primrec apply_subst :: "expr list => expr => expr"
+where "apply_subst [] e = e"
+    | "apply_subst (e' # e's) e = apply_subst e's (safe_subst e e')"
+
+lemma [simp]: "typecheck_subst env s ts ==> typecheck (extend_env ts env) e t ==> typecheck env (apply_subst s e) t"
+proof (induction env s ts arbitrary: e rule: typecheck_subst.induct)
+case tsubn
+  thus ?case by auto
+next case (tsubc env s t' ss ts)
+  from tsubc have "typecheck env s t'" by simp  
+  have "typecheck (extend_env ts env) s t'" by simp sorry
+  with tsubc show ?case by simp
+qed
+
 end
