@@ -2,10 +2,6 @@ theory Chapter13_2_Typechecking
 imports Chapter13_1_Language
 begin
 
-primrec extend_env :: "type list => (nat, type) assoc => (nat, type) assoc"
-where "extend_env [] env = env"
-    | "extend_env (t # ts) env = extend_env ts (extend_at env 0 t)"
-
 inductive types_from_pat :: "patn => type => type list => bool"
 where "types_from_pat Wild t []"
     | "types_from_pat PVar t [t]"
@@ -21,6 +17,9 @@ inductive_cases [elim!]: "types_from_pat PTriv t ts"
 inductive_cases [elim!]: "types_from_pat (PPair p1 p2) t ts"
 inductive_cases [elim!]: "types_from_pat (PInL p) t ts"
 inductive_cases [elim!]: "types_from_pat (PInR p) t ts"
+
+lemma [simp]: "types_from_pat p t ts ==> length ts = vars_count p"
+by (induction p t ts rule: types_from_pat.induct, simp_all)
 
 inductive typecheck :: "(nat, type) assoc => expr => type => bool"
       and typecheck_rules :: "(nat, type) assoc => rule list => type => type => bool"
@@ -45,7 +44,7 @@ where tvar [simp]: "lookup env v = Some t ==> typecheck env (Var v) t"
     | tmch [simp]: "typecheck env e t1 ==> typecheck_rules env rs t1 t2 ==> typecheck env (Match e rs) t2" 
     | tnil [simp]: "typecheck_rules env [] t1 t2"
     | tcns [simp]: "typecheck_rule env r t1 t2 ==> typecheck_rules env rs t1 t2 ==> typecheck_rules env (r # rs) t1 t2"
-    | trul [simp]: "types_from_pat p t1 ts ==> typecheck (extend_env ts env) e t2 ==>  typecheck_rule env (Rule p e) t1 t2"
+    | trul [simp]: "types_from_pat p t1 ts ==> typecheck (extend_env ts env) e t2 ==> typecheck_rule env (Rule p e) t1 t2"
 
 inductive_cases [elim!]: "typecheck e (Var x) t"
 inductive_cases [elim!]: "typecheck e Zero t"
@@ -69,9 +68,9 @@ inductive_cases [elim!]: "typecheck_rule e (Rule x y) t t'"
 thm typecheck_typecheck_rules_typecheck_rule.induct
 
 lemma [simp]: "typecheck env e t ==> typecheck (extend_at env n k) (incr_from n e) t"
-  and [simp]: "typecheck_rules env' rs t1 t2 ==> typecheck_rules (extend_at env' m k') (incr_from_rules m rs) t1 t2"
-  and [simp]: "typecheck_rule env'' r t1' t2' ==> typecheck_rule (extend_at env'' p k'') (incr_from_rule p r) t1' t2'"
-proof (induction env e t and env' rs t1 t2 and env'' r t1' t2' arbitrary: n and m and p rule: typecheck_typecheck_rules_typecheck_rule.inducts)
+  and [simp]: "typecheck_rules env rs t1 t2 ==> typecheck_rules (extend_at env n k) (incr_from_rules n rs) t1 t2"
+  and [simp]: "typecheck_rule env r t1 t2 ==> typecheck_rule (extend_at env n k) (incr_from_rule n r) t1 t2"
+proof (induction env e t and env rs t1 t2 and env r t1 t2 arbitrary: n and n and n rule: typecheck_typecheck_rules_typecheck_rule.inducts)
 case (tvar env v t)
   thus ?case by (simp add: incr_def) (* TODO: remove incr_def? *)
 next case tzer
@@ -107,20 +106,26 @@ next case tinl
   thus ?case by simp
 next case tinr
   thus ?case by simp
-next case tmch
-  thus ?case by simp sorry
+next case (tmch env e t1 rs t2)
+  hence "typecheck (extend_at env n k) (incr_from n e) t1" by simp
+  moreover from tmch have "typecheck_rules (extend_at env n k) (incr_from_rules n rs) t1 t2" by simp
+  ultimately show ?case by simp
 next case tnil
   thus ?case by simp
 next case tcns
-  thus ?case by simp sorry
-next case trul
-  thus ?case by simp sorry
+  thus ?case by simp
+next case (trul p t1 ts env e t2)
+  from trul have "vars_count p = length ts" by simp
+  moreover from trul have "typecheck (extend_at (extend_env ts env) (n + vars_count p) k) (incr_from (n + vars_count p) e) t2" by simp
+  ultimately have "typecheck (extend_env ts (extend_at env n k)) (incr_from (n + vars_count p) e) t2" by simp
+  with trul show ?case by simp
 qed
 
 lemma [simp]: "typecheck (extend_at env n k) e t ==> n ~: free_vars e ==> typecheck env (sub_from n e) t"
-  and [simp]: "typecheck_rules (extend_at env' m k') rs t1 t2 ==> m ~: free_vars_rules rs ==> typecheck_rules env' (sub_from_rules m rs) t1 t2"
-  and [simp]: "typecheck_rule (extend_at env'' p k'') r t1' t2' ==> p ~: free_vars_rule r ==> typecheck_rule env'' (sub_from_rule p r) t1' t2'"
-proof (induction "extend_at env n k" e t and "extend_at env' m k'" rs t1 t2 and "extend_at env'' p k''" r t1' t2' arbitrary: env n and env' m and env'' p rule: typecheck_typecheck_rules_typecheck_rule.inducts)
+  and [simp]: "typecheck_rules (extend_at env n k) rs t1 t2 ==> n ~: free_vars_rules rs ==> typecheck_rules env (sub_from_rules n rs) t1 t2"
+  and [simp]: "typecheck_rule (extend_at env n k) r t1 t2 ==> n ~: free_vars_rule r ==> typecheck_rule env (sub_from_rule n r) t1 t2"
+proof (induction "extend_at env n k" e t and "extend_at env n k" rs t1 t2 and "extend_at env n k" r t1 t2 
+       arbitrary: env n and env n and env n rule: typecheck_typecheck_rules_typecheck_rule.inducts)
 case (tvar v t)
   thus ?case by (cases "v < n", simp, cases "v = n", simp_all)
 next case tzer
@@ -155,21 +160,24 @@ next case tinl
   thus ?case by simp
 next case tinr
   thus ?case by simp
-next case tmch
-  thus ?case by simp sorry
+next case (tmch e t1 rs t2)
+  hence "typecheck_rules env (sub_from_rules n rs) t1 t2" by simp 
+  moreover from tmch have "typecheck env (sub_from n e) t1" by simp
+  ultimately show ?case by simp
 next case tnil
   thus ?case by simp
 next case tcns
-  thus ?case by simp sorry
-next case trul
-  thus ?case by simp sorry
+  thus ?case by simp
+next case (trul p t1 ts e t2)
+  have "extend_at (extend_env ts env) (n + length ts) k = extend_env ts (extend_at env n k)" by simp
+  with trul show ?case by simp
 qed
 
 lemma [simp]: "typecheck (extend env x t2) e t1 ==> typecheck env eb t2 ==> typecheck env (subst e eb x) t1"
-  and [simp]: "typecheck_rules (extend env' x' t2) rs t1a t1b ==> typecheck env eb' t2 ==> typecheck_rules env' (subst_rules rs eb' x') t1a t1b"
-  and [simp]: "typecheck_rule (extend env'' x'' t2) r t1a' t1b' ==> typecheck env eb'' t2 ==> typecheck_rule env'' (subst_rule r eb'' x'') t1a' t1b'"
-proof (induction "extend env x t2" e t1 and "extend env' x' t2" rs t1a t1b and "extend env'' x'' t2" r t1a' t1b' 
-       arbitrary: env eb x and env' eb' x' and env'' eb'' x'' rule: typecheck_typecheck_rules_typecheck_rule.inducts)
+  and [simp]: "typecheck_rules (extend env x t2) rs t1a t1b ==> typecheck env eb t2 ==> typecheck_rules env (subst_rules rs eb x) t1a t1b"
+  and [simp]: "typecheck_rule (extend env x t2) r t1a t1b ==> typecheck env eb t2 ==> typecheck_rule env (subst_rule r eb x) t1a t1b"
+proof (induction "extend env x t2" e t1 and "extend env x t2" rs t1a t1b and "extend env x t2" r t1a t1b 
+       arbitrary: env eb x and env eb x and env eb x rule: typecheck_typecheck_rules_typecheck_rule.inducts)
 case tvar
   thus ?case by auto
 next case tzer
@@ -202,20 +210,17 @@ next case tinl
   thus ?case by simp
 next case tinr
   thus ?case by simp
-next case tmch
+next case (tmch e t1 rs t2)
   thus ?case by simp sorry
 next case tnil
   thus ?case by simp
 next case tcns
-  thus ?case by simp sorry
+  thus ?case by simp
 next case trul
   thus ?case by simp sorry
 qed
 
 lemma [simp]: "typecheck (extend_at env 0 t') e t ==> typecheck env e' t' ==> typecheck env (safe_subst e e') t"
-proof (simp add: safe_subst_def)
-  assume "typecheck (extend_at env 0 t') e t"
-     and "typecheck env e' t'"
-  thus "typecheck env (sub_from 0 (subst e (incr_from 0 e') 0)) t" by simp sorry
-qed
+by (simp add: safe_subst_def)
 
+end

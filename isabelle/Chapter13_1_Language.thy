@@ -165,6 +165,12 @@ lemma [simp]: "free_vars (incr_from n e) = incr n ` free_vars e"
   and [simp]: "free_vars_rule (incr_from_rule m r) = incr m ` free_vars_rule r"
 by (induction e and rs and r arbitrary: n and k and m, auto)
 
+lemma [simp]: "n ~: incr n ` xs"
+proof (auto simp add: incr_def)
+  fix x
+  show "n = (if x < n then x else Suc x) ==> False" by (cases "x < n", simp_all)
+qed
+
 primrec incr_by :: "nat => expr => expr"
 where "incr_by 0 e = e"
     | "incr_by (Suc n) e = incr_from 0 (incr_by n e)"

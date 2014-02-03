@@ -150,4 +150,11 @@ case (ASSOC f)
   thus ?case by auto
 qed
 
+primrec extend_env :: "'a list => (nat, 'a) assoc => (nat, 'a) assoc"
+where "extend_env [] env = env"
+    | "extend_env (t # ts) env = extend_at (extend_env ts env) 0 t"
+
+lemma [simp]: "extend_at (extend_env ts env) (p + length ts) k = extend_env ts (extend_at env p k)"
+by (induction ts, simp_all add: extend_at_swap)
+
 end
