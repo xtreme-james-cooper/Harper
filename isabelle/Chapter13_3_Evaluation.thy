@@ -17,29 +17,7 @@ where "is_val (Var v) = False"
     | "is_val (Abort t e) = False"
     | "is_val (InL t t' e) = is_val e"
     | "is_val (InR t t' e) = is_val e"
-    | "is_val (Case e el er) = False"
-
-inductive eval :: "expr => expr => bool"
-where esuc [simp]: "eval n n' ==> eval (Succ n) (Succ n')"
-    | eap1 [simp]: "eval e1 e1' ==> eval (Ap e1 e2) (Ap e1' e2)"
-    | eap2 [simp]: "is_val e1 ==> eval e2 e2' ==> eval (Ap e1 e2) (Ap e1 e2')"
-    | eap3 [simp]: "is_val e2 ==> eval (Ap (Lam t b) e2) (safe_subst b e2)"
-    | eiz1 [simp]: "eval e e' ==> eval (IsZ e0 e1 e) (IsZ e0 e1 e')"
-    | eiz2 [simp]: "eval (IsZ e0 e1 Zero) e0"
-    | eiz3 [simp]: "is_val e ==> eval (IsZ e0 e1 (Succ e)) (safe_subst e1 e)"
-    | efix [simp]: "eval (Fix t b) (safe_subst b (Fix t b))"
-    | epa1 [simp]: "eval e1 e1' ==> eval (Pair e1 e2) (Pair e1' e2)"
-    | epa2 [simp]: "is_val e1 ==> eval e2 e2' ==> eval (Pair e1 e2) (Pair e1 e2')"
-    | epl1 [simp]: "eval e e' ==> eval (ProjL e) (ProjL e')"
-    | epl2 [simp]: "is_val e1 ==> is_val e2 ==> eval (ProjL (Pair e1 e2)) e1"
-    | epr1 [simp]: "eval e e' ==> eval (ProjR e) (ProjR e')"
-    | epr2 [simp]: "is_val e1 ==> is_val e2 ==> eval (ProjR (Pair e1 e2)) e2"
-    | eabt [simp]: "eval e e' ==> eval (Abort t e) (Abort t e')"
-    | einl [simp]: "eval e e' ==> eval (InL t t' e) (InL t t' e')"
-    | einr [simp]: "eval e e' ==> eval (InR t t' e) (InR t t' e')"
-    | ecs1 [simp]: "eval e e' ==> eval (Case e el er) (Case e el er)"
-    | ecs2 [simp]: "is_val e ==> eval (Case (InL t t' e) el er) (safe_subst el e)"
-    | ecs3 [simp]: "is_val e ==> eval (Case (InR t t' e) el er) (safe_subst er e)"
+    | "is_val (Match e rs) = False"
 
 lemma canonical_nat: "typecheck env e Nat ==> is_val e ==> e = Zero | (EX v. typecheck env v Nat & is_val v & e = Succ v)"
 by (induction e, auto)
@@ -59,6 +37,71 @@ by (induction e, auto)
 lemma canonical_sum: "typecheck env e (Sum t1 t2) ==> is_val e ==> 
       (EX e'. (e = InL t1 t2 e' & is_val e' & typecheck env e' t1)) | (EX e'. (e = InR t1 t2 e' & is_val e' & typecheck env e' t2))"
 by (induction e, auto)
+
+inductive typecheck_subst :: "(nat, type) assoc => expr list => type list => bool"
+where [simp]: "typecheck_subst env [] []"
+    | [simp]: "typecheck env e t ==> typecheck_subst env es ts ==> typecheck_subst env (e # es) (t # ts)"
+
+inductive_cases [elim!]: "typecheck_subst e [] t"
+inductive_cases [elim!]: "typecheck_subst e (x # y) t"
+
+inductive matches :: "expr list => patn => expr => bool"
+where [simp]: "matches [] Wild e"
+    | [simp]: "matches [e] PVar e"
+    | [simp]: "matches [] PTriv Triv"
+    | [simp]: "matches s1 p1 e1 ==> matches s2 p2 e2 ==> matches (s1 @ s2) (PPair p1 p2) (Pair e1 e2)"
+    | [simp]: "matches s p e ==> matches s (PInL p) (InL t t' e)"
+    | [simp]: "matches s p e ==> matches s (PInR p) (InR t t' e)"
+
+inductive_cases [elim!]: "matches s Wild e"
+inductive_cases [elim!]: "matches s PVar e"
+inductive_cases [elim!]: "matches s PTriv e"
+inductive_cases [elim!]: "matches s (PPair x y) e"
+inductive_cases [elim!]: "matches s (PInL x) e"
+inductive_cases [elim!]: "matches s (PInR x) e"
+
+inductive no_match :: "expr => patn => bool"
+where [simp]: "no_match e1 p1 ==> no_match (Pair e1 e2) (PPair p1 p2)"
+    | [simp]: "no_match e2 p2 ==> no_match (Pair e1 e2) (PPair p1 p2)"
+    | [simp]: "no_match (InL t t' e) (PInR p)"
+    | [simp]: "no_match e p ==> no_match (InL t t' e) (PInL p)"
+    | [simp]: "no_match (InR t t' e) (PInL p)"
+    | [simp]: "no_match e p ==> no_match (InR t t' e) (PInR p)"
+
+lemma "types_from_pat p t ts ==> typecheck env e t ==> is_val e ==> (EX s. typecheck_subst env s ts & matches s p e) | no_match e p"
+proof (induction p t ts rule: types_from_pat.induct)
+case (tpwld t')
+  thus ?case by auto sorry
+next case (tpvar t')
+  thus ?case by auto sorry
+next case tptrv
+  thus ?case by auto sorry
+next case (tppar p1 t1 ts1 p2 t2 ts2)
+  thus ?case by auto sorry
+next case (tpinl p t1 ts t2)
+  thus ?case by auto sorry
+next case (tpinr p t2 ts t1)
+  thus ?case by auto sorry
+qed
+
+inductive eval :: "expr => expr => bool"
+where esuc [simp]: "eval n n' ==> eval (Succ n) (Succ n')"
+    | eap1 [simp]: "eval e1 e1' ==> eval (Ap e1 e2) (Ap e1' e2)"
+    | eap2 [simp]: "is_val e1 ==> eval e2 e2' ==> eval (Ap e1 e2) (Ap e1 e2')"
+    | eap3 [simp]: "is_val e2 ==> eval (Ap (Lam t b) e2) (safe_subst b e2)"
+    | eiz1 [simp]: "eval e e' ==> eval (IsZ e0 e1 e) (IsZ e0 e1 e')"
+    | eiz2 [simp]: "eval (IsZ e0 e1 Zero) e0"
+    | eiz3 [simp]: "is_val e ==> eval (IsZ e0 e1 (Succ e)) (safe_subst e1 e)"
+    | efix [simp]: "eval (Fix t b) (safe_subst b (Fix t b))"
+    | epa1 [simp]: "eval e1 e1' ==> eval (Pair e1 e2) (Pair e1' e2)"
+    | epa2 [simp]: "is_val e1 ==> eval e2 e2' ==> eval (Pair e1 e2) (Pair e1 e2')"
+    | epl1 [simp]: "eval e e' ==> eval (ProjL e) (ProjL e')"
+    | epl2 [simp]: "is_val e1 ==> is_val e2 ==> eval (ProjL (Pair e1 e2)) e1"
+    | epr1 [simp]: "eval e e' ==> eval (ProjR e) (ProjR e')"
+    | epr2 [simp]: "is_val e1 ==> is_val e2 ==> eval (ProjR (Pair e1 e2)) e2"
+    | eabt [simp]: "eval e e' ==> eval (Abort t e) (Abort t e')"
+    | einl [simp]: "eval e e' ==> eval (InL t t' e) (InL t t' e')"
+    | einr [simp]: "eval e e' ==> eval (InR t t' e) (InR t t' e')"
 
 theorem preservation: "eval e e' ==> typecheck env e t ==> typecheck env e' t"
 proof (induction e e' arbitrary: t env rule: eval.induct)
@@ -100,12 +143,6 @@ next case eabt
 next case einl
   thus ?case by auto
 next case einr
-  thus ?case by auto
-next case ecs1
-  thus ?case by auto
-next case ecs2
-  thus ?case by auto
-next case ecs3
   thus ?case by auto
 qed
 

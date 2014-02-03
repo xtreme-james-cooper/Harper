@@ -3,13 +3,13 @@ imports Chapter13_1_Language
 begin
 
 inductive types_from_pat :: "patn => type => type list => bool"
-where "types_from_pat Wild t []"
-    | "types_from_pat PVar t [t]"
-    | "types_from_pat PTriv Unit []"
-    | "types_from_pat p1 t1 ts1 ==> types_from_pat p2 t2 ts2 ==> 
+where tpwld [simp]: "types_from_pat Wild t []"
+    | tpvar [simp]: "types_from_pat PVar t [t]"
+    | tptrv [simp]: "types_from_pat PTriv Unit []"
+    | tppar [simp]: "types_from_pat p1 t1 ts1 ==> types_from_pat p2 t2 ts2 ==> 
           types_from_pat (PPair p1 p2) (Prod t1 t2) (ts1 @ ts2)"
-    | "types_from_pat p t1 ts ==> types_from_pat (PInL p) (Sum t1 t2) ts"
-    | "types_from_pat p t2 ts ==> types_from_pat (PInR p) (Sum t1 t2) ts"
+    | tpinl [simp]: "types_from_pat p t1 ts ==> types_from_pat (PInL p) (Sum t1 t2) ts"
+    | tpinr [simp]: "types_from_pat p t2 ts ==> types_from_pat (PInR p) (Sum t1 t2) ts"
 
 inductive_cases [elim!]: "types_from_pat Wild t ts"
 inductive_cases [elim!]: "types_from_pat PVar t ts"
