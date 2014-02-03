@@ -47,6 +47,17 @@ and rule = Rule patn expr
 definition redr_set :: "nat set => nat set"
 where "redr_set xs = (%n. case n of 0 => undefined | Suc n => n) ` (xs - {0})"
 
+lemma [simp]: "redr_set (a Un b) = redr_set a Un redr_set b"
+by (auto simp add: redr_set_def)
+
+lemma [simp]: "redr_set (a - {Suc x}) = redr_set a - {x}"
+proof (auto simp add: redr_set_def) 
+  fix n
+  assume "0 < n" 
+     and "n ~= Suc (case n of 0 => undefined | Suc n => n)"
+  thus False by (cases n, simp_all)
+qed
+
 lemma [simp]: "(n : redr_set xs) = (Suc n : xs)" 
 proof (auto simp add: redr_set_def)
   fix x
@@ -62,6 +73,12 @@ qed
 primrec redr_set_by :: "nat => nat set => nat set"
 where "redr_set_by 0 xs = xs"
     | "redr_set_by (Suc n) xs = redr_set_by n (redr_set xs)"
+
+lemma [simp]: "redr_set_by n (a Un b) = redr_set_by n a Un redr_set_by n b"
+by (induction n arbitrary: a b, simp_all)
+
+lemma [simp]: "redr_set_by n (a - {x + n}) = redr_set_by n a - {x}"
+by (induction n arbitrary: a, simp_all)
 
 lemma [simp]: "(x : redr_set_by n xs) = (x + n : xs)" 
 by (induction n arbitrary: xs, simp_all)
@@ -88,10 +105,16 @@ where "free_vars (Var v) = {v}"
     | "free_vars_rules (r # rs) = free_vars_rule r Un free_vars_rules rs"    
     | "free_vars_rule (Rule p e) = redr_set_by (vars_count p) (free_vars e)"
 
+definition incr :: "nat => nat => nat"
+where "incr n v = (if v < n then v else Suc v)"
+
+lemma [simp]: "redr_set (incr 0 ` xs) = xs" 
+by (auto simp add: incr_def)
+
 primrec incr_from :: "nat => expr => expr"
     and incr_from_rules :: "nat => rule list => rule list"
     and incr_from_rule :: "nat => rule => rule"
-where "incr_from n (Var v) = Var (if v < n then v else Suc v)"
+where "incr_from n (Var v) = Var (incr n v)"
     | "incr_from n Zero = Zero"
     | "incr_from n (Succ e) = Succ (incr_from n e)"
     | "incr_from n (IsZ e0 e1 et) = IsZ (incr_from n e0) (incr_from (Suc n) e1) (incr_from n et)"
@@ -110,68 +133,37 @@ where "incr_from n (Var v) = Var (if v < n then v else Suc v)"
     | "incr_from_rules n (r # rs) = incr_from_rule n r # incr_from_rules n rs"    
     | "incr_from_rule n (Rule p e) = Rule p (incr_from (n + vars_count p) e)"
 
-lemma [simp]: "free_vars (incr_from n e) = (%v. if v < n then v else Suc v) ` free_vars e"
-  and [simp]: "free_vars_rules (incr_from_rules n rs) = (%v. if v < n then v else Suc v) ` free_vars_rules rs"
-  and [simp]: "free_vars_rule (incr_from_rule n r) = (%v. if v < n then v else Suc v) ` free_vars_rule r"
-proof (induction e and rs and r arbitrary: n)
-case Var
-  thus ?case by simp
-next case Zero
-  thus ?case by simp
-next case Succ
-  thus ?case by simp
-next case (IsZ e0 e1 e)
-  thus ?case
-  proof auto
-    fix xa
-    show "xa ~: Suc ` ((free_vars e0 Un free_vars e Un redr_set (free_vars e1)) Int {v. ~ v < n}) ==> xa : free_vars e1 ==> ~ xa < Suc n ==> xa : free_vars e0" by (cases xa, auto)
-  next
-    fix xa
-    show "xa ~: Suc ` ((free_vars e0 Un free_vars e Un redr_set (free_vars e1)) Int {v. ~ v < n}) ==> xa : free_vars e1 ==> ~ xa < Suc n ==> False" by (cases xa, auto)
+lemma [simp]: "redr_set (incr (Suc n) ` xs) = incr n ` redr_set xs" 
+proof (auto simp add: incr_def)
+  fix x xa
+  assume "Suc x = (if xa < Suc n then xa else Suc xa)"
+     and "xa : xs" 
+  thus "x : incr n ` redr_set xs"
+  proof (cases xa, auto)
+    fix xb
+    assume "Suc xb : xs"
+       and "Suc x = (if xb < n then Suc xb else Suc (Suc xb))"
+    moreover hence "x = incr n xb" by (auto simp add: incr_def)
+    ultimately show "x : incr n ` redr_set xs" by simp
   qed
-next case (Lam t b)
-  thus ?case
-  proof auto
-    fix xa
-    show "xa ~: Suc ` (redr_set (free_vars b) Int {v. ~ v < n}) ==> xa : free_vars b ==> ~ xa < Suc n ==> Suc xa : free_vars b" by (cases xa, simp_all)
-  next
-    fix xa
-    show "xa ~: Suc ` (redr_set (free_vars b) Int {v. ~ v < n}) ==> xa : free_vars b ==> ~ xa < Suc n ==> False" by (cases xa, simp_all)
-  qed
-next case Ap
-  thus ?case by auto
-next case (Fix t b)
-  thus ?case
-  proof auto
-    fix xa
-    show "xa ~: Suc ` (redr_set (free_vars b) Int {v. ~ v < n}) ==> xa : free_vars b ==> ~ xa < Suc n ==> Suc xa : free_vars b" by (cases xa, simp_all)
-  next
-    fix xa
-    show "xa ~: Suc ` (redr_set (free_vars b) Int {v. ~ v < n}) ==> xa : free_vars b ==> ~ xa < Suc n ==> False" by (cases xa, simp_all)
-  qed
-next case Triv
-  thus ?case by simp
-next case Pair
-  thus ?case by auto
-next case ProjL
-  thus ?case by simp
-next case ProjR
-  thus ?case by simp
-next case Abort
-  thus ?case by simp
-next case InL
-  thus ?case by simp
-next case InR
-  thus ?case by simp
-next case (Match e rs)
-  thus ?case by simp sorry
-next case Nil_rule
-  thus ?case by simp
-next case Cons_rule
-  thus ?case by simp sorry
-next case Rule
-  thus ?case by simp sorry
+next
+  fix xa
+  show "Suc xa : xs ==> xa < n ==> Suc xa : incr (Suc n) ` xs" by (auto simp add: incr_def)
+next 
+  fix xa
+  assume "Suc xa : xs"
+     and "~ xa < n"
+  moreover hence "Suc (Suc xa) = incr (Suc n) (Suc xa)" by (simp add: incr_def)
+  ultimately show "Suc (Suc xa) : incr (Suc n) ` xs" by blast
 qed
+
+lemma [simp]: "redr_set_by k (incr (n + k) ` xs) = incr n ` redr_set_by k xs" 
+by (induction k arbitrary: n xs, simp_all)
+
+lemma [simp]: "free_vars (incr_from n e) = incr n ` free_vars e"
+  and [simp]: "free_vars_rules (incr_from_rules k rs) = incr k ` free_vars_rules rs"
+  and [simp]: "free_vars_rule (incr_from_rule m r) = incr m ` free_vars_rule r"
+by (induction e and rs and r arbitrary: n and k and m, auto)
 
 primrec sub_from :: "nat => expr => expr"
     and sub_from_rules :: "nat => rule list => rule list"
@@ -215,7 +207,7 @@ where "subst (Var v) e x = (if v = x then e else Var v)"
     | "subst (Match ec rs) e x = Match (subst ec e x) (subst_rules rs e x)"
     | "subst_rules Nil e x = Nil"
     | "subst_rules (r # rs) e x = subst_rule r e x # subst_rules rs e x"
-    | "subst_rule (Rule p b) e x = Rule p (subst b (incr_from 0 e) (x + vars_count p))"
+    | "subst_rule (Rule p b) e x = Rule p (subst b (incr_from (vars_count p) e) (x + vars_count p))"
 
 definition safe_subst :: "expr => expr => expr"
 where "safe_subst e e' = sub_from 0 (subst e (incr_from 0 e') 0)"
@@ -231,7 +223,7 @@ next case Zero
 next case Succ
   thus ?case by simp
 next case IsZ
-  thus ?case by auto
+  thus ?case by auto 
 next case Lam
   thus ?case by auto
 next case Ap
@@ -258,8 +250,15 @@ next case Nil_rule
   thus ?case by simp
 next case Cons_rule
   thus ?case by auto
-next case Rule
-  thus ?case by auto sorry
+next case (Rule p b)
+  with Rule show ?case
+  proof (cases "x + vars_count p : free_vars b")
+  case True
+    have "redr_set_by (vars_count p) (free_vars (incr_from (vars_count p) e')) = free_vars e'" by simp sorry
+    with Rule True show ?thesis by simp
+  next case False
+    with Rule show ?thesis by simp
+  qed
 qed
 
 end
