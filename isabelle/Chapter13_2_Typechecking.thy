@@ -247,9 +247,11 @@ where "apply_subst [] e = e"
 lemma [simp]: "typecheck_subst env s ts ==> typecheck (extend_env ts env) e t ==> typecheck env (apply_subst s e) t"
 proof (induction env s ts arbitrary: e rule: typecheck_subst.induct)
 case tsubn
-  thus ?case by auto
+  thus ?case by simp
 next case (tsubc env s t' ss ts)
-  from tsubc have "typecheck env s t'" by simp  
+  from tsubc have "typecheck env s t'" by simp
+  from tsubc have "typecheck_subst env ss ts" by simp
+
   have "typecheck (extend_env ts env) s t'" by simp sorry
   with tsubc show ?case by simp
 qed

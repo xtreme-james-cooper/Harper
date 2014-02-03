@@ -84,16 +84,7 @@ next case (emt2 e s p e2 rs)
        and "types_from_pat p t1 ts"
        and A: "typecheck (extend_env ts env) e2 t"
     hence "is_val e ==> (EX s. typecheck_subst env s ts & matches s p e) | no_match e p" by simp
-    with emt2 have "EX s. typecheck_subst env s ts & matches s p e" by simp
-    with A show "typecheck env (apply_subst s e2) t"
-    proof auto
-      fix sa
-      assume "typecheck_subst env sa ts" 
-         and "matches sa p e"
-         and "typecheck (extend_env ts env) e2 t"
-      (* s = sa ! *)
-      show "typecheck env (apply_subst s e2) t" by simp sorry
-    qed
+    with emt2 A show "typecheck env (apply_subst s e2) t" by simp
   qed
 next case emt3
   thus ?case by auto

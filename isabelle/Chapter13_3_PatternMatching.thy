@@ -39,12 +39,12 @@ lemma canonical_sum: "typecheck env e (Sum t1 t2) ==> is_val e ==>
 by (induction e, auto)
 
 inductive matches :: "expr list => patn => expr => bool"
-where [simp]: "matches [] Wild e"
-    | [simp]: "matches [e] PVar e"
-    | [simp]: "matches [] PTriv Triv"
-    | [simp]: "matches s1 p1 e1 ==> matches s2 p2 e2 ==> matches (s1 @ s2) (PPair p1 p2) (Pair e1 e2)"
-    | [simp]: "matches s p e ==> matches s (PInL p) (InL t t' e)"
-    | [simp]: "matches s p e ==> matches s (PInR p) (InR t t' e)"
+where mtchw [simp]: "matches [] Wild e"
+    | mtchv [simp]: "matches [e] PVar e"
+    | mtcht [simp]: "matches [] PTriv Triv"
+    | mtchp [simp]: "matches s1 p1 e1 ==> matches s2 p2 e2 ==> matches (s1 @ s2) (PPair p1 p2) (Pair e1 e2)"
+    | mtchl [simp]: "matches s p e ==> matches s (PInL p) (InL t t' e)"
+    | mtchr [simp]: "matches s p e ==> matches s (PInR p) (InR t t' e)"
 
 inductive_cases [elim!]: "matches s Wild e"
 inductive_cases [elim!]: "matches s PVar e"
@@ -71,9 +71,28 @@ lemma [simp]: "no_match (InR t t' e) (PInR p) = no_match e p"
 by (auto, induction "InR t t' e" "PInR p" rule: no_match.induct, simp)
 
 lemma [simp]: "matches s p e ==> ~ no_match e p"
-apply (induction s p e rule: matches.induct)
-apply auto
-sorry
+proof (induction s p e rule: matches.induct)
+case (mtchw e)
+  thus ?case by (auto, induction e Wild rule: no_match.induct)
+next case (mtchv e)
+  thus ?case by (auto, induction e PVar rule: no_match.induct)
+next case mtcht
+  thus ?case by (auto, induction Triv PTriv rule: no_match.induct)
+next case (mtchp s1 p1 e1 s2 p2 e2)
+  thus ?case
+  proof auto 
+    assume "no_match (Pair e1 e2) (PPair p1 p2)"
+       and "matches s1 p1 e1"
+       and "matches s2 p2 e2"
+       and "~ no_match e1 p1"
+       and "~ no_match e2 p2"
+    thus False by (induction "Pair e1 e2" "PPair p1 p2" rule: no_match.induct, simp_all)
+  qed
+next case mtchl
+  thus ?case by simp 
+next case (mtchr s p e)
+  thus ?case by simp 
+qed
 
 lemma [simp]: "types_from_pat p t ts ==> typecheck env e t ==> is_val e ==> (EX s. typecheck_subst env s ts & matches s p e) | no_match e p"
 proof (induction p t ts arbitrary: e rule: types_from_pat.induct)
@@ -142,5 +161,44 @@ next case (tpinr p t2 ts t1)
     thus "EX s. typecheck_subst env s ts & matches s (PInR p) (InR t1 t2 e')" by auto
   qed
 qed
+
+lemma [simp]: "matches s p e ==> matches s' p e ==> s = s'"
+proof (induction s p e arbitrary: s' rule: matches.induct)
+case mtchw
+  thus ?case by auto 
+next case mtchv
+  thus ?case by auto 
+next case mtcht
+  thus ?case by auto 
+next case (mtchp s1 p1 e1 s2 p2 e2)
+  hence "EX s1' s2'. matches s1' p1 e1 & matches s2' p2 e2 & s1' @ s2' = s'" by auto
+  hence "s1 @ s2 = s'"
+  proof auto
+    fix s1' s2'
+    assume "matches s1' p1 e1" 
+       and "matches s2' p2 e2"
+    with mtchp show "s1 @ s2 = s1' @ s2'" by simp
+  qed
+  thus ?case by simp 
+next case (mtchl s p e)
+  hence "matches s' p e" by auto
+  with mtchl show ?case by simp 
+next case (mtchr s p e)
+  hence "matches s' p e" by auto
+  with mtchr show ?case by simp 
+qed
+
+lemma [simp]: "matches s p e ==> typecheck (extend_env ts env) e2 t ==> 
+          EX s'. typecheck_subst env s' ts & matches s' p e ==> 
+                    typecheck env (apply_subst s e2) t"
+proof auto
+  fix s'
+  assume "matches s p e" 
+     and X: "typecheck (extend_env ts env) e2 t" 
+     and Y: "typecheck_subst env s' ts" 
+     and "matches s' p e"
+  moreover hence "s = s'" by simp
+  ultimately show "typecheck env (apply_subst s e2) t" by simp
+qed 
 
 end
