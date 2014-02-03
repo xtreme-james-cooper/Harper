@@ -165,6 +165,13 @@ lemma [simp]: "free_vars (incr_from n e) = incr n ` free_vars e"
   and [simp]: "free_vars_rule (incr_from_rule m r) = incr m ` free_vars_rule r"
 by (induction e and rs and r arbitrary: n and k and m, auto)
 
+primrec incr_by :: "nat => expr => expr"
+where "incr_by 0 e = e"
+    | "incr_by (Suc n) e = incr_from 0 (incr_by n e)"
+
+lemma [simp]:  "redr_set_by n (free_vars (incr_by n e)) = free_vars e" 
+by (induction n, simp_all) 
+
 primrec sub_from :: "nat => expr => expr"
     and sub_from_rules :: "nat => rule list => rule list"
     and sub_from_rule :: "nat => rule => rule"
@@ -207,58 +214,14 @@ where "subst (Var v) e x = (if v = x then e else Var v)"
     | "subst (Match ec rs) e x = Match (subst ec e x) (subst_rules rs e x)"
     | "subst_rules Nil e x = Nil"
     | "subst_rules (r # rs) e x = subst_rule r e x # subst_rules rs e x"
-    | "subst_rule (Rule p b) e x = Rule p (subst b (incr_from (vars_count p) e) (x + vars_count p))"
+    | "subst_rule (Rule p b) e x = Rule p (subst b (incr_by (vars_count p) e) (x + vars_count p))"
 
 definition safe_subst :: "expr => expr => expr"
 where "safe_subst e e' = sub_from 0 (subst e (incr_from 0 e') 0)"
 
 lemma [simp]: "free_vars (subst e e' x) = (if x : free_vars e then free_vars e - {x} Un free_vars e' else free_vars e)"
-  and [simp]: "free_vars_rules (subst_rules rs e' x) = (if x : free_vars_rules rs then free_vars_rules rs - {x} Un free_vars e' else free_vars_rules rs)"
-  and [simp]: "free_vars_rule (subst_rule r e' x) = (if x : free_vars_rule r then free_vars_rule r - {x} Un free_vars e' else free_vars_rule r)"
-proof (induction e and rs and r arbitrary: e' x)
-case Var
-  thus ?case by simp
-next case Zero
-  thus ?case by simp
-next case Succ
-  thus ?case by simp
-next case IsZ
-  thus ?case by auto 
-next case Lam
-  thus ?case by auto
-next case Ap
-  thus ?case by auto
-next case Fix
-  thus ?case by auto
-next case Triv
-  thus ?case by simp
-next case Pair
-  thus ?case by auto
-next case ProjL
-  thus ?case by simp
-next case ProjR
-  thus ?case by simp
-next case Abort
-  thus ?case by simp
-next case InL
-  thus ?case by simp
-next case InR
-  thus ?case by simp
-next case (Match e rs)
-  thus ?case by auto sorry
-next case Nil_rule
-  thus ?case by simp
-next case Cons_rule
-  thus ?case by auto
-next case (Rule p b)
-  with Rule show ?case
-  proof (cases "x + vars_count p : free_vars b")
-  case True
-    have "redr_set_by (vars_count p) (free_vars (incr_from (vars_count p) e')) = free_vars e'" by simp sorry
-    with Rule True show ?thesis by simp
-  next case False
-    with Rule show ?thesis by simp
-  qed
-qed
+  and [simp]: "free_vars_rules (subst_rules rs e'' y) = (if y : free_vars_rules rs then free_vars_rules rs - {y} Un free_vars e'' else free_vars_rules rs)"
+  and [simp]: "free_vars_rule (subst_rule r e''' z) = (if z : free_vars_rule r then free_vars_rule r - {z} Un free_vars e''' else free_vars_rule r)"
+by (induction e and rs and r arbitrary: e' x and e'' y and e''' z, auto)
 
 end
