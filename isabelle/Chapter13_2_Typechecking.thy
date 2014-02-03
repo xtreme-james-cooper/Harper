@@ -240,20 +240,14 @@ inductive_cases [elim!]: "typecheck_subst e (x # y) t"
 lemma [simp]: "typecheck_subst env e1 t1 ==> typecheck_subst env e2 t2 ==> typecheck_subst env (e1 @ e2) (t1 @ t2)"
 by (induction env e1 t1 rule: typecheck_subst.induct, simp_all)
 
+lemma [simp]: "typecheck_subst env ss ts ==> length ss = length ts"
+by (induction env ss ts rule: typecheck_subst.induct, simp_all)
+
 primrec apply_subst :: "expr list => expr => expr"
 where "apply_subst [] e = e"
-    | "apply_subst (e' # e's) e = apply_subst e's (safe_subst e e')"
+    | "apply_subst (e' # e's) e = apply_subst e's (safe_subst e (incr_by (length e's) e'))"
 
 lemma [simp]: "typecheck_subst env s ts ==> typecheck (extend_env ts env) e t ==> typecheck env (apply_subst s e) t"
-proof (induction env s ts arbitrary: e rule: typecheck_subst.induct)
-case tsubn
-  thus ?case by simp
-next case (tsubc env s t' ss ts)
-  from tsubc have "typecheck env s t'" by simp
-  from tsubc have "typecheck_subst env ss ts" by simp
-
-  have "typecheck (extend_env ts env) s t'" by simp sorry
-  with tsubc show ?case by simp
-qed
+by (induction env s ts arbitrary: e rule: typecheck_subst.induct, simp_all)
 
 end
