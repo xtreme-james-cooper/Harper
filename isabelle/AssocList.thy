@@ -157,4 +157,7 @@ where "extend_env [] env = env"
 lemma [simp]: "extend_at (extend_env ts env) (p + length ts) k = extend_env ts (extend_at env p k)"
 by (induction ts, simp_all add: extend_at_swap)
 
+lemma [simp]: "extend_env ts (extend env x t2) = extend (extend_env ts env) (x + length ts) t2"
+by (induction ts, simp_all add: extend_at_swap)
+
 end

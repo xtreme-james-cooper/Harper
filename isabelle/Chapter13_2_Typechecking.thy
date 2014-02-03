@@ -65,8 +65,6 @@ inductive_cases [elim!]: "typecheck_rules e [] t t'"
 inductive_cases [elim!]: "typecheck_rules e (r # rs) t t'"
 inductive_cases [elim!]: "typecheck_rule e (Rule x y) t t'"
                         
-thm typecheck_typecheck_rules_typecheck_rule.induct
-
 lemma [simp]: "typecheck env e t ==> typecheck (extend_at env n k) (incr_from n e) t"
   and [simp]: "typecheck_rules env rs t1 t2 ==> typecheck_rules (extend_at env n k) (incr_from_rules n rs) t1 t2"
   and [simp]: "typecheck_rule env r t1 t2 ==> typecheck_rule (extend_at env n k) (incr_from_rule n r) t1 t2"
@@ -120,6 +118,9 @@ next case (trul p t1 ts env e t2)
   ultimately have "typecheck (extend_env ts (extend_at env n k)) (incr_from (n + vars_count p) e) t2" by simp
   with trul show ?case by simp
 qed
+
+lemma [simp]: "typecheck env e t ==> typecheck (extend_env ts env) (incr_by (length ts) e) t"
+by (induction ts, simp_all)        
 
 lemma [simp]: "typecheck (extend_at env n k) e t ==> n ~: free_vars e ==> typecheck env (sub_from n e) t"
   and [simp]: "typecheck_rules (extend_at env n k) rs t1 t2 ==> n ~: free_vars_rules rs ==> typecheck_rules env (sub_from_rules n rs) t1 t2"
@@ -211,13 +212,19 @@ next case tinl
 next case tinr
   thus ?case by simp
 next case (tmch e t1 rs t2)
-  thus ?case by simp sorry
+  hence "typecheck env (subst e eb x) t1" by simp
+  moreover from tmch have "typecheck_rules env (subst_rules rs eb x) t1 t2" by simp
+  ultimately show ?case by simp
 next case tnil
   thus ?case by simp
 next case tcns
   thus ?case by simp
-next case trul
-  thus ?case by simp sorry
+next case (trul p t1 ts b t2')
+  from trul have "typecheck env eb t2" by simp
+  hence B: "typecheck (extend_env ts env) (incr_by (length ts) eb) t2" by simp
+  from trul have A: "vars_count p = length ts" by simp
+  hence "extend_env ts (extend env x t2) = extend (extend_env ts env) (x + vars_count p) t2" by simp
+  with A B trul show ?case by simp
 qed
 
 lemma [simp]: "typecheck (extend_at env 0 t') e t ==> typecheck env e' t' ==> typecheck env (safe_subst e e') t"
