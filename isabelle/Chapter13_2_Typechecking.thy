@@ -13,14 +13,14 @@ datatype constr =
 | CPair constr constr
 
 inductive typecheck_constr :: "constr => type => bool"
-where [simp]: "typecheck_constr All t"
-    | [simp]: "typecheck_constr c1 t ==> typecheck_constr c2 t ==> typecheck_constr (And c1 c2) t"
-    | [simp]: "typecheck_constr Nothing t"
-    | [simp]: "typecheck_constr c1 t ==> typecheck_constr c2 t ==> typecheck_constr (Or c1 c2) t"
-    | [simp]: "typecheck_constr c t1 ==> typecheck_constr (CInL t1 t2 c) (Sum t1 t2)"
-    | [simp]: "typecheck_constr c t2 ==> typecheck_constr (CInR t1 t2 c) (Sum t1 t2)"
-    | [simp]: "typecheck_constr CTriv Unit"
-    | [simp]: "typecheck_constr c1 t1 ==> typecheck_constr c2 t2 ==> typecheck_constr (CPair c1 c2) (Prod t1 t2)"
+where tcal [simp]: "typecheck_constr All t"
+    | tcan [simp]: "typecheck_constr c1 t ==> typecheck_constr c2 t ==> typecheck_constr (And c1 c2) t"
+    | tcno [simp]: "typecheck_constr Nothing t"
+    | tcor [simp]: "typecheck_constr c1 t ==> typecheck_constr c2 t ==> typecheck_constr (Or c1 c2) t"
+    | tcil [simp]: "typecheck_constr c t1 ==> typecheck_constr (CInL t1 t2 c) (Sum t1 t2)"
+    | tcir [simp]: "typecheck_constr c t2 ==> typecheck_constr (CInR t1 t2 c) (Sum t1 t2)"
+    | tctr [simp]: "typecheck_constr CTriv Unit"
+    | tcpr [simp]: "typecheck_constr c1 t1 ==> typecheck_constr c2 t2 ==> typecheck_constr (CPair c1 c2) (Prod t1 t2)"
 
 inductive_cases [elim!]: "typecheck_constr All t"
 inductive_cases [elim!]: "typecheck_constr (And x y) t"
@@ -32,14 +32,14 @@ inductive_cases [elim!]: "typecheck_constr CTriv t"
 inductive_cases [elim!]: "typecheck_constr (CPair x y) t"
 
 inductive de_morgan_dual :: "constr => constr => bool"
-where "de_morgan_dual All Nothing"
-    | "de_morgan_dual c1 c1' ==> de_morgan_dual c2 c2' ==> de_morgan_dual (And c1 c2) (Or c1' c2')"
-    | "de_morgan_dual Nothing All"
-    | "de_morgan_dual c1 c1' ==> de_morgan_dual c2 c2' ==> de_morgan_dual (Or c1 c2) (And c1' c2')"
-    | "de_morgan_dual c c' ==> de_morgan_dual (CInL t1 t2 c) (Or (CInL t1 t2 c') (CInR t1 t2 All))"
-    | "de_morgan_dual c c' ==> de_morgan_dual (CInR t1 t2 c) (Or (CInR t1 t2 c') (CInL t1 t2 All))"
-    | "de_morgan_dual CTriv Nothing"
-    | "de_morgan_dual c1 c1' ==> de_morgan_dual c2 c2' ==> 
+where dmdal [simp]: "de_morgan_dual All Nothing"
+    | dmdan [simp]: "de_morgan_dual c1 c1' ==> de_morgan_dual c2 c2' ==> de_morgan_dual (And c1 c2) (Or c1' c2')"
+    | dmdno [simp]: "de_morgan_dual Nothing All"
+    | dmdor [simp]: "de_morgan_dual c1 c1' ==> de_morgan_dual c2 c2' ==> de_morgan_dual (Or c1 c2) (And c1' c2')"
+    | dmdil [simp]: "de_morgan_dual c c' ==> de_morgan_dual (CInL t1 t2 c) (Or (CInL t1 t2 c') (CInR t1 t2 All))"
+    | dmdir [simp]: "de_morgan_dual c c' ==> de_morgan_dual (CInR t1 t2 c) (Or (CInR t1 t2 c') (CInL t1 t2 All))"
+    | dmdtr [simp]: "de_morgan_dual CTriv Nothing"
+    | dmdpr [simp]: "de_morgan_dual c1 c1' ==> de_morgan_dual c2 c2' ==> 
           de_morgan_dual (CPair c1 c2) (Or (CPair c1' c2) (Or (CPair c1 c2') (CPair c1' c2')))"
 
 inductive_cases [elim!]: "de_morgan_dual All t"
@@ -52,8 +52,7 @@ inductive_cases [elim!]: "de_morgan_dual CTriv t"
 inductive_cases [elim!]: "de_morgan_dual (CPair x y) t"
 
 lemma [simp]: "typecheck_constr c t ==> de_morgan_dual c c' ==> typecheck_constr c' t"
-by simp
-sorry
+by (induction c t arbitrary: c' rule: typecheck_constr.induct, auto)
 
 inductive satisfies :: "expr => constr => bool"
 where [simp]: "satisfies e All"
@@ -74,20 +73,20 @@ inductive_cases [elim!]: "satisfies e (CInR x y z)"
 inductive_cases [elim!]: "satisfies e CTriv"
 inductive_cases [elim!]: "satisfies e (CPair x y)"
 
-lemma "de_morgan_dual c c' ==> satisfies e c' = (~ satisfies e c)"
-proof auto
-  assume "de_morgan_dual c c'"
-     and "satisfies e c"
-     and "satisfies e c'"
-  thus False apply (induction c c' rule: de_morgan_dual.induct) by simp sorry
-next
-  assume "de_morgan_dual c c'"
-     and "~ satisfies e c"
-  thus "satisfies e c'" apply (induction c c' rule: de_morgan_dual.induct) by simp sorry
-qed
+inductive incon :: "constr list => bool"
+where "incon cs ==> incon (All # cs)"
+    | "incon (c1 # c2 # cs) ==> incon (And c1 c2 # cs)"
+    | "incon (Nothing # cs)"
+    | "incon (c1 # cs) ==> incon (c2 # cs) ==> incon (Or c1 c2 # cs)"
+    | "CInR t1 t2 c' : set cs ==> incon (CInL t1 t2 c # cs)"
+    | "CInL t1 t2 c' : set cs ==> incon (CInR t1 t2 c # cs)"
+    | "ALL c : set cs. EX c'. c = CInL t1 t2 c' ==> incon (map (%c. case c of CInL t t' c' => c') cs) ==> incon cs"
+    | "ALL c : set cs. EX c'. c = CInR t1 t2 c' ==> incon (map (%c. case c of CInR t t' c' => c') cs) ==> incon cs"
+    | "ALL c : set cs. EX c1 c2. c = CPair c1 c2 ==> incon (map (%c. case c of CPair c1 c2 => c1) cs) ==> incon cs"
+    | "ALL c : set cs. EX c1 c2. c = CPair c1 c2 ==> incon (map (%c. case c of CPair c1 c2 => c2) cs) ==> incon cs"
 
 definition totally_satisfied :: "constr => bool"
-where "totally_satisfied c = (ALL v. satisfies v c)" (* TODO: not all, but ALL v : typecheck env v t *)
+where "totally_satisfied c = incon [THE c'. de_morgan_dual c c']"
 
 inductive types_from_pat :: "patn => type => type list => constr => bool"
 where tpwld [simp]: "types_from_pat Wild t [] All"

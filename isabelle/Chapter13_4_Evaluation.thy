@@ -66,22 +66,57 @@ next case einl
 next case einr
   thus ?case by auto
 next case (emt1 e e' rs)
-  hence "EX t1 c. typecheck env e t1 & typecheck_rules env rs t1 t c" by auto
+  hence "EX t1 c. typecheck env e t1 & typecheck_rules env rs t1 t c & totally_satisfied c" by auto
   thus ?case
   proof auto
     fix t1 c
     assume "typecheck env e t1"
        and "typecheck_rules env rs t1 t c"
+       and "totally_satisfied c"
     moreover with emt1 have "typecheck env e' t1" by simp
-    ultimately show "typecheck env (Match e' rs) t" by simp sorry
+    ultimately show "typecheck env (Match e' rs) t" by simp
   qed
-next case (emt2 e s p e2 rs)
-  thus ?case by simp sorry
-next case emt3
-  thus ?case by auto sorry
+next case (emt2 e s p e' rs)
+  from emt2 have "EX t1 c cs ts. typecheck env e t1 & types_from_pat p t1 ts c & typecheck (extend_env ts env) e' t & typecheck_rules env rs t1 t cs & totally_satisfied (Or c cs)" by auto
+  thus ?case
+  proof auto
+    fix t1 c cs ts
+    assume "typecheck env e t1"
+       and "types_from_pat p t1 ts c" 
+       and X: "typecheck (extend_env ts env) e' t" 
+       and "typecheck_rules env rs t1 t cs"
+       and "totally_satisfied (Or c cs)"
+    hence "is_val e ==> (EX s. typecheck_subst env s ts & matches s p e) | no_match e p" by simp
+    with emt2 have "EX s. typecheck_subst env s ts & matches s p e" by simp
+    hence "typecheck_subst env s ts"
+    proof auto
+      fix sa
+      assume "typecheck_subst env sa ts"
+         and "matches sa p e"
+      moreover with emt2 have "sa = s" by simp
+      ultimately show "typecheck_subst env s ts" by simp
+    qed
+    with X show "typecheck env (apply_subst s e') t" by simp
+  qed
+next case (emt3 e p rs e' e2)
+  from emt3 have "EX t1 c cs ts. typecheck env e t1 & types_from_pat p t1 ts c & typecheck (extend_env ts env) e2 t & typecheck_rules env rs t1 t cs & totally_satisfied (Or c cs)" by auto
+  hence "EX t1 c. typecheck env e t1 & typecheck_rules env rs t1 t c & totally_satisfied c" 
+  proof auto
+    fix t1a c cs ts
+    assume "typecheck env e t1a" 
+       and "types_from_pat p t1a ts c" 
+       and "typecheck (extend_env ts env) e2 t" 
+       and "typecheck_rules env rs t1a t cs"
+       and "totally_satisfied (Or c cs)"
+    moreover have "totally_satisfied cs" by simp sorry
+    ultimately show "EX t1. typecheck env e t1 & (EX c. typecheck_rules env rs t1 t c & totally_satisfied c)" by auto
+  qed
+  with emt3 show ?case by auto
 qed
 
 theorem progress: "typecheck env e t ==> env = empty_map ==> is_val e | (EX e'. eval e e')"
+    and "typecheck_rules env rs t1 t c ==> env = empty_map ==> False"
+    and "typecheck_rule env r t1 t c ==> env = empty_map ==> False"
 proof (induction env e t rule: typecheck_typecheck_rules_typecheck_rule.inducts)
 case tvar
   thus ?case by auto
@@ -276,33 +311,28 @@ next case (tinr env e t2 t1)
     hence "eval (InR t1 t2 e) (InR t1 t2 x)" by simp
     thus "EX y. eval (InR t1 t2 e) y " by auto
   qed
-next case (tcse env e t1 t2 el t er)
+next case (tmch env e t1 rs t2 c)
   thus ?case
   proof (cases "is_val e")
   case True
-    with tcse have "(EX e'. e = InL t1 t2 e' & is_val e' & typecheck env e' t1) | (EX e'. e = InR t1 t2 e' & is_val e' & typecheck env e' t2)" by (simp add: canonical_sum)
-    thus ?thesis
-    proof (cases "EX e'. e = InL t1 t2 e'", auto)
-      fix e'
-      assume "is_val e'" 
-      hence "EX x. eval (Case (InL t1 t2 e') el er) (safe_subst el e')" by simp
-      thus "EX x. eval (Case (InL t1 t2 e') el er) x" by auto
-    next
-      fix e'
-      assume "is_val e'" 
-      hence "EX x. eval (Case (InR t1 t2 e') el er) (safe_subst er e')" by simp
-      thus "EX x. eval (Case (InR t1 t2 e') el er) x" by auto
-    qed
+    hence "EX a. eval (Match e rs) a" by simp sorry
+    thus ?thesis by simp
   next case False
-    with tcse have "EX a. eval e a" by simp
+    with tmch have "EX a. eval e a" by simp
     thus ?thesis
     proof auto
       fix a
       assume "eval e a"
-      hence "eval (Case e el er) (Case e el er)" by simp
-      thus "EX x. eval (Case e el er) x" by auto
+      hence "eval (Match e rs) (Match a rs)" by simp
+      thus "EX x. eval (Match e rs) x" by auto
     qed
   qed
+next case tnil
+  thus ?case by simp sorry
+next case tcns
+  thus ?case by simp 
+next case trul
+  thus ?case by simp sorry
 qed 
 
 end
