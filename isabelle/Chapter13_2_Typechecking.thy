@@ -111,7 +111,7 @@ where tvar [simp]: "lookup env v = Some t ==> typecheck env (Var v) t"
     | tabt [simp]: "typecheck env e Void ==> typecheck env (Abort t e) t"
     | tinl [simp]: "typecheck env e t1 ==> typecheck env (InL t1 t2 e) (Sum t1 t2)"
     | tinr [simp]: "typecheck env e t2 ==> typecheck env (InR t1 t2 e) (Sum t1 t2)"
-    | tmch [simp]: "typecheck env e t1 ==> typecheck_rules env rs t1 t2 ==> typecheck env (Match e rs) t2" 
+    | tmch [simp]: "typecheck env e t1 ==> typecheck_rules env rs t1 t2 ==> typecheck env (Match e t1 rs) t2" 
     | tnil [simp]: "typecheck_rules env [] t1 t2"
     | tcns [simp]: "typecheck_rule env r t1 t2 ==> typecheck_rules env rs t1 t2 ==> typecheck_rules env (r # rs) t1 t2"
     | trul [simp]: "types_from_pat p t1 ts ==> typecheck (extend_env ts env) e t2 ==> typecheck_rule env (Rule p e) t1 t2"
@@ -130,7 +130,7 @@ inductive_cases [elim!]: "typecheck e (ProjR x) t"
 inductive_cases [elim!]: "typecheck e (Abort x y) t"
 inductive_cases [elim!]: "typecheck e (InL x y z) t"
 inductive_cases [elim!]: "typecheck e (InR x y z) t"
-inductive_cases [elim!]: "typecheck e (Match x y) t"
+inductive_cases [elim!]: "typecheck e (Match x y z) t"
 inductive_cases [elim!]: "typecheck_rules e [] t t'"
 inductive_cases [elim!]: "typecheck_rules e (r # rs) t t'"
 inductive_cases [elim!]: "typecheck_rule e (Rule x y) t t'"
@@ -139,7 +139,7 @@ lemma [simp]: "typecheck env e t ==> typecheck (extend_at env n k) (incr_from n 
   and [simp]: "typecheck_rules env rs t1 t2 ==> typecheck_rules (extend_at env n k) (incr_from_rules n rs) t1 t2"
   and [simp]: "typecheck_rule env r t1 t2 ==> typecheck_rule (extend_at env n k) (incr_from_rule n r) t1 t2"
 proof (induction env e t and env rs t1 t2 and env r t1 t2 arbitrary: n and n and n rule: typecheck_typecheck_rules_typecheck_rule.inducts)
-case (tvar env v t)
+case tvar
   thus ?case by (simp add: incr_def)
 next case tzer
   thus ?case by simp

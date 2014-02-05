@@ -17,7 +17,7 @@ where "is_val (Var v) = False"
     | "is_val (Abort t e) = False"
     | "is_val (InL t t' e) = is_val e"
     | "is_val (InR t t' e) = is_val e"
-    | "is_val (Match e rs) = False"
+    | "is_val (Match e t rs) = False"
 
 lemma canonical_nat: "typecheck env e Nat ==> is_val e ==> e = Zero | (EX v. typecheck env v Nat & is_val v & e = Succ v)"
 by (induction e, auto)

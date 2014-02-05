@@ -41,7 +41,7 @@ datatype expr =
 | Abort type expr
 | InL type type expr
 | InR type type expr
-| Match expr "rule list"
+| Match expr type "rule list"
 and rule = Rule patn expr
 
 definition redr_set :: "nat set => nat set"
@@ -100,7 +100,7 @@ where "free_vars (Var v) = {v}"
     | "free_vars (Abort t e) = free_vars e"
     | "free_vars (InL t t' e) = free_vars e"
     | "free_vars (InR t t' e) = free_vars e"
-    | "free_vars (Match e rs) = free_vars e Un free_vars_rules rs"
+    | "free_vars (Match e t rs) = free_vars e Un free_vars_rules rs"
     | "free_vars_rules Nil = {}"
     | "free_vars_rules (r # rs) = free_vars_rule r Un free_vars_rules rs"    
     | "free_vars_rule (Rule p e) = redr_set_by (vars_count p) (free_vars e)"
@@ -128,10 +128,13 @@ where "incr_from n (Var v) = Var (incr n v)"
     | "incr_from n (Abort t e) = Abort t (incr_from n e)"
     | "incr_from n (InL t t' e) = InL t t' (incr_from n e)"
     | "incr_from n (InR t t' e) = InR t t' (incr_from n e)"
-    | "incr_from n (Match e rs) = Match (incr_from n e) (incr_from_rules n rs)"
+    | "incr_from n (Match e t rs) = Match (incr_from n e) t (incr_from_rules n rs)"
     | "incr_from_rules n Nil = Nil"
     | "incr_from_rules n (r # rs) = incr_from_rule n r # incr_from_rules n rs"    
     | "incr_from_rule n (Rule p e) = Rule p (incr_from (n + vars_count p) e)"
+
+lemma [simp]: "rs ~= [] ==> incr_from_rules n rs ~= []"
+by (cases rs, simp_all)
 
 lemma [simp]: "redr_set (incr (Suc n) ` xs) = incr n ` redr_set xs" 
 proof (auto simp add: incr_def)
@@ -195,10 +198,13 @@ where "sub_from n (Var v) = Var (if v < n then v else if v = n then undefined el
     | "sub_from n (Abort t e) = Abort t (sub_from n e)"
     | "sub_from n (InL t t' e) = InL t t' (sub_from n e)"
     | "sub_from n (InR t t' e) = InR t t' (sub_from n e)"
-    | "sub_from n (Match e rs) = Match (sub_from n e) (sub_from_rules n rs)"
+    | "sub_from n (Match e t rs) = Match (sub_from n e) t (sub_from_rules n rs)"
     | "sub_from_rules n Nil = Nil"
     | "sub_from_rules n (r # rs) = sub_from_rule n r # sub_from_rules n rs"    
     | "sub_from_rule n (Rule p e) = Rule p (sub_from (n + vars_count p) e)"
+
+lemma [simp]: "rs ~= [] ==> sub_from_rules n rs ~= []"
+by (cases rs, simp_all)
 
 primrec subst :: "expr => expr => nat => expr"
     and subst_rules :: "rule list => expr => nat => rule list"
@@ -217,10 +223,13 @@ where "subst (Var v) e x = (if v = x then e else Var v)"
     | "subst (Abort t n) e x = Abort t (subst n e x)"
     | "subst (InL t t' n) e x = InL t t' (subst n e x)"
     | "subst (InR t t' n) e x = InR t t' (subst n e x)"
-    | "subst (Match ec rs) e x = Match (subst ec e x) (subst_rules rs e x)"
+    | "subst (Match ec t rs) e x = Match (subst ec e x) t (subst_rules rs e x)"
     | "subst_rules Nil e x = Nil"
     | "subst_rules (r # rs) e x = subst_rule r e x # subst_rules rs e x"
     | "subst_rule (Rule p b) e x = Rule p (subst b (incr_by (vars_count p) e) (x + vars_count p))"
+
+lemma [simp]: "rs ~= [] ==> subst_rules rs e x ~= []"
+by (cases rs, simp_all)
 
 definition safe_subst :: "expr => expr => expr"
 where "safe_subst e e' = sub_from 0 (subst e (incr_from 0 e') 0)"
