@@ -94,8 +94,8 @@ next case (mtchr s p e)
   thus ?case by simp 
 qed
 
-lemma [simp]: "types_from_pat p t ts c ==> typecheck env e t ==> is_val e ==> (EX s. typecheck_subst env s ts & matches s p e) | no_match e p"
-proof (induction p t ts c arbitrary: e rule: types_from_pat.induct)
+lemma [simp]: "types_from_pat p t ts ==> typecheck env e t ==> is_val e ==> (EX s. typecheck_subst env s ts & matches s p e) | no_match e p"
+proof (induction p t ts arbitrary: e rule: types_from_pat.induct)
 case tpwld
   have "typecheck_subst env [] [] & matches [] Wild e" by simp
   hence "EX s. typecheck_subst env s [] & matches s Wild e" by (rule exI)
@@ -109,7 +109,7 @@ next case tptrv
   hence "typecheck_subst env [] [] & matches [] PTriv e" by simp
   hence "EX s. typecheck_subst env s [] \<and> matches s PTriv e" by (rule exI)
   thus ?case by simp
-next case (tppar p1 t1 ts1 c p2 t2 ts2)
+next case (tppar p1 t1 ts1 p2 t2 ts2)
   hence "(EX e1 e2. e = Pair e1 e2 & typecheck env e1 t1 & typecheck env e2 t2 & is_val e1 & is_val e2)" by (simp add: canonical_prod)
   with tppar show ?case
   proof auto
@@ -136,7 +136,7 @@ next case (tppar p1 t1 ts1 c p2 t2 ts2)
       thus "EX s. typecheck_subst env s (ts1 @ ts2) & matches s (PPair p1 p2) (Pair e1 e2)" by auto
     qed
   qed
-next case (tpinl p t1 ts c t2)
+next case (tpinl p t1 ts t2)
   from tpinl have "(EX e'. e = InL t1 t2 e' & is_val e' & typecheck env e' t1) | (EX e'. e = InR t1 t2 e' & is_val e' & typecheck env e' t2)" by (simp add: canonical_sum)
   with tpinl show ?case
   proof (cases "EX e'. e = InL t1 t2 e'", auto)
@@ -148,7 +148,7 @@ next case (tpinl p t1 ts c t2)
     hence "EX s. typecheck_subst env s ts & matches s p e'" by auto
     thus "EX s. typecheck_subst env s ts & matches s (PInL p) (InL t1 t2 e')" by auto
   qed
-next case (tpinr p t2 ts c t1)
+next case (tpinr p t2 ts t1)
   from tpinr have "(EX e'. e = InL t1 t2 e' & is_val e' & typecheck env e' t1) | (EX e'. e = InR t1 t2 e' & is_val e' & typecheck env e' t2)" by (simp add: canonical_sum)
   with tpinr show ?case
   proof (cases "EX e'. e = InR t1 t2 e'", auto)
@@ -200,5 +200,43 @@ proof auto
   moreover hence "s = s'" by simp
   ultimately show "typecheck env (apply_subst s e2) t" by simp
 qed 
- 
+
+lemma [simp]: "satisfies e (extract_constraint p) ==> EX s. matches s p e"
+proof (induction p arbitrary: e)
+case Wild
+  have "matches [] Wild e" by simp
+  thus ?case by (rule exI)
+next case PVar
+  have "matches [e] PVar e" by simp
+  thus ?case by (rule exI)
+next case PTriv
+  hence X: "satisfies e CTriv" by simp
+  have "matches [] PTriv Triv" by simp
+  hence "EX s. matches s PTriv Triv" by (rule exI)
+  with X show ?case by (induction e CTriv rule: satisfies.induct)
+next case (PPair p1 p2)
+  hence "satisfies e (CPair (extract_constraint p1) (extract_constraint p2))" by simp
+  hence "EX e1 e2. satisfies e1 (extract_constraint p1) & satisfies e2 (extract_constraint p2) & e = Pair e1 e2" 
+      by (induction e "CPair (extract_constraint p1) (extract_constraint p2)" rule: satisfies.induct, simp)
+  thus ?case
+  proof auto
+    fix e1 e2
+    assume "satisfies e1 (extract_constraint p1)"
+       and "satisfies e2 (extract_constraint p2)"
+    with PPair have "EX s1 s2. matches s1 p1 e1 & matches s2 p2 e2" by simp
+    thus "EX s. matches s (PPair p1 p2) (Pair e1 e2)"
+    proof auto
+      fix s1 s2
+      assume "matches s1 p1 e1" 
+         and "matches s2 p2 e2"
+      hence "matches (s1 @ s2) (PPair p1 p2) (Pair e1 e2)" by simp
+      thus "EX s. matches s (PPair p1 p2) (Pair e1 e2)" by (rule exI)
+    qed
+  qed
+next case (PInL p)
+  thus ?case by simp sorry
+next case (PInR p)
+  thus ?case by simp sorry
+qed
+
 end
