@@ -50,6 +50,18 @@ inductive_cases [elim!]: "satisfies e (CInR x y z)"
 inductive_cases [elim!]: "satisfies e CTriv"
 inductive_cases [elim!]: "satisfies e (CPair x y)"
 
+lemma [simp]: "satisfies e CTriv ==> e = Triv"
+by (induction e CTriv rule: satisfies.induct, simp)
+
+lemma [simp]: "satisfies e (CPair c1 c2) ==> EX e1 e2. e = Pair e1 e2"
+by (induction e "CPair c1 c2" rule: satisfies.induct, simp)
+
+lemma [simp]: "satisfies e (CInL t1 t2 c) ==> EX e'. e = InL t1 t2 e'"
+by (induction e "CInL t1 t2 c" rule: satisfies.induct, simp)
+
+lemma [simp]: "satisfies e (CInR t1 t2 c) ==> EX e'. e = InR t1 t2 e'"
+by (induction e "CInR t1 t2 c" rule: satisfies.induct, simp)
+
 primrec totally_satisfied :: "type => constr => bool"
 where "totally_satisfied t All = True"
     | "totally_satisfied t (And c1 c2) = (totally_satisfied t c1 & totally_satisfied t c2)" 
@@ -122,43 +134,6 @@ inductive_cases [elim!]: "typecheck e (Match x y) t"
 inductive_cases [elim!]: "typecheck_rules e [] t t'"
 inductive_cases [elim!]: "typecheck_rules e (r # rs) t t'"
 inductive_cases [elim!]: "typecheck_rule e (Rule x y) t t'"
-  
-inductive extract_constraint :: "patn => type => constr => bool"       
-where [simp]: "extract_constraint Wild t All"
-    | [simp]: "extract_constraint PVar t All"
-    | [simp]: "extract_constraint PTriv Unit CTriv"
-    | [simp]: "extract_constraint p1 t1 c1 ==> extract_constraint p2 t2 c2 ==> extract_constraint (PPair p1 p2) (Prod t1 t2) (CPair c1 c2)"
-    | [simp]: "extract_constraint p t1 c ==> extract_constraint (PInL p) (Sum t1 t2) (CInL t1 t2 c)"
-    | [simp]: "extract_constraint p t2 c ==> extract_constraint (PInR p) (Sum t1 t2) (CInR t1 t2 c)"
- 
-inductive_cases [elim!]: "extract_constraint Wild t c"
-inductive_cases [elim!]: "extract_constraint PVar t c"
-inductive_cases [elim!]: "extract_constraint PTriv t c"
-inductive_cases [elim!]: "extract_constraint (PPair p1 p2) t c"
-inductive_cases [elim!]: "extract_constraint (PInL p) t c"
-inductive_cases [elim!]: "extract_constraint (PInR p) t c"
-
-primrec all_matches_complete :: "expr => type => bool"
-    and extract_constraints :: "rule list => type => constr"
-    and extract_constraint_rule :: "rule => type => constr"
-where "all_matches_complete (Var v) t = True" 
-    | "all_matches_complete Zero t = True"
-    | "all_matches_complete (Succ e) t = all_matches_complete e t"
-    | "all_matches_complete (IsZ e1 e2 e3) t = (all_matches_complete e1 t & all_matches_complete e2 t & all_matches_complete e3 t)"
-    | "all_matches_complete (Lam t' e) t = all_matches_complete e t"
-    | "all_matches_complete (Ap e1 e2) t = (all_matches_complete e1 t & all_matches_complete e2 t)"
-    | "all_matches_complete (Fix t' e) t = all_matches_complete e t"
-    | "all_matches_complete Triv t = True"
-    | "all_matches_complete (Pair e1 e2) t = (all_matches_complete e1 t & all_matches_complete e2 t)"
-    | "all_matches_complete (ProjL e) t = all_matches_complete e t"
-    | "all_matches_complete (ProjR e) t = all_matches_complete e t"
-    | "all_matches_complete (Abort t' e) t = all_matches_complete e t"
-    | "all_matches_complete (InL t1 t2 e) t = all_matches_complete e t"
-    | "all_matches_complete (InR t1 t2 e) t = all_matches_complete e t"
-    | "all_matches_complete (Match e rs) t = (all_matches_complete e t & totally_satisfied Void (extract_constraints rs t))"
-    | "extract_constraints [] t = Nothing"
-    | "extract_constraints (r # rs) t = Or (extract_constraint_rule r t) (extract_constraints rs t)"
-    | "extract_constraint_rule (Rule p e) t = (if all_matches_complete e t then THE c. extract_constraint p t c else Nothing)"
 
 lemma [simp]: "typecheck env e t ==> typecheck (extend_at env n k) (incr_from n e) t"
   and [simp]: "typecheck_rules env rs t1 t2 ==> typecheck_rules (extend_at env n k) (incr_from_rules n rs) t1 t2"
