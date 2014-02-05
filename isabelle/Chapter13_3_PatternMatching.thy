@@ -201,29 +201,26 @@ proof auto
   ultimately show "typecheck env (apply_subst s e2) t" by simp
 qed 
 
-lemma [simp]: "satisfies e (extract_constraint p) ==> EX s. matches s p e"
-proof (induction p arbitrary: e)
-case Wild
+lemma [simp]: "types_from_pat p t ts ==> extract_constraint p t c ==> satisfies e c ==> EX s. matches s p e"
+proof (induction p t ts arbitrary: e rule: types_from_pat.induct)
+case tpwld
   have "matches [] Wild e" by simp
   thus ?case by (rule exI)
-next case PVar
+next case tpvar
   have "matches [e] PVar e" by simp
   thus ?case by (rule exI)
-next case PTriv
-  hence X: "satisfies e CTriv" by simp
+next case tptrv
   have "matches [] PTriv Triv" by simp
   hence "EX s. matches s PTriv Triv" by (rule exI)
-  with X show ?case by (induction e CTriv rule: satisfies.induct)
-next case (PPair p1 p2)
-  hence "satisfies e (CPair (extract_constraint p1) (extract_constraint p2))" by simp
-  hence "EX e1 e2. satisfies e1 (extract_constraint p1) & satisfies e2 (extract_constraint p2) & e = Pair e1 e2" 
-      by (induction e "CPair (extract_constraint p1) (extract_constraint p2)" rule: satisfies.induct, simp)
+  thus ?case by simp sorry
+next case (tppar p1 t1 _ p2 t2 _)
+  hence "EX e1 e2. satisfies e1 c1 & satisfies e2 c2 & e = Pair e1 e2" by (induction e "CPair c1 c2" rule: satisfies.induct, simp) sorry
   thus ?case
   proof auto
     fix e1 e2
-    assume "satisfies e1 (extract_constraint p1)"
-       and "satisfies e2 (extract_constraint p2)"
-    with PPair have "EX s1 s2. matches s1 p1 e1 & matches s2 p2 e2" by simp
+    assume "satisfies e1 c1"
+       and "satisfies e2 c2"
+    with tppar have "EX s1 s2. matches s1 p1 e1 & matches s2 p2 e2" by simp sorry
     thus "EX s. matches s (PPair p1 p2) (Pair e1 e2)"
     proof auto
       fix s1 s2
@@ -233,9 +230,22 @@ next case (PPair p1 p2)
       thus "EX s. matches s (PPair p1 p2) (Pair e1 e2)" by (rule exI)
     qed
   qed
-next case (PInL p)
-  thus ?case by simp sorry
-next case (PInR p)
+next case (tpinl p t1 _ t2)
+  hence "EX e'. satisfies e' c & e = InL t1 t2 e'" by (induction e "CInL t1 t2 c" rule: satisfies.induct, simp) sorry
+  thus ?case
+  proof auto
+    fix e'
+    assume "satisfies e' c"
+    with tpinl have "EX s. matches s p e'" by simp sorry
+    thus "EX s. matches s (PInL p) (InL t1 t2 e')"
+    proof auto
+      fix s
+      assume "matches s p e'"
+      hence "matches s (PInL p) (InL t1 t2 e')" by simp
+      thus "EX s. matches s (PInL p) (InL t1 t2 e')" by (rule exI)
+    qed
+  qed
+next case (tpinr p t2 _ t1)
   thus ?case by simp sorry
 qed
 
