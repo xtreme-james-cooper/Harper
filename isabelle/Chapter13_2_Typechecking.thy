@@ -62,15 +62,18 @@ by (induction e "CInL t1 t2 c" rule: satisfies.induct, simp)
 lemma [simp]: "satisfies e (CInR t1 t2 c) ==> EX e'. e = InR t1 t2 e'"
 by (induction e "CInR t1 t2 c" rule: satisfies.induct, simp)
 
-primrec totally_satisfied :: "type => constr => bool"
-where "totally_satisfied t All = True"
-    | "totally_satisfied t (And c1 c2) = (totally_satisfied t c1 & totally_satisfied t c2)" 
-    | "totally_satisfied t Nothing = False"  
-    | "totally_satisfied t (Or c1 c2) = (totally_satisfied t c1 | totally_satisfied t c2)" 
-    | "totally_satisfied t (CInL t1 t2 c) = (t = Sum t1 t2 & totally_satisfied t1 c)"
-    | "totally_satisfied t (CInR t1 t2 c) = (t = Sum t1 t2 & totally_satisfied t2 c)"
-    | "totally_satisfied t CTriv = (t = Unit)" 
-    | "totally_satisfied t (CPair c1 c2) = (case t of Prod t1 t2 => totally_satisfied t1 c1 & totally_satisfied t2 c2 | _ => False)" 
+function totally_satisfied :: "type => constr list => bool"
+where "totally_satisfied t [] = False"
+    | "totally_satisfied t (All # cs) = totally_satisfied t cs"
+    | "totally_satisfied t (And c1 c2 # cs) = (totally_satisfied t (c1 # c2 # cs))" 
+    | "totally_satisfied t (Nothing # cs) = False"  
+    | "totally_satisfied t (Or c1 c2 # cs) = (totally_satisfied t (c1 # cs) | totally_satisfied t (c2 # cs))" 
+    | "totally_satisfied t (CInL t1 t2 c # cs) = (t = Sum t1 t2 & totally_satisfied t1 (c # cs))"
+    | "totally_satisfied t (CInR t1 t2 c # cs) = (t = Sum t1 t2 & totally_satisfied t2 (c # cs))"
+    | "totally_satisfied t (CTriv # cs) = (t = Unit & totally_satisfied t cs)" 
+    | "totally_satisfied t (CPair c1 c2 # cs) = (case t of Prod t1 t2 => 
+                                totally_satisfied t1 (c1 # cs) & totally_satisfied t2 (c2 # cs) | _ => False)" 
+by pat_completeness auto
 
 inductive types_from_pat :: "patn => type => type list => bool"
 where tpwld [simp]: "types_from_pat Wild t []"

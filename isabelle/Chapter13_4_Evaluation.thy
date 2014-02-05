@@ -50,7 +50,7 @@ where [simp]: "all_matches_complete (Var v)"
     | [simp]: "all_matches_complete e ==> all_matches_complete (Abort t e)"
     | [simp]: "all_matches_complete e ==> all_matches_complete (InL t1 t2 e)"
     | [simp]: "all_matches_complete e ==> all_matches_complete (InR t1 t2 e)"
-    | [simp]: "all_matches_complete e ==> extract_constraints rs t c ==> totally_satisfied t c ==> all_matches_complete (Match e t rs)"
+    | [simp]: "all_matches_complete e ==> extract_constraints rs t c ==> totally_satisfied t [c] ==> all_matches_complete (Match e t rs)"
     | [simp]: "extract_constraints [] t Nothing"
     | [simp]: "extract_constraint_rule r t c1 ==> extract_constraints rs t c2 ==> extract_constraints (r # rs) t (Or c1 c2)"
     | [simp]: "extract_constraint p t c ==> all_matches_complete e ==> extract_constraint_rule (Rule p e) t c"
@@ -239,9 +239,9 @@ next case emt3
 qed
 
 theorem progress: "typecheck env e t ==> env = empty_map ==> all_matches_complete e ==> is_val e | (EX e'. eval e e')"
-    and "typecheck_rules env rs t1 t ==> env = empty_map ==> True"
-    and "typecheck_rule env r t1 t ==> env = empty_map ==> True"
-proof (induction env e t rule: typecheck_typecheck_rules_typecheck_rule.inducts)
+    and "typecheck_rules env rs t1 t ==> extract_constraints rs t1 c ==> is_val v ==> typecheck env v t1 ==> satisfies v c ==> EX e'. eval (Match v t1 rs) e'"
+    and "typecheck_rule env r t1 t ==> True"
+proof (induction env e t and env rs t1 t arbitrary: and v c rule: typecheck_typecheck_rules_typecheck_rule.inducts)
 case tvar
   thus ?case by auto
 next case tzer
@@ -436,14 +436,17 @@ next case (tmch env e t1 rs t2)
   thus ?case
   proof (cases "is_val e")
   case True
-    hence "is_val e" by simp
-    from tmch have "typecheck env e t1" by simp
-    from tmch have "typecheck_rules env rs t1 t2" by simp
-    from tmch have "all_matches_complete e \<Longrightarrow> is_val e | (EX a. eval e a)" by simp
-    from tmch have "all_matches_complete (Match e t1 rs)" by simp
-
-    hence "EX a. eval (Match e t1 rs) a" by auto sorry
-    thus ?thesis by simp
+    from tmch have "EX c. extract_constraints rs t1 c & totally_satisfied t1 [c]" by auto
+    hence "EX c. extract_constraints rs t1 c & satisfies e c"
+    proof auto
+      fix c
+      assume "extract_constraints rs t1 c"
+         and "totally_satisfied t1 [c]"
+      moreover with True tmch have "satisfies e c" by simp
+      ultimately have "extract_constraints rs t1 c & satisfies e c" by simp
+      thus "EX c. extract_constraints rs t1 c & satisfies e c" by auto
+    qed
+    with True tmch show ?thesis by auto
   next case False
     with tmch have "EX a. eval e a" by auto
     thus ?thesis
@@ -455,9 +458,50 @@ next case (tmch env e t1 rs t2)
     qed
   qed
 next case tnil
-  thus ?case by simp
-next case tcns
-  thus ?case by simp 
+  thus ?case by auto
+next case (tcns env r t1 t2 rs)
+  thus ?case
+  proof (cases r)
+  case (Rule p e2)
+    from tcns have "satisfies v c" by simp
+    moreover from tcns Rule have "EX c1 c2. c = Or c1 c2 & extract_constraint_rule (Rule p e2) t1 c1 & extract_constraints rs t1 c2" by auto
+    moreover from tcns Rule have "EX ts. types_from_pat p t1 ts & typecheck (extend_env ts env) e2 t2" by auto
+    ultimately show ?thesis
+    proof auto
+      fix c1 ts c2
+      assume "types_from_pat p t1 ts"
+         and "extract_constraint p t1 c1" 
+         and "satisfies v c1"
+      hence "EX s. matches s p v" by simp
+      moreover from tcns have "is_val v" by simp
+      ultimately show ?thesis
+      proof auto
+        fix s
+        assume "is_val v"
+           and "matches s p v"
+        hence "eval (Match v t1 (Rule p e2 # rs)) (apply_subst s e2)" by simp
+        with Rule show "EX a. eval (Match v t1 (r # rs)) a" by auto
+      qed
+    next
+      fix c1 ts c2
+      assume "types_from_pat p t1 ts"
+         and "typecheck (extend_env ts env) e2 t2"
+         and "extract_constraints rs t1 c2"
+         and "extract_constraint p t1 c1" 
+         and "all_matches_complete e2"
+         and "satisfies v c2"
+      with tcns have "EX a. eval (Match v t1 rs) a" by auto
+      moreover have "no_match v p" by simp sorry
+      ultimately show ?thesis
+      proof auto
+        fix a
+        assume "no_match v p" 
+           and "eval (Match v t1 rs) a"
+        with tcns have "eval (Match v t1 (Rule p e2 # rs)) a" by simp
+        with Rule show "EX a. eval (Match v t1 (r # rs)) a" by auto
+      qed
+    qed
+  qed
 next case trul
   thus ?case by simp
 qed 

@@ -38,6 +38,27 @@ lemma canonical_sum: "typecheck env e (Sum t1 t2) ==> is_val e ==>
       (EX e'. e = InL t1 t2 e' & is_val e' & typecheck env e' t1) | (EX e'. e = InR t1 t2 e' & is_val e' & typecheck env e' t2)"
 by (induction e, auto)
 
+lemma [simp]: "totally_satisfied t [c] ==> typecheck env e t ==> is_val e ==> satisfies e c"
+proof (induction c arbitrary: t e)
+case All
+  thus ?case by simp
+next case (And c1 c2)
+  thus ?case by auto sorry
+next case Nothing
+  thus ?case by simp sorry
+next case Or
+  thus ?case by auto sorry
+next case (CInL t1 t2 c)
+  thus ?case by simp sorry
+next case CInR
+  thus ?case by simp sorry
+next case CTriv
+  hence "e = Triv" by (simp add: canonical_unit) sorry
+  thus ?case by simp
+next case (CPair c1 c2)
+  thus ?case by simp sorry
+qed
+
 inductive matches :: "expr list => patn => expr => bool"
 where mtchw [simp]: "matches [] Wild e"
     | mtchv [simp]: "matches [e] PVar e"
