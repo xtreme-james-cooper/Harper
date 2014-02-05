@@ -12,6 +12,16 @@ datatype constr =
 | CTriv
 | CPair constr constr
 
+primrec de_morgan_dual :: "constr => constr"
+where "de_morgan_dual All = Nothing"
+    | "de_morgan_dual (And c1 c2) = Or (de_morgan_dual c1) (de_morgan_dual c2)"
+    | "de_morgan_dual Nothing = All"
+    | "de_morgan_dual (Or c1 c2) = And (de_morgan_dual c1) (de_morgan_dual c2)"
+    | "de_morgan_dual (CInL t1 t2 c) = Or (CInL t1 t2 (de_morgan_dual c)) (CInR t1 t2 All)"
+    | "de_morgan_dual (CInR t1 t2 c) = Or (CInR t1 t2 (de_morgan_dual c)) (CInL t1 t2 All)"
+    | "de_morgan_dual CTriv = Nothing"
+    | "de_morgan_dual (CPair c1 c2) = Or (Or (CPair (de_morgan_dual c1) c2) (CPair c1 (de_morgan_dual c2))) (CPair (de_morgan_dual c1) (de_morgan_dual c2))"
+
 inductive typecheck_constr :: "constr => type => bool"
 where tcal [simp]: "typecheck_constr All t"
     | tcan [simp]: "typecheck_constr c1 t ==> typecheck_constr c2 t ==> typecheck_constr (And c1 c2) t"
@@ -61,19 +71,6 @@ by (induction e "CInL t1 t2 c" rule: satisfies.induct, simp)
 
 lemma [simp]: "satisfies e (CInR t1 t2 c) ==> EX e'. e = InR t1 t2 e'"
 by (induction e "CInR t1 t2 c" rule: satisfies.induct, simp)
-
-function totally_satisfied :: "type => constr list => bool"
-where "totally_satisfied t [] = False"
-    | "totally_satisfied t (All # cs) = totally_satisfied t cs"
-    | "totally_satisfied t (And c1 c2 # cs) = (totally_satisfied t (c1 # c2 # cs))" 
-    | "totally_satisfied t (Nothing # cs) = False"  
-    | "totally_satisfied t (Or c1 c2 # cs) = (totally_satisfied t (c1 # cs) | totally_satisfied t (c2 # cs))" 
-    | "totally_satisfied t (CInL t1 t2 c # cs) = (t = Sum t1 t2 & totally_satisfied t1 (c # cs))"
-    | "totally_satisfied t (CInR t1 t2 c # cs) = (t = Sum t1 t2 & totally_satisfied t2 (c # cs))"
-    | "totally_satisfied t (CTriv # cs) = (t = Unit & totally_satisfied t cs)" 
-    | "totally_satisfied t (CPair c1 c2 # cs) = (case t of Prod t1 t2 => 
-                                totally_satisfied t1 (c1 # cs) & totally_satisfied t2 (c2 # cs) | _ => False)" 
-by pat_completeness auto
 
 inductive types_from_pat :: "patn => type => type list => bool"
 where tpwld [simp]: "types_from_pat Wild t []"

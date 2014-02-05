@@ -33,6 +33,92 @@ lemma [simp]: "extract_constraint (PInR p) (Sum t1 t2) c ==>
       EX c'. extract_constraint p t2 c' & c = CInR t1 t2 c'"
 by (induction "PInR p" "Sum t1 t2" c rule: extract_constraint.induct, simp)
 
+primrec strip_inl :: "constr => constr"
+where "strip_inl All = All"
+    | "strip_inl (And c1 c2) = And (strip_inl c1) (strip_inl c2)"
+    | "strip_inl Nothing = Nothing"
+    | "strip_inl (Or c1 c2) = Or (strip_inl c1) (strip_inl c2)"
+    | "strip_inl (CInL t1 t2 c) = c"
+    | "strip_inl (CInR t1 t2 c) = Nothing"
+    | "strip_inl CTriv = Nothing"
+    | "strip_inl (CPair c1 c2) = Nothing"
+
+primrec strip_inr :: "constr => constr"
+where "strip_inr All = All"
+    | "strip_inr (And c1 c2) = And (strip_inr c1) (strip_inr c2)"
+    | "strip_inr Nothing = Nothing"
+    | "strip_inr (Or c1 c2) = Or (strip_inr c1) (strip_inr c2)"
+    | "strip_inr (CInL t1 t2 c) = Nothing"
+    | "strip_inr (CInR t1 t2 c) = c"
+    | "strip_inr CTriv = Nothing"
+    | "strip_inr (CPair c1 c2) = Nothing"
+
+primrec strip_pair_1 :: "constr => constr"
+where "strip_pair_1 All = All"
+    | "strip_pair_1 (And c1 c2) = And (strip_pair_1 c1) (strip_pair_1 c2)"
+    | "strip_pair_1 Nothing = Nothing"
+    | "strip_pair_1 (Or c1 c2) = Or (strip_pair_1 c1) (strip_pair_1 c2)"
+    | "strip_pair_1 (CInL t1 t2 c) = Nothing"
+    | "strip_pair_1 (CInR t1 t2 c) = Nothing"
+    | "strip_pair_1 CTriv = Nothing"
+    | "strip_pair_1 (CPair c1 c2) = c1"
+
+primrec strip_pair_2 :: "constr => constr"
+where "strip_pair_2 All = All"
+    | "strip_pair_2 (And c1 c2) = And (strip_pair_2 c1) (strip_pair_2 c2)"
+    | "strip_pair_2 Nothing = Nothing"
+    | "strip_pair_2 (Or c1 c2) = Or (strip_pair_2 c1) (strip_pair_2 c2)"
+    | "strip_pair_2 (CInL t1 t2 c) = Nothing"
+    | "strip_pair_2 (CInR t1 t2 c) = Nothing"
+    | "strip_pair_2 CTriv = Nothing"
+    | "strip_pair_2 (CPair c1 c2) = c2"
+
+inductive incon :: "constr list => bool"
+where [simp]: "incon cs ==> incon (All # cs)"
+    | [simp]: "incon (c1 # c2 # cs) ==> incon (And c1 c2 # cs)"
+    | [simp]: "incon (Nothing # cs)"
+    | [simp]: "incon (c1 # cs) ==> incon (c2 # cs) ==> incon (Or c1 c2 # cs)"
+    | [simp]: "incon (map strip_inl cs) ==> incon (CInL t1 t2 c # cs)" 
+    | [simp]: "incon (map strip_inr cs) ==> incon (CInR t1 t2 c # cs)" 
+    | [simp]: "incon (c1 # map strip_pair1 cs) ==> incon (CPair c1 c2 # cs)" 
+    | [simp]: "incon (c2 # map strip_pair2 cs) ==> incon (CPair c1 c2 # cs)" 
+
+inductive_cases [elim!]: "incon (All # cs)"
+inductive_cases [elim!]: "incon (And x y # cs)"
+inductive_cases [elim!]: "incon (Nothing # cs)"
+inductive_cases [elim!]: "incon (Or x y # cs)"
+inductive_cases [elim!]: "incon (CInL x y z # cs)"
+inductive_cases [elim!]: "incon (CInR x y z # cs)"
+inductive_cases [elim!]: "incon (CTriv # cs)"
+inductive_cases [elim!]: "incon (CPair x y # cs)"
+
+definition totally_satisfied :: "constr => bool"
+where "totally_satisfied c = (~ incon [de_morgan_dual c])"
+
+lemma [simp]: "totally_satisfied c ==> is_val e ==> satisfies e c"
+proof (induction c arbitrary: e)
+case All
+  thus ?case by simp
+next case (And c1 c2)
+  thus ?case apply (auto simp add: totally_satisfied_def) sorry
+next case Nothing
+  thus ?case by simp sorry
+next case Or
+  thus ?case by simp sorry
+next case (CInL t1 t2 c)
+  thus ?case by simp sorry
+next case CInR
+  thus ?case by simp sorry
+next case CTriv
+  thus ?case by simp sorry
+next case (CPair c1 c2)
+  thus ?case by simp sorry
+qed
+
+lemma [simp]: "totally_satisfied (Or c cs) ==> is_val e ==> satisfies e cs ==> ~ satisfies e c"
+by simp
+sorry
+
 inductive all_matches_complete :: "expr => bool"
       and extract_constraints :: "rule list => type => constr => bool"
       and extract_constraint_rule :: "rule => type => constr => bool"
@@ -50,7 +136,7 @@ where [simp]: "all_matches_complete (Var v)"
     | [simp]: "all_matches_complete e ==> all_matches_complete (Abort t e)"
     | [simp]: "all_matches_complete e ==> all_matches_complete (InL t1 t2 e)"
     | [simp]: "all_matches_complete e ==> all_matches_complete (InR t1 t2 e)"
-    | [simp]: "all_matches_complete e ==> extract_constraints rs t c ==> totally_satisfied t [c] ==> all_matches_complete (Match e t rs)"
+    | [simp]: "all_matches_complete e ==> extract_constraints rs t c ==> totally_satisfied c ==> all_matches_complete (Match e t rs)"
     | [simp]: "extract_constraints [] t Nothing"
     | [simp]: "extract_constraint_rule r t c1 ==> extract_constraints rs t c2 ==> extract_constraints (r # rs) t (Or c1 c2)"
     | [simp]: "extract_constraint p t c ==> all_matches_complete e ==> extract_constraint_rule (Rule p e) t c"
@@ -436,12 +522,12 @@ next case (tmch env e t1 rs t2)
   thus ?case
   proof (cases "is_val e")
   case True
-    from tmch have "EX c. extract_constraints rs t1 c & totally_satisfied t1 [c]" by auto
+    from tmch have "EX c. extract_constraints rs t1 c & totally_satisfied c" by auto
     hence "EX c. extract_constraints rs t1 c & satisfies e c"
     proof auto
       fix c
       assume "extract_constraints rs t1 c"
-         and "totally_satisfied t1 [c]"
+         and "totally_satisfied c"
       moreover with True tmch have "satisfies e c" by simp
       ultimately have "extract_constraints rs t1 c & satisfies e c" by simp
       thus "EX c. extract_constraints rs t1 c & satisfies e c" by auto
