@@ -171,10 +171,9 @@ next case mtchv
 next case mtcht
   thus ?case by auto 
 next case (mtchp s1 p1 e1 s2 p2 e2)
-  hence "EX s1' s2'. matches s1' p1 e1 & matches s2' p2 e2 & s1' @ s2' = s'" by auto
+  then obtain s1' s2' where "matches s1' p1 e1 & matches s2' p2 e2 & s1' @ s2' = s'" by auto
   hence "s1 @ s2 = s'"
   proof auto
-    fix s1' s2'
     assume "matches s1' p1 e1" 
        and "matches s2' p2 e2"
     with mtchp show "s1 @ s2 = s1' @ s2'" by simp

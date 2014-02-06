@@ -73,46 +73,39 @@ where "strip_pair_2 All = All"
     | "strip_pair_2 CTriv = Nothing"
     | "strip_pair_2 (CPair c1 c2) = c2"
 
-inductive incon :: "constr list => bool"
-where [simp]: "incon cs ==> incon (All # cs)"
-    | [simp]: "incon (c1 # c2 # cs) ==> incon (And c1 c2 # cs)"
-    | [simp]: "incon (Nothing # cs)"
-    | [simp]: "incon (c1 # cs) ==> incon (c2 # cs) ==> incon (Or c1 c2 # cs)"
-    | [simp]: "incon (map strip_inl cs) ==> incon (CInL t1 t2 c # cs)" 
-    | [simp]: "incon (map strip_inr cs) ==> incon (CInR t1 t2 c # cs)" 
-    | [simp]: "incon (c1 # map strip_pair1 cs) ==> incon (CPair c1 c2 # cs)" 
-    | [simp]: "incon (c2 # map strip_pair2 cs) ==> incon (CPair c1 c2 # cs)" 
-
-inductive_cases [elim!]: "incon (All # cs)"
-inductive_cases [elim!]: "incon (And x y # cs)"
-inductive_cases [elim!]: "incon (Nothing # cs)"
-inductive_cases [elim!]: "incon (Or x y # cs)"
-inductive_cases [elim!]: "incon (CInL x y z # cs)"
-inductive_cases [elim!]: "incon (CInR x y z # cs)"
-inductive_cases [elim!]: "incon (CTriv # cs)"
-inductive_cases [elim!]: "incon (CPair x y # cs)"
+function incon :: "constr list => bool"
+where "incon [] = False"
+    | "incon (All # cs) = incon cs"
+    | "incon (And c1 c2 # cs) = incon (c1 # c2 # cs)"
+    | "incon (Nothing # cs) = True"
+    | "incon (Or c1 c2 # cs) = (incon (c1 # cs) & incon (c2 # cs))"
+    | "incon (CInL t1 t2 c # cs) = incon (map strip_inl cs)" 
+    | "incon (CInR t1 t2 c # cs) = incon (map strip_inr cs)" 
+    | "incon (CTriv # cs) = False"
+    | "incon (CPair c1 c2 # cs) = (incon (c1 # map strip_pair_1 cs) | incon (c2 # map strip_pair_2 cs))" 
+by pat_completeness auto
 
 definition totally_satisfied :: "constr => bool"
-where "totally_satisfied c = (~ incon [de_morgan_dual c])"
+where "totally_satisfied c = incon [de_morgan_dual c]"
 
 lemma [simp]: "totally_satisfied c ==> is_val e ==> satisfies e c"
-proof (induction c arbitrary: e)
+proof (simp add: totally_satisfied_def, induction c arbitrary: e)
 case All
   thus ?case by simp
 next case (And c1 c2)
-  thus ?case apply (auto simp add: totally_satisfied_def) sorry
+  thus ?case by auto sorry
 next case Nothing
-  thus ?case by simp sorry
+  thus ?case by auto sorry
 next case Or
-  thus ?case by simp sorry
+  thus ?case by auto sorry
 next case (CInL t1 t2 c)
-  thus ?case by simp sorry
+  thus ?case by auto sorry
 next case CInR
-  thus ?case by simp sorry
+  thus ?case by auto sorry
 next case CTriv
-  thus ?case by simp sorry
+  thus ?case by auto sorry
 next case (CPair c1 c2)
-  thus ?case by simp sorry
+  thus ?case by auto sorry
 qed
 
 lemma [simp]: "totally_satisfied (Or c cs) ==> is_val e ==> satisfies e cs ==> ~ satisfies e c"
@@ -186,32 +179,22 @@ next case (tppar p1 t1 _ p2 t2 _)
        and Y: "!!cc ee. extract_constraint p2 t2 cc \<Longrightarrow> satisfies ee cc \<Longrightarrow> \<exists>s. matches s p2 ee"
        and Z: "satisfies e2 c2"
     hence "EX s. matches s p1 e1" by simp
-    moreover from X Y Z have "EX s. matches s p2 e2" by simp
-    ultimately show "EX s. matches s (PPair p1 p2) (Pair e1 e2)"
-    proof auto
-      fix s1 s2
-      assume "matches s1 p1 e1" 
-         and "matches s2 p2 e2"
-      hence "matches (s1 @ s2) (PPair p1 p2) (Pair e1 e2)" by simp
-      thus "EX s. matches s (PPair p1 p2) (Pair e1 e2)" by (rule exI)
-    qed
+    then obtain s1 where A: "matches s1 p1 e1" by auto
+    from X Y Z have "EX s. matches s p2 e2" by simp
+    then obtain s2 where "matches s2 p2 e2" by auto
+    with A have "matches (s1 @ s2) (PPair p1 p2) (Pair e1 e2)" by simp 
+    thus "EX s. matches s (PPair p1 p2) (Pair e1 e2)" by (rule exI)
   qed
 next case (tpinl p t1 _ t2)
-  hence "EX c'. extract_constraint p t1 c' & c = CInL t1 t2 c'" by auto
+  then obtain c' where C: "extract_constraint p t1 c' & c = CInL t1 t2 c'" by auto
   with tpinl show ?case
   proof auto
-    fix e' c'
-    assume "extract_constraint p t1 c'"
-       and "!!cc ee. extract_constraint p t1 cc \<Longrightarrow> satisfies ee cc \<Longrightarrow> \<exists>s. matches s p ee"
+    fix e'
+    assume "!!cc ee. extract_constraint p t1 cc \<Longrightarrow> satisfies ee cc \<Longrightarrow> \<exists>s. matches s p ee"
        and "satisfies e' c'" 
-    hence "EX s. matches s p e'" by simp
-    thus "EX s. matches s (PInL p) (InL t1 t2 e')"
-    proof auto
-      fix s
-      assume "matches s p e'" 
-      hence "matches s (PInL p) (InL t1 t2 e')" by simp
-      thus "EX s. matches s (PInL p) (InL t1 t2 e')" by (rule exI)
-    qed
+    with C obtain s where "matches s p e'" by auto
+    hence "matches s (PInL p) (InL t1 t2 e')" by simp
+    thus "EX s. matches s (PInL p) (InL t1 t2 e')" by (rule exI)
   qed
 next case (tpinr p t2 _ t1)
   hence "EX c'. extract_constraint p t2 c' & c = CInR t1 t2 c'" by auto
@@ -309,15 +292,9 @@ next case (emt2 e s p t1 e' rs)
        and Y: "types_from_pat p t1 ts"
        and X: "typecheck (extend_env ts env) e' t" 
     have "types_from_pat p t1 ts ==> typecheck env e t1 ==> is_val e ==> (EX s. typecheck_subst env s ts & matches s p e) | no_match e p" by simp
-    with Y Z W V have "EX s. typecheck_subst env s ts & matches s p e" by simp
-    hence "typecheck_subst env s ts"
-    proof auto
-      fix sa
-      assume "typecheck_subst env sa ts" 
-         and "matches sa p e"
-      moreover with V have "sa = s" by simp 
-      ultimately show "typecheck_subst env s ts" by simp
-    qed
+    with Y Z W V obtain sa where "typecheck_subst env sa ts & matches sa p e" by auto
+    moreover with V have "sa = s" by auto 
+    ultimately have "typecheck_subst env s ts" by simp
     with X show "typecheck env (apply_subst s e') t" by simp
   qed
 next case emt3
