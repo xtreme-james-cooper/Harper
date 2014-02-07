@@ -203,73 +203,23 @@ qed
 
 datatype constr = 
   All
-| And constr constr
-| Nothing
-| Or constr constr
 | CInL type type constr
 | CInR type type constr
 | CTriv
 | CPair constr constr
 
-primrec de_morgan_dual :: "constr => constr"
-where "de_morgan_dual All = Nothing"
-    | "de_morgan_dual (And c1 c2) = Or (de_morgan_dual c1) (de_morgan_dual c2)"
-    | "de_morgan_dual Nothing = All"
-    | "de_morgan_dual (Or c1 c2) = And (de_morgan_dual c1) (de_morgan_dual c2)"
-    | "de_morgan_dual (CInL t1 t2 c) = Or (CInL t1 t2 (de_morgan_dual c)) (CInR t1 t2 All)"
-    | "de_morgan_dual (CInR t1 t2 c) = Or (CInR t1 t2 (de_morgan_dual c)) (CInL t1 t2 All)"
-    | "de_morgan_dual CTriv = Nothing"
-    | "de_morgan_dual (CPair c1 c2) = Or (Or (CPair (de_morgan_dual c1) c2) (CPair c1 (de_morgan_dual c2))) (CPair (de_morgan_dual c1) (de_morgan_dual c2))"
-
 inductive typecheck_constr :: "constr => type => bool"
 where tcal [simp]: "typecheck_constr All t"
-    | tcan [simp]: "typecheck_constr c1 t ==> typecheck_constr c2 t ==> typecheck_constr (And c1 c2) t"
-    | tcno [simp]: "typecheck_constr Nothing t"
-    | tcor [simp]: "typecheck_constr c1 t ==> typecheck_constr c2 t ==> typecheck_constr (Or c1 c2) t"
     | tcil [simp]: "typecheck_constr c t1 ==> typecheck_constr (CInL t1 t2 c) (Sum t1 t2)"
     | tcir [simp]: "typecheck_constr c t2 ==> typecheck_constr (CInR t1 t2 c) (Sum t1 t2)"
     | tctr [simp]: "typecheck_constr CTriv Unit"
     | tcpr [simp]: "typecheck_constr c1 t1 ==> typecheck_constr c2 t2 ==> typecheck_constr (CPair c1 c2) (Prod t1 t2)"
 
 inductive_cases [elim!]: "typecheck_constr All t"
-inductive_cases [elim!]: "typecheck_constr (And x y) t"
-inductive_cases [elim!]: "typecheck_constr Nothing t"
-inductive_cases [elim!]: "typecheck_constr (Or x y) t"
 inductive_cases [elim!]: "typecheck_constr (CInL x y z) t"
 inductive_cases [elim!]: "typecheck_constr (CInR x y z) t"
 inductive_cases [elim!]: "typecheck_constr CTriv t"
 inductive_cases [elim!]: "typecheck_constr (CPair x y) t"
-
-inductive satisfies :: "expr => constr => bool"
-where [simp]: "satisfies e All"
-    | [simp]: "satisfies e c1 ==> satisfies e c2 ==> satisfies e (And c1 c2)"
-    | [simp]: "satisfies e c1 ==> satisfies e (Or c1 c2)"
-    | [simp]: "satisfies e c2 ==> satisfies e (Or c1 c2)"
-    | [simp]: "satisfies e c ==> satisfies (InL t1 t2 e) (CInL t1 t2 c)"
-    | [simp]: "satisfies e c ==> satisfies (InR t1 t2 e) (CInR t1 t2 c)"
-    | [simp]: "satisfies Triv CTriv"
-    | [simp]: "satisfies e1 c1 ==> satisfies e2 c2 ==> satisfies (Pair e1 e2) (CPair c1 c2)"
-
-inductive_cases [elim!]: "satisfies e All"
-inductive_cases [elim!]: "satisfies e (And x y)"
-inductive_cases [elim!]: "satisfies e Nothing"
-inductive_cases [elim!]: "satisfies e (Or x y)"
-inductive_cases [elim!]: "satisfies e (CInL x y z)"
-inductive_cases [elim!]: "satisfies e (CInR x y z)"
-inductive_cases [elim!]: "satisfies e CTriv"
-inductive_cases [elim!]: "satisfies e (CPair x y)"
-
-lemma [simp]: "satisfies e CTriv ==> e = Triv"
-by (induction e CTriv rule: satisfies.induct, simp)
-
-lemma [simp]: "satisfies e (CPair c1 c2) ==> EX e1 e2. e = Pair e1 e2"
-by (induction e "CPair c1 c2" rule: satisfies.induct, simp)
-
-lemma [simp]: "satisfies e (CInL t1 t2 c) ==> EX e'. e = InL t1 t2 e'"
-by (induction e "CInL t1 t2 c" rule: satisfies.induct, simp)
-
-lemma [simp]: "satisfies e (CInR t1 t2 c) ==> EX e'. e = InR t1 t2 e'"
-by (induction e "CInR t1 t2 c" rule: satisfies.induct, simp)
 
 inductive extract_constraint :: "patn => type => constr => bool"       
 where [simp]: "extract_constraint Wild t All"
@@ -301,93 +251,176 @@ lemma [simp]: "extract_constraint (PInR p) (Sum t1 t2) c ==>
       EX c'. extract_constraint p t2 c' & c = CInR t1 t2 c'"
 by (induction "PInR p" "Sum t1 t2" c rule: extract_constraint.induct, simp)
 
-primrec strip_inl :: "constr => constr"
-where "strip_inl All = All"
-    | "strip_inl (And c1 c2) = And (strip_inl c1) (strip_inl c2)"
-    | "strip_inl Nothing = Nothing"
-    | "strip_inl (Or c1 c2) = Or (strip_inl c1) (strip_inl c2)"
-    | "strip_inl (CInL t1 t2 c) = c"
-    | "strip_inl (CInR t1 t2 c) = Nothing"
-    | "strip_inl CTriv = Nothing"
-    | "strip_inl (CPair c1 c2) = Nothing"
+fun get_inls :: "constr list => constr list option"
+where "get_inls [] = Some []"
+    | "get_inls (All # cs) = None"
+    | "get_inls (CInL t1 t2 c # cs) = (case get_inls cs of Some cs' => Some (c # cs') | None => None)"
+    | "get_inls (CInR t1 t2 c # cs) = get_inls cs"
+    | "get_inls (CTriv # cs) = None"
+    | "get_inls (CPair c1 c2 # cs) = None"
 
-primrec strip_inr :: "constr => constr"
-where "strip_inr All = All"
-    | "strip_inr (And c1 c2) = And (strip_inr c1) (strip_inr c2)"
-    | "strip_inr Nothing = Nothing"
-    | "strip_inr (Or c1 c2) = Or (strip_inr c1) (strip_inr c2)"
-    | "strip_inr (CInL t1 t2 c) = Nothing"
-    | "strip_inr (CInR t1 t2 c) = c"
-    | "strip_inr CTriv = Nothing"
-    | "strip_inr (CPair c1 c2) = Nothing"
+fun get_inrs :: "constr list => constr list option"
+where "get_inrs [] = Some []"
+    | "get_inrs (All # cs) = None"
+    | "get_inrs (CInL t1 t2 c # cs) = get_inrs cs"
+    | "get_inrs (CInR t1 t2 c # cs) = (case get_inrs cs of Some cs' => Some (c # cs') | None => None)"
+    | "get_inrs (CTriv # cs) = None"
+    | "get_inrs (CPair c1 c2 # cs) = None"
 
-primrec strip_pair_1 :: "constr => constr"
-where "strip_pair_1 All = All"
-    | "strip_pair_1 (And c1 c2) = And (strip_pair_1 c1) (strip_pair_1 c2)"
-    | "strip_pair_1 Nothing = Nothing"
-    | "strip_pair_1 (Or c1 c2) = Or (strip_pair_1 c1) (strip_pair_1 c2)"
-    | "strip_pair_1 (CInL t1 t2 c) = Nothing"
-    | "strip_pair_1 (CInR t1 t2 c) = Nothing"
-    | "strip_pair_1 CTriv = Nothing"
-    | "strip_pair_1 (CPair c1 c2) = c1"
+fun strip_pair_1 :: "constr list => constr list option"
+where "strip_pair_1 [] = Some []"
+    | "strip_pair_1 (All # cs) = (case strip_pair_1 cs of Some cs' => Some (All # cs') | None => None)"
+    | "strip_pair_1 (CInL t1 t2 c # cs) = None"
+    | "strip_pair_1 (CInR t1 t2 c # cs) = None"
+    | "strip_pair_1 (CTriv # cs) = None"
+    | "strip_pair_1 (CPair c1 c2 # cs) = (case strip_pair_1 cs of Some cs' => Some (c1 # cs') | None => None)"
 
-primrec strip_pair_2 :: "constr => constr"
-where "strip_pair_2 All = All"
-    | "strip_pair_2 (And c1 c2) = And (strip_pair_2 c1) (strip_pair_2 c2)"
-    | "strip_pair_2 Nothing = Nothing"
-    | "strip_pair_2 (Or c1 c2) = Or (strip_pair_2 c1) (strip_pair_2 c2)"
-    | "strip_pair_2 (CInL t1 t2 c) = Nothing"
-    | "strip_pair_2 (CInR t1 t2 c) = Nothing"
-    | "strip_pair_2 CTriv = Nothing"
-    | "strip_pair_2 (CPair c1 c2) = c2"
+fun strip_pair_2 :: "constr list => constr list option"
+where "strip_pair_2 [] = Some []"
+    | "strip_pair_2 (All # cs) = (case strip_pair_2 cs of Some cs' => Some (All # cs') | None => None)"
+    | "strip_pair_2 (CInL t1 t2 c # cs) = None"
+    | "strip_pair_2 (CInR t1 t2 c # cs) = None"
+    | "strip_pair_2 (CTriv # cs) = None"
+    | "strip_pair_2 (CPair c1 c2 # cs) = (case strip_pair_2 cs of Some cs' => Some (c2 # cs') | None => None)"
 
-inductive incon :: "constr list => bool"
-where ical [simp]: "incon cs ==> incon (All # cs)"
-    | ican [simp]: "incon (c1 # c2 # cs) ==> incon (And c1 c2 # cs)"
-    | icno [simp]: "incon (Nothing # cs)"
-    | icor [simp]: "incon (c1 # cs) ==> incon (c2 # cs) ==> incon (Or c1 c2 # cs)"
-    | icil [simp]: "incon (map strip_inl cs) ==> incon (CInL t1 t2 c # cs)" 
-    | icir [simp]: "incon (map strip_inr cs) ==> incon (CInR t1 t2 c # cs)" 
-    | icp1 [simp]: "incon (c1 # map strip_pair_1 cs) ==> incon (CPair c1 c2 # cs)"
-    | icp2 [simp]: "incon (c2 # map strip_pair_2 cs) ==> incon (CPair c1 c2 # cs)" 
-
-inductive_cases [elim!]: "incon (All # cs)"
-inductive_cases [elim!]: "incon (And x y # cs)"
-inductive_cases [elim!]: "incon (Nothing # cs)"
-inductive_cases [elim!]: "incon (Or x y # cs)"
-inductive_cases [elim!]: "incon (CInL x y z # cs)"
-inductive_cases [elim!]: "incon (CInR x y z # cs)"
-inductive_cases [elim!]: "incon (CPair x y # cs)"
-
-definition totally_satisfied :: "constr => bool"
-where "totally_satisfied c = incon [de_morgan_dual c]"
-
-lemma [simp]: "typecheck_constr c t ==> totally_satisfied c ==> typecheck env e t ==> is_val e ==> satisfies e c"
-proof (simp add: totally_satisfied_def, induction c t arbitrary: env e rule: typecheck_constr.induct)
-case tcal
-  thus ?case by auto
-next case tcan
-  thus ?case by auto
-next case tcno
-  thus ?case by auto sorry
-next case tcor
-  thus ?case by auto sorry
-next case tcil
-  thus ?case by auto sorry
-next case tcir
-  thus ?case by auto sorry
-next case tctr
-  thus ?case apply auto by simp sorry
-next case tcpr
-  thus ?case by auto sorry
+lemma [simp]: "Some cs' = get_inls cs ==> list_size size cs' <= list_size size cs"
+proof (induction cs arbitrary: cs' rule: get_inls.induct)
+case 1
+  thus ?case by simp
+next case 2
+  thus ?case by simp
+next case (3 _ _ _ cs)
+  thus ?case
+  proof (cases "get_inls cs")
+  case None
+    with 3 show ?thesis by simp
+  next case (Some ils)
+    with 3 have "list_size size ils <= list_size size cs" by simp
+    with 3 Some show ?thesis by simp
+  qed
+next case (4 _ _ _ cs)
+  hence "list_size size cs' <= list_size size cs" by simp
+  thus ?case by simp
+next case 5
+  thus ?case by simp
+next case 6
+  thus ?case by simp
 qed
 
-lemma [simp]: "totally_satisfied (Or c cs) ==> is_val e ==> satisfies e cs ==> ~ satisfies e c"
-by simp
-sorry
+lemma [simp]: "Some cs' = get_inls cs ==> list_size size cs' <= Suc (n + list_size size cs)"
+proof -
+  assume "Some cs' = get_inls cs"
+  hence "list_size size cs' <= list_size size cs" by simp
+  thus "list_size size cs' <= Suc (n + list_size size cs)" by simp
+qed
+
+lemma [simp]: "Some cs' = get_inrs cs ==> list_size size cs' <= list_size size cs"
+proof (induction cs arbitrary: cs' rule: get_inrs.induct)
+case 1
+  thus ?case by simp
+next case 2
+  thus ?case by simp
+next case (3 _ _ _ cs)
+  from 3 have "list_size size cs' <= list_size size cs" by simp
+  thus ?case by simp
+next case (4 _ _ _ cs)
+  thus ?case
+  proof (cases "get_inrs cs")
+  case None
+    with 4 show ?thesis by simp
+  next case (Some irs)
+    with 4 have "list_size size irs <= list_size size cs" by simp
+    with 4 Some show ?thesis by simp
+  qed
+next case 5
+  thus ?case by simp
+next case 6
+  thus ?case by simp
+qed
+
+lemma [simp]: "Some cs' = get_inrs cs ==> list_size size cs' <= Suc (n + list_size size cs)"
+proof -
+  assume "Some cs' = get_inrs cs"
+  hence "list_size size cs' <= list_size size cs" by simp
+  thus "list_size size cs' <= Suc (n + list_size size cs)" by simp
+qed
+
+lemma [simp]: "Some cs' = strip_pair_1 cs ==> list_size size cs' <= list_size size cs"
+proof (induction cs arbitrary: cs' rule: strip_pair_1.induct)
+case 1
+  thus ?case by simp
+next case (2 cs)
+  thus ?case
+  proof (cases "strip_pair_1 cs")
+  case None
+    with 2 show ?thesis by simp
+  next case (Some p1s)
+    with 2 have "list_size size p1s <= list_size size cs" by simp
+    with 2 Some show ?thesis by simp
+  qed
+next case 3
+  thus ?case by simp
+next case 4
+  thus ?case by simp
+next case 5
+  thus ?case by simp
+next case (6 _ _ cs)
+  thus ?case
+  proof (cases "strip_pair_1 cs")
+  case None
+    with 6 show ?thesis by simp
+  next case (Some p1s)
+    with 6 have "list_size size p1s <= list_size size cs" by simp
+    with 6 Some show ?thesis by simp
+  qed
+qed
+
+lemma [simp]: "Some cs' = strip_pair_2 cs ==> list_size size cs' <= list_size size cs"
+proof (induction cs arbitrary: cs' rule: strip_pair_2.induct)
+case 1
+  thus ?case by simp
+next case (2 cs)
+  thus ?case
+  proof (cases "strip_pair_2 cs")
+  case None
+    with 2 show ?thesis by simp
+  next case (Some p2s)
+    from 2 Some have "list_size size p2s <= list_size size cs" by simp
+    with 2 Some show ?thesis by simp
+  qed
+next case 3
+  thus ?case by simp
+next case 4
+  thus ?case by simp
+next case 5
+  thus ?case by simp
+next case (6 _ _ cs)
+  thus ?case
+  proof (cases "strip_pair_2 cs")
+  case None
+    with 6 show ?thesis by simp
+  next case (Some p1s)
+    with 6 have "list_size size p1s <= list_size size cs" by simp
+    with 6 Some show ?thesis by simp
+  qed
+qed
+
+fun perfectly_satisfied :: "constr list => bool"
+where "perfectly_satisfied [] = False"
+    | "perfectly_satisfied (All # cs) = (cs = [])"
+    | "perfectly_satisfied (CInL t1 t2 c # cs) = (case (get_inls cs, get_inrs cs) of
+              (Some cls, Some crs) => perfectly_satisfied (c # cls) & perfectly_satisfied crs
+            | _ => False)"
+    | "perfectly_satisfied (CInR t1 t2 c # cs) = (case (get_inls cs, get_inrs cs) of
+              (Some cls, Some crs) => perfectly_satisfied cls & perfectly_satisfied (c # crs)
+            | _ => False)"
+    | "perfectly_satisfied (CTriv # cs) = (cs = [])"
+    | "perfectly_satisfied (CPair c1 c2 # cs) = (case (strip_pair_1 cs, strip_pair_2 cs) of
+              (Some c1s, Some c2s) => perfectly_satisfied (c1 # c1s) & perfectly_satisfied (c2 # c2s)
+            | _ => False)"
 
 inductive all_matches_complete :: "expr => bool"
-      and extract_constraints :: "rule list => type => constr => bool"
+      and extract_constraints :: "rule list => type => constr list => bool"
       and extract_constraint_rule :: "rule => type => constr => bool"
 where [simp]: "all_matches_complete (Var v)" 
     | [simp]: "all_matches_complete Zero"
@@ -403,9 +436,9 @@ where [simp]: "all_matches_complete (Var v)"
     | [simp]: "all_matches_complete e ==> all_matches_complete (Abort t e)"
     | [simp]: "all_matches_complete e ==> all_matches_complete (InL t1 t2 e)"
     | [simp]: "all_matches_complete e ==> all_matches_complete (InR t1 t2 e)"
-    | [simp]: "all_matches_complete e ==> extract_constraints rs t c ==> totally_satisfied c ==> all_matches_complete (Match e t rs)"
-    | [simp]: "extract_constraints [] t Nothing"
-    | [simp]: "extract_constraint_rule r t c1 ==> extract_constraints rs t c2 ==> extract_constraints (r # rs) t (Or c1 c2)"
+    | [simp]: "all_matches_complete e ==> extract_constraints rs t cs ==> perfectly_satisfied cs ==> all_matches_complete (Match e t rs)"
+    | [simp]: "extract_constraints [] t []"
+    | [simp]: "extract_constraint_rule r t c1 ==> extract_constraints rs t c2 ==> extract_constraints (r # rs) t (c1 # c2)"
     | [simp]: "extract_constraint p t c ==> all_matches_complete e ==> extract_constraint_rule (Rule p e) t c"
 
 inductive_cases [elim!]: "all_matches_complete (Var x)"
@@ -426,67 +459,5 @@ inductive_cases [elim!]: "all_matches_complete (Match x y z)"
 inductive_cases [elim!]: "extract_constraints [] t c"
 inductive_cases [elim!]: "extract_constraints (x # y) t c"
 inductive_cases [elim!]: "extract_constraint_rule (Rule x y) t c"
-
-lemma [simp]: "types_from_pat p t ts ==> extract_constraint p t c ==> satisfies e c ==> EX s. matches s p e"
-proof (induction p t ts arbitrary: e c rule: types_from_pat.induct)
-case tpwld
-  have "matches [] Wild e" by simp
-  thus ?case by (rule exI)
-next case tpvar
-  have "matches [e] PVar e" by simp
-  thus ?case by (rule exI)
-next case tptrv
-  hence "c = CTriv" by simp
-  with tptrv have X: "e = Triv" by simp
-  have "matches [] PTriv Triv" by simp
-  hence "EX s. matches s PTriv Triv" by (rule exI)
-  with X show ?case by simp
-next case (tppar p1 t1 _ p2 t2 _)
-  then obtain c1 c2 where "extract_constraint p1 t1 c1 & extract_constraint p2 t2 c2 & c = CPair c1 c2" by auto
-  with tppar show ?case
-  proof auto
-    fix e1 e2
-    assume "extract_constraint p1 t1 c1"
-       and "!!cc ee. extract_constraint p1 t1 cc \<Longrightarrow> satisfies ee cc \<Longrightarrow> \<exists>s. matches s p1 ee"
-       and "satisfies e1 c1" 
-       and X: "extract_constraint p2 t2 c2"
-       and Y: "!!cc ee. extract_constraint p2 t2 cc \<Longrightarrow> satisfies ee cc \<Longrightarrow> \<exists>s. matches s p2 ee"
-       and Z: "satisfies e2 c2"
-    hence "EX s. matches s p1 e1" by simp
-    then obtain s1 where A: "matches s1 p1 e1" by auto
-    from X Y Z have "EX s. matches s p2 e2" by simp
-    then obtain s2 where "matches s2 p2 e2" by auto
-    with A have "matches (s1 @ s2) (PPair p1 p2) (Pair e1 e2)" by simp 
-    thus "EX s. matches s (PPair p1 p2) (Pair e1 e2)" by (rule exI)
-  qed
-next case (tpinl p t1 _ t2)
-  then obtain c' where C: "extract_constraint p t1 c' & c = CInL t1 t2 c'" by auto
-  with tpinl show ?case
-  proof auto
-    fix e'
-    assume "!!cc ee. extract_constraint p t1 cc \<Longrightarrow> satisfies ee cc \<Longrightarrow> \<exists>s. matches s p ee"
-       and "satisfies e' c'" 
-    with C obtain s where "matches s p e'" by auto
-    hence "matches s (PInL p) (InL t1 t2 e')" by simp
-    thus "EX s. matches s (PInL p) (InL t1 t2 e')" by (rule exI)
-  qed
-next case (tpinr p t2 _ t1)
-  hence "EX c'. extract_constraint p t2 c' & c = CInR t1 t2 c'" by auto
-  with tpinr show ?case
-  proof auto
-    fix e' c'
-    assume "extract_constraint p t2 c'"
-       and "!!cc ee. extract_constraint p t2 cc \<Longrightarrow> satisfies ee cc \<Longrightarrow> \<exists>s. matches s p ee"
-       and "satisfies e' c'" 
-    hence "EX s. matches s p e'" by simp
-    thus "EX s. matches s (PInR p) (InR t1 t2 e')"
-    proof auto
-      fix s
-      assume "matches s p e'" 
-      hence "matches s (PInR p) (InR t1 t2 e')" by simp
-      thus "EX s. matches s (PInR p) (InR t1 t2 e')" by (rule exI)
-    qed
-  qed
-qed
 
 end
