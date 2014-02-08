@@ -3,6 +3,7 @@ imports Chapter13_3_PatternMatching
 begin
 
 inductive eval :: "expr => expr => bool"
+      and eval_rules :: "expr => rule list => expr => bool"
 where esuc [simp]: "eval n n' ==> eval (Succ n) (Succ n')"
     | eap1 [simp]: "eval e1 e1' ==> eval (Ap e1 e2) (Ap e1' e2)"
     | eap2 [simp]: "is_val e1 ==> eval e2 e2' ==> eval (Ap e1 e2) (Ap e1 e2')"
@@ -21,11 +22,13 @@ where esuc [simp]: "eval n n' ==> eval (Succ n) (Succ n')"
     | einl [simp]: "eval e e' ==> eval (InL t t' e) (InL t t' e')"
     | einr [simp]: "eval e e' ==> eval (InR t t' e) (InR t t' e')"
     | emt1 [simp]: "eval e e' ==> eval (Match e t rs) (Match e' t rs)"
-    | emt2 [simp]: "is_val e ==> matches s p e ==> eval (Match e t (Rule p e2 # rs)) (apply_subst s e2)"
-    | emt3 [simp]: "is_val e ==> no_match e p ==> eval (Match e t rs) e' ==> eval (Match e t (Rule p e2 # rs)) e'"
+    | emt2 [simp]: "is_val e ==> eval_rules e rs e' ==> eval (Match e t rs) e'"
+    | ers1 [simp]: "is_val e ==> matches s p e ==> eval_rules e (Rule p e2 # rs) (apply_subst s e2)"
+    | ers2 [simp]: "is_val e ==> no_match e p ==> eval_rules e rs e' ==> eval_rules e (Rule p e2 # rs) e'"
 
 theorem preservation: "eval e e' ==> typecheck env e t ==> typecheck env e' t"
-proof (induction e e' arbitrary: t env rule: eval.induct)
+    and "eval_rules e rs e' ==> typecheck_rules env rs t t' ==> typecheck env e t ==> typecheck env e' t'"
+proof (induction e e' and e rs e' arbitrary: t env and t t' env rule: eval_eval_rules.inducts)
 case esuc
   thus ?case by auto
 next case (eap1 e1 e1' e2)
@@ -69,27 +72,18 @@ next case (emt1 e e' t1 rs)
   hence "typecheck env e t1 & typecheck_rules env rs t1 t" by auto
   moreover with emt1 have "typecheck env e' t1" by simp
   ultimately show ?case by simp
-next case (emt2 e s p t1 e' rs)
-  thus ?case
-  proof auto
-    fix ts
-    assume W: "is_val e" 
-       and V: "matches s p e" 
-       and Z: "typecheck env e t1" 
-       and Y: "types_from_pat p t1 ts"
-       and X: "typecheck (extend_env ts env) e' t" 
-    have "types_from_pat p t1 ts ==> typecheck env e t1 ==> is_val e ==> (EX s. typecheck_subst env s ts & matches s p e) | no_match e p" by simp
-    with Y Z W V obtain sa where "typecheck_subst env sa ts & matches sa p e" by auto
-    moreover with V have "sa = s" by auto 
-    ultimately have "typecheck_subst env s ts" by simp
-    with X show "typecheck env (apply_subst s e') t" by simp
-  qed
-next case emt3
+next case emt2
+  thus ?case by auto
+next case (ers1 e s p e2 rs)
+  then obtain ts where "types_from_pat p t ts & typecheck (extend_env ts env) e2 t'" by auto
+  moreover with ers1 have "typecheck_subst env s ts" by simp
+  ultimately show ?case by simp
+next case ers2
   thus ?case by auto
 qed
 
 theorem progress: "typecheck env e t ==> env = empty_map ==> all_matches_complete e ==> is_val e | (EX e'. eval e e')"
-    and "typecheck_rules env rs t1 t ==> extract_constraints rs t1 c ==> is_val v ==> typecheck env v t1 ==> perfectly_satisfied c ==> EX e'. eval (Match v t1 rs) e'"
+    and "typecheck_rules env rs t1 t ==> extract_constraints rs t1 c ==> is_val v ==> typecheck env v t1 ==> perfectly_satisfied c ==> EX e'. eval_rules v rs e'"
     and "typecheck_rule env r t1 t ==> True"
 proof (induction env e t and env rs t1 t arbitrary: and v c rule: typecheck_typecheck_rules_typecheck_rule.inducts)
 case tvar
@@ -290,24 +284,14 @@ next case (tmch env e t1 rs t2)
     with True tmch show ?thesis by auto sorry
   next case False
     with tmch have "EX a. eval e a" by auto
-    thus ?thesis
-    proof auto
-      fix a
-      assume "eval e a"
-      hence "eval (Match e t1 rs) (Match a t1 rs)" by simp
-      thus "EX x. eval (Match e t1 rs) x" by auto
-    qed
+    then obtain a where "eval e a" by auto
+    hence "eval (Match e t1 rs) (Match a t1 rs)" by simp
+    thus ?thesis by auto
   qed
 next case tnil
   thus ?case by auto
 next case (tcns env r t1 t2 rs)
-  thus ?case
-  proof (cases r)
-  case (Rule p e2)
-    moreover from tcns Rule have "EX c1 c2. c = c1 # c2 & extract_constraint_rule (Rule p e2) t1 c1 & extract_constraints rs t1 c2" by auto
-    moreover from tcns Rule have "EX ts. types_from_pat p t1 ts & typecheck (extend_env ts env) e2 t2" by auto
-    ultimately show ?thesis by simp sorry
-  qed
+  thus ?case by auto sorry
 next case trul
   thus ?case by simp
 qed 

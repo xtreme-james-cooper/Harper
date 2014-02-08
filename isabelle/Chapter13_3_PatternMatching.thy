@@ -187,6 +187,9 @@ next case (mtchr s p e)
   with mtchr show ?case by simp 
 qed
 
+lemma [simp]: "matches s p e ==> typecheck env e t ==> types_from_pat p t ts ==> typecheck_subst env s ts"
+by (induction s p e arbitrary: t ts rule: matches.induct, auto)
+
 lemma [simp]: "matches s p e ==> typecheck (extend_env ts env) e2 t ==> 
           EX s'. typecheck_subst env s' ts & matches s' p e ==> 
                     typecheck env (apply_subst s e2) t"
