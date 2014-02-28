@@ -20,8 +20,8 @@ where esuc [simp]: "eval n n' ==> eval (Succ n) (Succ n')"
     | einr [simp]: "eval e e' ==> eval (InR t t' e) (InR t t' e')"
     | ecs1 [simp]: "eval e e' ==> eval (Case e t rs) (Case e' t rs)"
     | ecs2 [simp]: "is_val e ==> eval_rules e rs e' ==> eval (Case e t rs) e'"
-    | ers1 [simp]: "is_val e ==> matches s p e ==> eval_rules e (Rule p e2 # rs) (apply_subst s e2)"
-    | ers2 [simp]: "is_val e ==> no_match e p ==> eval_rules e rs e' ==> eval_rules e (Rule p e2 # rs) e'"
+    | ers1 [simp]: "is_val e ==> matches p e = Some s ==> eval_rules e (Rule p e2 # rs) (apply_subst s e2)"
+    | ers2 [simp]: "is_val e ==> matches p e = None ==> eval_rules e rs e' ==> eval_rules e (Rule p e2 # rs) e'"
 
 theorem preservation: "eval e e' ==> typecheck env e t ==> typecheck env e' t"
     and "eval_rules e rs e' ==> typecheck_rules env rs t t' ==> typecheck env e t ==> typecheck env e' t'"
@@ -65,7 +65,7 @@ next case (ecs1 e e' t1 rs)
   ultimately show ?case by simp
 next case ecs2
   thus ?case by auto
-next case (ers1 e s p e2 rs)
+next case (ers1 e p s e2 rs)
   then obtain ts where "types_from_pat p t ts & typecheck (extend_env ts env) e2 t'" by auto
   moreover with ers1 have "typecheck_subst env s ts" by simp
   ultimately show ?case by simp
@@ -73,29 +73,69 @@ next case ers2
   thus ?case by auto
 qed
 
-lemma [simp]: "no_match v p ==> typecheck_rules env rs t t' ==> extract_constraints (Rule p e # rs) t c ==> 
-                  is_val v ==> perfectly_satisfied t c ==> typecheck env v t ==> EX a. eval_rules v rs a"
-proof (induction t c arbitrary: v p rs rule: perfectly_satisfied.induct)
-case 1
+lemma [simp]: "matches p v = None ==> is_val v ==> perfectly_satisfied t (extract_patterns (Rule p e # rs)) ==> 
+                  typecheck env v t ==> EX a. eval_rules v rs a"
+proof (induction t)
+case Nat
+  hence "v = Zero | (EX v'. typecheck env v' Nat & is_val v' & v = Succ v')" by (simp add: canonical_nat)
+  with Nat show ?case
+  proof auto
+    fix z v'
+    assume "(case z of Rule p x => p) = PSucc"
+    then obtain e2 where Z: "z = Rule PSucc e2" by (induction z, auto)
+    assume "is_val v'"
+    hence "!!s p. matches p (Succ v') = Some s ==> eval_rules (Succ v') [Rule p e2] (apply_subst s e2)" by simp
+    hence "matches PSucc (Succ v') = Some [v'] ==> eval_rules (Succ v') [Rule PSucc e2] (apply_subst [v'] e2)" by blast
+    with Z have "eval_rules (Succ v') [z] (apply_subst [v'] e2)" by simp
+    thus "EX a. eval_rules (Succ v') [z] a" by (rule exI)
+  next 
+    fix z
+    assume "(case z of Rule p x => p) = PZero"
+    then obtain e2 where Z: "z = Rule PZero e2" by (induction z, auto)
+    hence "!!s p. matches p Zero = Some s ==> eval_rules Zero [Rule p e2] (apply_subst s e2)" by simp
+    hence "matches PZero Zero = Some [] ==> eval_rules Zero [Rule PZero e2] (apply_subst [] e2)" by blast
+    with Z have "eval_rules Zero [z] e2" by simp
+    thus "EX a. eval_rules Zero [z] a" by (rule exI)
+  qed
+next case (Prod t1 t2)
+  hence "EX e1 e2. v = Pair e1 e2 & typecheck env e1 t1 & typecheck env e2 t2 & is_val e1 & is_val e2" by (simp add: canonical_prod)
+  with Prod show ?case by auto
+next case (Sum t1 t2)
+  hence "(EX e'. v = InL t1 t2 e' & is_val e' & typecheck env e' t1) | (EX e'. v = InR t1 t2 e' & is_val e' & typecheck env e' t2)" by (simp add: canonical_sum)
+  with Sum show ?case
+  proof auto
+    fix z v'
+    assume "(case z of Rule p x => p) = PInR"
+    then obtain e2 where Z: "z = Rule PInR e2" by (induction z, auto)
+    assume "is_val v'"
+    hence "!!s p. matches p (InR t1 t2 v') = Some s ==> eval_rules (InR t1 t2 v') [Rule p e2] (apply_subst s e2)" by simp
+    hence "matches PInR (InR t1 t2 v') = Some [v'] ==> eval_rules (InR t1 t2 v') [Rule PInR e2] (apply_subst [v'] e2)" by blast
+    with Z have "eval_rules (InR t1 t2 v') [z] (apply_subst [v'] e2)" by simp
+    thus "EX a. eval_rules (InR t1 t2 v') [z] a" by (rule exI)
+  next 
+    fix z v'
+    assume "(case z of Rule p x => p) = PInL"
+    then obtain e2 where Z: "z = Rule PInL e2" by (induction z, auto)
+    assume "is_val v'"
+    hence "!!s p. matches p (InL t1 t2 v') = Some s ==> eval_rules (InL t1 t2 v') [Rule p e2] (apply_subst s e2)" by simp
+    hence "matches PInL (InL t1 t2 v') = Some [v'] ==> eval_rules (InL t1 t2 v') [Rule PInL e2] (apply_subst [v'] e2)" by blast
+    with Z have "eval_rules (InL t1 t2 v') [z] (apply_subst [v'] e2)" by simp
+    thus "EX a. eval_rules (InL t1 t2 v') [z] a" by (rule exI)
+  qed
+next case Unit
+  hence "v = Triv" by (simp add: canonical_unit)
+  with Unit show ?case by simp
+next case Void
   thus ?case by simp
-next case (2 t t1 t2 c cs)
-  thus ?case by simp sorry
-next case (3 t t1 t2 c cs)
-  thus ?case by simp sorry
-next case (4 t cs)
-  thus ?case by simp sorry
-next case (5 t t1 t2 cs)
-  thus ?case by simp sorry
-next case 6
-  thus ?case by simp sorry
-next case 7
-  thus ?case by simp sorry
+next case Arr
+  thus ?case by simp
 qed
 
 theorem progress: "typecheck env e t ==> env = empty_map ==> all_matches_complete e ==> is_val e | (EX e'. eval e e')"
-    and "typecheck_rules env rs t1 t ==> extract_patterns rs c ==> is_val v ==> typecheck env v t1 ==> perfectly_satisfied t1 c ==> EX e'. eval_rules v rs e'"
+    and "typecheck_rules env rs t1 t ==> check_rules rs ==> is_val v ==> typecheck env v t1 ==> 
+            perfectly_satisfied t1 (extract_patterns rs) ==> EX e'. eval_rules v rs e'"
     and "typecheck_rule env r t1 t ==> True"
-proof (induction env e t and env rs t1 t arbitrary: and v c rule: typecheck_typecheck_rules_typecheck_rule.inducts)
+proof (induction env e t and env rs t1 t arbitrary: and v rule: typecheck_typecheck_rules_typecheck_rule.inducts)
 case tvar
   thus ?case by auto
 next case tzer
@@ -263,20 +303,14 @@ next case (tcse env e t1 rs t2)
     case Nil
       with tcse show ?thesis by auto
     next case (Cons r rs')
-      from tcse have "EX cs. all_matches_complete e & extract_patterns rs cs & perfectly_satisfied t1 cs" by auto
-      then obtain cs where "all_matches_complete e & extract_patterns rs cs & perfectly_satisfied t1 cs" by auto
-      with Cons have "all_matches_complete e & (EX c1 c2. cs = c1 # c2 & extract_pattern r c1 & extract_patterns rs' c2) & perfectly_satisfied t1 cs" by auto
+      from tcse have "all_matches_complete e & perfectly_satisfied t1 (extract_patterns rs)" by auto
       thus ?thesis 
       proof auto
-        fix c1 c2
-        assume "all_matches_complete e"
-           and "perfectly_satisfied t1 (c1 # c2)"
-           and "extract_pattern r c1"
-           and "extract_patterns rs' c2"
-        moreover from tcse True Cons have "extract_patterns (r # rs') (c1 # c2) ==> perfectly_satisfied t1 (c1 # c2) ==> EX a. eval_rules e (r # rs') a" by simp
-        ultimately obtain a where "eval_rules e (r # rs') a" by auto
-        with True have "eval (Case e t1 (r # rs')) a" by simp
-        with Cons show "EX a. (eval (Case e t1 rs)) a" by auto      
+        assume "all_matches_complete e" 
+           and "perfectly_satisfied t1 (map (rule_case (%p x. p)) rs)"
+        with tcse True obtain a where "eval_rules e rs a" by auto
+        with True have "eval (Case e t1 rs) a" by simp      
+        thus "EX a. eval (Case e t1 rs) a" by (rule exI)      
       qed
     qed
   next case False
@@ -292,18 +326,18 @@ next case (tcns env r t1 t2 rs)
   proof (cases r)
   case (Rule p e)
     from tcns Rule obtain ts where "types_from_pat p t1 ts & typecheck (extend_env ts env) e t2" by auto
-    moreover from tcns have "types_from_pat p t1 ts ==> (EX s. typecheck_subst env s ts & matches s p v) | no_match v p" by simp
-    ultimately have X: "(EX s. typecheck_subst env s ts & matches s p v) | no_match v p" by simp
+    moreover from tcns have "!!s. types_from_pat p t1 ts ==> matches p v = Some s ==> typecheck_subst env s ts" by simp
+    ultimately have X: "!!s. matches p v = Some s ==> typecheck_subst env s ts" by simp
     thus ?thesis
-    proof (cases "EX s. matches s p v")
+    proof (cases "EX s. matches p v = Some s")
     case False
-      with X have Y: "no_match v p" by simp
+      with X have Y: "matches p v = None" by simp
       with tcns Rule have "EX a. eval_rules v rs a" by simp
       then obtain a where "eval_rules v rs a" by auto
       with Y tcns have "eval_rules v (Rule p e # rs) a" by simp
       with Rule show ?thesis by auto
     next case True
-      with X obtain s where "matches s p v" by auto
+      with X obtain s where "matches p v = Some s" by auto
       with tcns have "eval_rules v (Rule p e # rs) (apply_subst s e)" by simp
       with Rule show ?thesis by auto
     qed

@@ -37,112 +37,66 @@ lemma canonical_sum: "typecheck env e (Sum t1 t2) ==> is_val e ==>
       (EX e'. e = InL t1 t2 e' & is_val e' & typecheck env e' t1) | (EX e'. e = InR t1 t2 e' & is_val e' & typecheck env e' t2)"
 by (induction e, auto)
 
-inductive matches :: "expr list => patn => expr => bool"
-where mtcht [simp]: "matches [] PTriv Triv"
-    | mtchp [simp]: "matches [e1, e2] PPair (Pair e1 e2)"
-    | mtchl [simp]: "matches [e] PInL (InL t t' e)"
-    | mtchr [simp]: "matches [e] PInR (InR t t' e)"
-    | mtchz [simp]: "matches [] PZero Zero"
-    | mtchs [simp]: "matches [e] PSucc (Succ e)"
+fun matches :: "patn => expr => expr list option"
+where "matches PTriv Triv = Some []"
+    | "matches PTriv e = None"
+    | "matches PPair (Pair e1 e2) = Some [e1, e2]"
+    | "matches PPair e = None"
+    | "matches PInL (InL t t' e) = Some [e]"
+    | "matches PInL e = None"
+    | "matches PInR (InR t t' e) = Some [e]"
+    | "matches PInR e = None"
+    | "matches PZero Zero = Some []"
+    | "matches PZero e = None"
+    | "matches PSucc (Succ e) = Some [e]"
+    | "matches PSucc e = None"
 
-inductive_cases [elim!]: "matches s PTriv e"
-inductive_cases [elim!]: "matches s PPair e"
-inductive_cases [elim!]: "matches s PInL e"
-inductive_cases [elim!]: "matches s PInR e"
-inductive_cases [elim!]: "matches s PZero e"
-inductive_cases [elim!]: "matches s PSucc e"
-
-inductive no_match :: "expr => patn => bool"
-where [simp]: "no_match (InL t t' e) PInR"
-    | [simp]: "no_match (InR t t' e) PInL"
-    | [simp]: "no_match Zero PSucc"
-    | [simp]: "no_match (Succ e) PZero"
-
-lemma [simp]: "(~ no_match e p) = matches s p e"
-proof auto
-  show "~ no_match e p ==> matches s p e" by simp sorry
-next 
-  show "matches s p e ==> no_match e p ==> False"
-  proof (induction s p e rule: matches.induct)
-  case mtcht
-    thus ?case by (induction Triv PTriv rule: no_match.induct)
-  next case (mtchp e1 e2)
-    thus ?case by (induction "Pair e1 e2" PPair rule: no_match.induct)
-  next case (mtchl e t t')
-    thus ?case by (induction "InL t t' e" PInL rule: no_match.induct)
-  next case (mtchr e t t')
-    thus ?case by (induction "InR t t' e" PInR rule: no_match.induct)
-  next case mtchz
-    thus ?case by (induction Zero PZero rule: no_match.induct)
-  next case (mtchs e)
-    thus ?case by (induction "Succ e" PSucc rule: no_match.induct)
-  qed
-qed
-
-lemma [simp]: "types_from_pat p t ts ==> typecheck env e t ==> is_val e ==> (EX s. typecheck_subst env s ts & matches s p e) | no_match e p"
-proof (induction p t ts arbitrary: e rule: types_from_pat.induct)
+lemma [simp]: "types_from_pat p t ts ==> typecheck env e t ==> is_val e ==> matches p e = Some s ==> typecheck_subst env s ts"
+proof (induction p t ts rule: types_from_pat.induct)
 case tptrv
   hence "e = Triv" by (simp add: canonical_unit)
-  thus ?case by simp sorry
+  with tptrv show ?case by simp
 next case (tppar t1 t2)
-  hence "(EX e1 e2. e = Pair e1 e2 & typecheck env e1 t1 & typecheck env e2 t2 & is_val e1 & is_val e2)" by (simp add: canonical_prod)
-  with tppar show ?case by auto sorry
+  hence "EX e1 e2. e = Pair e1 e2 & typecheck env e1 t1 & typecheck env e2 t2 & is_val e1 & is_val e2" by (simp add: canonical_prod)
+  then obtain e1 e2 where "e = Pair e1 e2 & typecheck env e1 t1 & typecheck env e2 t2 & is_val e1 & is_val e2" by auto
+  with tppar show ?case by auto
 next case (tpinl t1 t2)
-  from tpinl have "(EX e'. e = InL t1 t2 e' & is_val e' & typecheck env e' t1) | (EX e'. e = InR t1 t2 e' & is_val e' & typecheck env e' t2)" by (simp add: canonical_sum)
-  with tpinl show ?case
-  proof (cases "EX e'. e = InL t1 t2 e'", auto)
-    fix e'
-    show "EX s. typecheck_subst env s [t1] & matches s PInL (InL t1 t2 e')" by auto sorry
-  qed
+  hence "(EX e'. e = InL t1 t2 e' & is_val e' & typecheck env e' t1) | (EX e'. e = InR t1 t2 e' & is_val e' & typecheck env e' t2)" by (simp add: canonical_sum)
+  with tpinl show ?case by (cases "EX e'. e = InR t1 t2 e' & is_val e' & typecheck env e' t2", auto)
 next case (tpinr t1 t2)
-  from tpinr have "(EX e'. e = InL t1 t2 e' & is_val e' & typecheck env e' t1) | (EX e'. e = InR t1 t2 e' & is_val e' & typecheck env e' t2)" by (simp add: canonical_sum)
-  with tpinr show ?case
-  proof (cases "EX e'. e = InR t1 t2 e'", auto)
-    fix e'
-    assume "\<not> no_match (InR t1 t2 e') PInR" 
-       and "is_val e'" 
-       and "typecheck env e' t2"
-    show "EX s. typecheck_subst env s [t2] & matches s PInR (InR t1 t2 e')" by auto sorry
-  qed
+  hence "(EX e'. e = InL t1 t2 e' & is_val e' & typecheck env e' t1) | (EX e'. e = InR t1 t2 e' & is_val e' & typecheck env e' t2)" by (simp add: canonical_sum)
+  with tpinr show ?case by (cases "EX e'. e = InL t1 t2 e' & is_val e' & typecheck env e' t1", auto)
 next case tpzer
   hence "e = Zero | (EX v. typecheck env v Nat & is_val v & e = Succ v)" by (simp add: canonical_nat)
-  thus ?case by simp sorry
+  with tpzer show ?case by auto
 next case tpsuc
   hence "e = Zero | (EX v. typecheck env v Nat & is_val v & e = Succ v)" by (simp add: canonical_nat)
-  show ?case by auto sorry
+  with tpsuc show ?case by auto
 qed
 
-lemma [simp]: "matches s p e ==> matches s' p e ==> s = s'"
-by (induction s p e arbitrary: s' rule: matches.induct, auto)
+lemma [simp]: "matches p e = Some s ==> typecheck env e t ==> types_from_pat p t ts ==> typecheck_subst env s ts"
+by (induction p e arbitrary: t ts rule: matches.induct, auto)
 
-lemma [simp]: "matches s p e ==> typecheck env e t ==> types_from_pat p t ts ==> typecheck_subst env s ts"
-by (induction s p e arbitrary: t ts rule: matches.induct, auto)
+lemma [simp]: "matches p e = Some s ==> typecheck (extend_env ts env) e2 t ==> typecheck_subst env s ts ==> typecheck env (apply_subst s e2) t"
+by auto
 
-lemma [simp]: "matches s p e ==> typecheck (extend_env ts env) e2 t ==> 
-          EX s'. typecheck_subst env s' ts & matches s' p e ==> 
-                    typecheck env (apply_subst s e2) t"
-proof auto
-  fix s'
-  assume "matches s p e" 
-     and X: "typecheck (extend_env ts env) e2 t" 
-     and Y: "typecheck_subst env s' ts" 
-     and "matches s' p e"
-  moreover hence "s = s'" by simp
-  ultimately show "typecheck env (apply_subst s e2) t" by simp
-qed 
+primrec perfectly_satisfied :: "type => patn list => bool"
+where "perfectly_satisfied (Sum t1 t2) ps = (ps = [PInL, PInR] | ps = [PInR, PInL])"
+    | "perfectly_satisfied Unit ps = (ps = [PTriv])"
+    | "perfectly_satisfied (Prod t1 t2) ps = (ps = [PPair])"
+    | "perfectly_satisfied Nat ps = (ps = [PZero, PSucc] | ps = [PSucc, PZero])"
+    | "perfectly_satisfied Void ps = False"
+    | "perfectly_satisfied (Arr t1 t2) ps = False"
 
-fun perfectly_satisfied :: "type => patn list => bool"
-where "perfectly_satisfied t [] = False"
-    | "perfectly_satisfied t (PInL # ps) = (ps = [PInR] & (EX t1 t2. t = Sum t1 t2))"
-    | "perfectly_satisfied t (PInR # ps) = (ps = [PInL] & (EX t1 t2. t = Sum t1 t2))"
-    | "perfectly_satisfied t (PTriv # cs) = (cs = [] & t = Unit)"
-    | "perfectly_satisfied t (PPair # cs) = (cs = [] & (EX t1 t2. t = Prod t1 t2))"
-    | "perfectly_satisfied t (PZero # cs) = (cs = [PSucc] & t = Nat)"
-    | "perfectly_satisfied t (PSucc # cs) = (cs = [PZero] & t = Nat)"
+lemma [simp]: "~ perfectly_satisfied t []"
+by (induction t, simp_all)
+
+definition extract_patterns :: "rule list => patn list"
+where [simp]: "extract_patterns = map (%r. case r of Rule p _ => p)"
 
 inductive all_matches_complete :: "expr => bool"
-      and extract_patterns :: "rule list => patn list => bool"
-      and extract_pattern :: "rule => patn => bool"
+      and check_rules :: "rule list => bool"
+      and check_rule :: "rule => bool"
 where [simp]: "all_matches_complete (Var v)" 
     | [simp]: "all_matches_complete Zero"
     | [simp]: "all_matches_complete e ==> all_matches_complete (Succ e)"
@@ -156,10 +110,11 @@ where [simp]: "all_matches_complete (Var v)"
     | [simp]: "all_matches_complete e ==> all_matches_complete (Abort t e)"
     | [simp]: "all_matches_complete e ==> all_matches_complete (InL t1 t2 e)"
     | [simp]: "all_matches_complete e ==> all_matches_complete (InR t1 t2 e)"
-    | [simp]: "all_matches_complete e ==> extract_patterns rs ps ==> perfectly_satisfied t ps ==> all_matches_complete (Case e t rs)"
-    | [simp]: "extract_patterns [] []"
-    | [simp]: "extract_pattern r p ==> extract_patterns rs ps ==> extract_patterns (r # rs) (p # ps)"
-    | [simp]: "all_matches_complete e ==> extract_pattern (Rule p e) p"
+    | [simp]: "all_matches_complete e ==> check_rules rs ==> perfectly_satisfied t (extract_patterns rs) ==> 
+                all_matches_complete (Case e t rs)"
+    | [simp]: "check_rules []"
+    | [simp]: "check_rule r ==> check_rules rs ==> check_rules (r # rs)"
+    | [simp]: "all_matches_complete e ==> check_rule (Rule p e)"
 
 inductive_cases [elim!]: "all_matches_complete (Var x)"
 inductive_cases [elim!]: "all_matches_complete Zero"
@@ -175,8 +130,8 @@ inductive_cases [elim!]: "all_matches_complete (Abort x y)"
 inductive_cases [elim!]: "all_matches_complete (InL x y z)"
 inductive_cases [elim!]: "all_matches_complete (InR x y z)"
 inductive_cases [elim!]: "all_matches_complete (Case x y z)"
-inductive_cases [elim!]: "extract_patterns [] c"
-inductive_cases [elim!]: "extract_patterns (x # y) c"
-inductive_cases [elim!]: "extract_pattern (Rule x y) c"
+inductive_cases [elim!]: "check_rules []"
+inductive_cases [elim!]: "check_rules (x # y)"
+inductive_cases [elim!]: "check_rule (Rule x y)"
 
 end
