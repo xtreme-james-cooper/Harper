@@ -3,20 +3,19 @@ imports Chapter13_1_Language
 begin
 
 inductive types_from_pat :: "patn => type => type list => bool"
-where tpwld [simp]: "types_from_pat Wild t []"
-    | tpvar [simp]: "types_from_pat PVar t [t]"
-    | tptrv [simp]: "types_from_pat PTriv Unit []"
-    | tppar [simp]: "types_from_pat p1 t1 ts1 ==> types_from_pat p2 t2 ts2 ==> 
-          types_from_pat (PPair p1 p2) (Prod t1 t2) (ts1 @ ts2)"
-    | tpinl [simp]: "types_from_pat p t1 ts ==> types_from_pat (PInL p) (Sum t1 t2) ts"
-    | tpinr [simp]: "types_from_pat p t2 ts ==> types_from_pat (PInR p) (Sum t1 t2) ts"
+where tptrv [simp]: "types_from_pat PTriv Unit []"
+    | tppar [simp]: "types_from_pat PPair (Prod t1 t2) [t1, t2]"
+    | tpinl [simp]: "types_from_pat PInL (Sum t1 t2) [t1]"
+    | tpinr [simp]: "types_from_pat PInR (Sum t1 t2) [t2]"
+    | tpzer [simp]: "types_from_pat PZero Nat []"
+    | tpsuc [simp]: "types_from_pat PSucc Nat [Nat]"
 
-inductive_cases [elim!]: "types_from_pat Wild t ts"
-inductive_cases [elim!]: "types_from_pat PVar t ts"
 inductive_cases [elim!]: "types_from_pat PTriv t ts"
-inductive_cases [elim!]: "types_from_pat (PPair p1 p2) t ts"
-inductive_cases [elim!]: "types_from_pat (PInL p) t ts"
-inductive_cases [elim!]: "types_from_pat (PInR p) t ts"
+inductive_cases [elim!]: "types_from_pat PPair t ts"
+inductive_cases [elim!]: "types_from_pat PInL t ts"
+inductive_cases [elim!]: "types_from_pat PInR t ts"
+inductive_cases [elim!]: "types_from_pat PZero t ts"
+inductive_cases [elim!]: "types_from_pat PSucc t ts"
 
 lemma [simp]: "types_from_pat p t ts ==> length ts = vars_count p"
 by (induction p t ts rule: types_from_pat.induct, simp_all)
@@ -27,9 +26,6 @@ inductive typecheck :: "(nat, type) assoc => expr => type => bool"
 where tvar [simp]: "lookup env v = Some t ==> typecheck env (Var v) t"
     | tzer [simp]: "typecheck env Zero Nat"    
     | tsuc [simp]: "typecheck env n Nat ==> typecheck env (Succ n) Nat"
-    | trec [simp]: "typecheck env e Nat ==> typecheck env e0 t ==> 
-                        typecheck (extend_at env 0 Nat) e1 t ==> 
-                            typecheck env (IsZ e0 e1 e) t"
     | tlam [simp]: "typecheck (extend_at env 0 r) e t ==> typecheck env (Lam r e) (Arr r t)"
     | tapp [simp]: "typecheck env e1 (Arr t2 t) ==> typecheck env e2 t2 ==> 
                         typecheck env (Ap e1 e2) t"
@@ -41,7 +37,7 @@ where tvar [simp]: "lookup env v = Some t ==> typecheck env (Var v) t"
     | tabt [simp]: "typecheck env e Void ==> typecheck env (Abort t e) t"
     | tinl [simp]: "typecheck env e t1 ==> typecheck env (InL t1 t2 e) (Sum t1 t2)"
     | tinr [simp]: "typecheck env e t2 ==> typecheck env (InR t1 t2 e) (Sum t1 t2)"
-    | tmch [simp]: "typecheck env e t1 ==> typecheck_rules env rs t1 t2 ==> typecheck env (Match e t1 rs) t2" 
+    | tcse [simp]: "typecheck env e t1 ==> typecheck_rules env rs t1 t2 ==> typecheck env (Case e t1 rs) t2" 
     | tnil [simp]: "typecheck_rules env [] t1 t2"
     | tcns [simp]: "typecheck_rule env r t1 t2 ==> typecheck_rules env rs t1 t2 ==> typecheck_rules env (r # rs) t1 t2"
     | trul [simp]: "types_from_pat p t1 ts ==> typecheck (extend_env ts env) e t2 ==> typecheck_rule env (Rule p e) t1 t2"
@@ -49,7 +45,6 @@ where tvar [simp]: "lookup env v = Some t ==> typecheck env (Var v) t"
 inductive_cases [elim!]: "typecheck e (Var x) t"
 inductive_cases [elim!]: "typecheck e Zero t"
 inductive_cases [elim!]: "typecheck e (Succ x) t"
-inductive_cases [elim!]: "typecheck e (IsZ x y z) t"
 inductive_cases [elim!]: "typecheck e (Lam x y) t"
 inductive_cases [elim!]: "typecheck e (Ap x y) t"
 inductive_cases [elim!]: "typecheck e (Fix x y) t"
@@ -60,7 +55,7 @@ inductive_cases [elim!]: "typecheck e (ProjR x) t"
 inductive_cases [elim!]: "typecheck e (Abort x y) t"
 inductive_cases [elim!]: "typecheck e (InL x y z) t"
 inductive_cases [elim!]: "typecheck e (InR x y z) t"
-inductive_cases [elim!]: "typecheck e (Match x y z) t"
+inductive_cases [elim!]: "typecheck e (Case x y z) t"
 inductive_cases [elim!]: "typecheck_rules e [] t t'"
 inductive_cases [elim!]: "typecheck_rules e (r # rs) t t'"
 inductive_cases [elim!]: "typecheck_rule e (Rule x y) t t'"
@@ -68,16 +63,15 @@ inductive_cases [elim!]: "typecheck_rule e (Rule x y) t t'"
 lemma [simp]: "typecheck env e t ==> typecheck (extend_at env n k) (incr_from n e) t"
   and [simp]: "typecheck_rules env rs t1 t2 ==> typecheck_rules (extend_at env n k) (incr_from_rules n rs) t1 t2"
   and [simp]: "typecheck_rule env r t1 t2 ==> typecheck_rule (extend_at env n k) (incr_from_rule n r) t1 t2"
-proof (induction env e t and env rs t1 t2 and env r t1 t2 arbitrary: n and n and n rule: typecheck_typecheck_rules_typecheck_rule.inducts)
+proof (induction env e t and env rs t1 t2 and env r t1 t2 
+       arbitrary: n and n and n 
+       rule: typecheck_typecheck_rules_typecheck_rule.inducts)
 case tvar
   thus ?case by (simp add: incr_def)
 next case tzer
   thus ?case by simp
 next case tsuc
   thus ?case by simp
-next case (trec env e e0 t e1)
-  hence "typecheck (extend_at (extend_at env 0 Nat) (Suc n) k) (incr_from (Suc n) e1) t" by simp
-  with trec show ?case by (simp add: extend_at_swap)
 next case (tlam env r b t)
   hence "typecheck (extend_at (extend_at env 0 r) (Suc n) k) (incr_from (Suc n) b) t" by simp
   thus ?case by (simp add: extend_at_swap)
@@ -104,9 +98,9 @@ next case tinl
   thus ?case by simp
 next case tinr
   thus ?case by simp
-next case (tmch env e t1 rs t2)
+next case (tcse env e t1 rs t2)
   hence "typecheck (extend_at env n k) (incr_from n e) t1" by simp
-  moreover from tmch have "typecheck_rules (extend_at env n k) (incr_from_rules n rs) t1 t2" by simp
+  moreover from tcse have "typecheck_rules (extend_at env n k) (incr_from_rules n rs) t1 t2" by simp
   ultimately show ?case by simp
 next case tnil
   thus ?case by simp
@@ -133,10 +127,6 @@ next case tzer
   thus ?case by simp
 next case tsuc
   thus ?case by simp
-next case (trec e e0 t e1)
-  moreover hence "Suc n ~: free_vars e1" by auto
-  moreover have "extend_at (extend_at env n k) 0 Nat = extend_at (extend_at env 0 Nat) (Suc n) k" by (simp add: extend_at_swap)
-  ultimately show ?case by simp
 next case tlam
   thus ?case by (simp add: extend_at_swap)
 next case (tapp e1 t2 t e2)
@@ -161,9 +151,9 @@ next case tinl
   thus ?case by simp
 next case tinr
   thus ?case by simp
-next case (tmch e t1 rs t2)
+next case (tcse e t1 rs t2)
   hence "typecheck_rules env (sub_from_rules n rs) t1 t2" by simp 
-  moreover from tmch have "typecheck env (sub_from n e) t1" by simp
+  moreover from tcse have "typecheck env (sub_from n e) t1" by simp
   ultimately show ?case by simp
 next case tnil
   thus ?case by simp
@@ -184,8 +174,6 @@ case tvar
 next case tzer
   thus ?case by simp
 next case tsuc
-  thus ?case by simp
-next case trec
   thus ?case by simp
 next case tlam
   thus ?case by simp
@@ -211,9 +199,9 @@ next case tinl
   thus ?case by simp
 next case tinr
   thus ?case by simp
-next case (tmch e t1 rs t2)
+next case (tcse e t1 rs t2)
   hence "typecheck env (subst e eb x) t1" by simp
-  moreover from tmch have "typecheck_rules env (subst_rules rs eb x) t1 t2" by simp
+  moreover from tcse have "typecheck_rules env (subst_rules rs eb x) t1 t2" by simp
   ultimately show ?case by simp
 next case tnil
   thus ?case by simp

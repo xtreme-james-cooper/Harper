@@ -8,9 +8,6 @@ where esuc [simp]: "eval n n' ==> eval (Succ n) (Succ n')"
     | eap1 [simp]: "eval e1 e1' ==> eval (Ap e1 e2) (Ap e1' e2)"
     | eap2 [simp]: "is_val e1 ==> eval e2 e2' ==> eval (Ap e1 e2) (Ap e1 e2')"
     | eap3 [simp]: "is_val e2 ==> eval (Ap (Lam t b) e2) (safe_subst b e2)"
-    | eiz1 [simp]: "eval e e' ==> eval (IsZ e0 e1 e) (IsZ e0 e1 e')"
-    | eiz2 [simp]: "eval (IsZ e0 e1 Zero) e0"
-    | eiz3 [simp]: "is_val e ==> eval (IsZ e0 e1 (Succ e)) (safe_subst e1 e)"
     | efix [simp]: "eval (Fix t b) (safe_subst b (Fix t b))"
     | epa1 [simp]: "eval e1 e1' ==> eval (Pair e1 e2) (Pair e1' e2)"
     | epa2 [simp]: "is_val e1 ==> eval e2 e2' ==> eval (Pair e1 e2) (Pair e1 e2')"
@@ -21,8 +18,8 @@ where esuc [simp]: "eval n n' ==> eval (Succ n) (Succ n')"
     | eabt [simp]: "eval e e' ==> eval (Abort t e) (Abort t e')"
     | einl [simp]: "eval e e' ==> eval (InL t t' e) (InL t t' e')"
     | einr [simp]: "eval e e' ==> eval (InR t t' e) (InR t t' e')"
-    | emt1 [simp]: "eval e e' ==> eval (Match e t rs) (Match e' t rs)"
-    | emt2 [simp]: "is_val e ==> eval_rules e rs e' ==> eval (Match e t rs) e'"
+    | ecs1 [simp]: "eval e e' ==> eval (Case e t rs) (Case e' t rs)"
+    | ecs2 [simp]: "is_val e ==> eval_rules e rs e' ==> eval (Case e t rs) e'"
     | ers1 [simp]: "is_val e ==> matches s p e ==> eval_rules e (Rule p e2 # rs) (apply_subst s e2)"
     | ers2 [simp]: "is_val e ==> no_match e p ==> eval_rules e rs e' ==> eval_rules e (Rule p e2 # rs) e'"
 
@@ -37,12 +34,6 @@ next case (eap1 e1 e1' e2)
 next case (eap2 e1 e2 e2')
   thus ?case by auto
 next case eap3
-  thus ?case by auto
-next case eiz1
-  thus ?case by auto
-next case eiz2
-  thus ?case by auto
-next case eiz3
   thus ?case by auto
 next case efix
   thus ?case by auto
@@ -68,11 +59,11 @@ next case einl
   thus ?case by auto
 next case einr
   thus ?case by auto
-next case (emt1 e e' t1 rs)
+next case (ecs1 e e' t1 rs)
   hence "typecheck env e t1 & typecheck_rules env rs t1 t" by auto
-  moreover with emt1 have "typecheck env e' t1" by simp
+  moreover with ecs1 have "typecheck env e' t1" by simp
   ultimately show ?case by simp
-next case emt2
+next case ecs2
   thus ?case by auto
 next case (ers1 e s p e2 rs)
   then obtain ts where "types_from_pat p t ts & typecheck (extend_env ts env) e2 t'" by auto
@@ -82,25 +73,27 @@ next case ers2
   thus ?case by auto
 qed
 
-lemma [simp]: "no_match v p ==> typecheck_rules env rs t1 t2 ==> extract_constraints (Rule p e # rs) t1 c ==> 
-                  is_val v ==> typecheck env v t1 ==> perfectly_satisfied c ==> EX a. eval_rules v rs a"
-proof (cases c, auto)
-  fix c1 c2
-  assume "no_match v p"
-     and "typecheck_rules env rs t1 t2"
-     and "is_val v"
-     and "typecheck env v t1"
-     and "perfectly_satisfied (c1 # c2)"
-     and "extract_constraints rs t1 c2"
-     and "extract_constraint p t1 c1"
-     and "all_matches_complete e"
-
-  have "EX a. eval_rules v rs a" by simp sorry
-  thus ?thesis by simp
+lemma [simp]: "no_match v p ==> typecheck_rules env rs t t' ==> extract_constraints (Rule p e # rs) t c ==> 
+                  is_val v ==> perfectly_satisfied t c ==> typecheck env v t ==> EX a. eval_rules v rs a"
+proof (induction t c arbitrary: v p rs rule: perfectly_satisfied.induct)
+case 1
+  thus ?case by simp
+next case (2 t t1 t2 c cs)
+  thus ?case by simp sorry
+next case (3 t t1 t2 c cs)
+  thus ?case by simp sorry
+next case (4 t cs)
+  thus ?case by simp sorry
+next case (5 t t1 t2 cs)
+  thus ?case by simp sorry
+next case 6
+  thus ?case by simp sorry
+next case 7
+  thus ?case by simp sorry
 qed
 
 theorem progress: "typecheck env e t ==> env = empty_map ==> all_matches_complete e ==> is_val e | (EX e'. eval e e')"
-    and "typecheck_rules env rs t1 t ==> extract_constraints rs t1 c ==> is_val v ==> typecheck env v t1 ==> perfectly_satisfied c ==> EX e'. eval_rules v rs e'"
+    and "typecheck_rules env rs t1 t ==> extract_patterns rs c ==> is_val v ==> typecheck env v t1 ==> perfectly_satisfied t1 c ==> EX e'. eval_rules v rs e'"
     and "typecheck_rule env r t1 t ==> True"
 proof (induction env e t and env rs t1 t arbitrary: and v c rule: typecheck_typecheck_rules_typecheck_rule.inducts)
 case tvar
@@ -114,38 +107,6 @@ next case (tsuc env n)
     assume "eval n x"
     hence "eval (Succ n) (Succ x)" by simp
     thus "EX y. eval (Succ n) y " by auto
-  qed
-next case (trec env e e0 t e1)
-  thus ?case
-  proof (cases "is_val e")
-  case True
-    have "EX x. eval (IsZ e0 e1 e) x"
-    proof (cases "e = Zero")
-    case True
-      def e0' == e0
-      have "eval (IsZ e0 e1 Zero) e0'" by (simp add: e0'_def)
-      with True show ?thesis by auto
-    next case False
-      from trec True have "e = Zero | (EX v. typecheck env v Nat & is_val v & e = Succ v)" by (simp add: canonical_nat)
-      with False have "EX v. typecheck env v Nat & is_val v & e = Succ v" by simp
-      thus ?thesis
-      proof auto
-        fix v
-        assume "is_val v"
-        hence "eval (IsZ e0 e1 (Succ v)) (safe_subst e1 v)" by simp
-        thus "EX x. eval (IsZ e0 e1 (Succ v)) x" by auto
-      qed
-    qed
-    thus ?thesis by simp
-  next case False
-    with trec have "\<exists>a. eval e a" by auto
-    thus ?thesis
-    proof auto
-      fix a
-      assume "eval e a"
-      hence "eval (IsZ e0 e1 e) (IsZ e0 e1 a)" by simp
-      thus "EX x. eval (IsZ e0 e1 e) x" by auto
-    qed
   qed
 next case tlam
   thus ?case by simp
@@ -293,35 +254,35 @@ next case (tinr env e t2 t1)
     hence "eval (InR t1 t2 e) (InR t1 t2 x)" by simp
     thus "EX y. eval (InR t1 t2 e) y " by auto
   qed
-next case (tmch env e t1 rs t2)
+next case (tcse env e t1 rs t2)
   thus ?case
   proof (cases "is_val e")
   case True
     thus ?thesis
     proof (cases rs)
     case Nil
-      with tmch show ?thesis by auto
+      with tcse show ?thesis by auto
     next case (Cons r rs')
-      from tmch have "EX cs. all_matches_complete e & extract_constraints rs t1 cs & perfectly_satisfied cs" by auto
-      then obtain cs where "all_matches_complete e & extract_constraints rs t1 cs & perfectly_satisfied cs" by auto
-      with Cons have "all_matches_complete e & (EX c1 c2. cs = c1 # c2 & extract_constraint_rule r t1 c1 & extract_constraints rs' t1 c2) & perfectly_satisfied cs" by auto
+      from tcse have "EX cs. all_matches_complete e & extract_patterns rs cs & perfectly_satisfied t1 cs" by auto
+      then obtain cs where "all_matches_complete e & extract_patterns rs cs & perfectly_satisfied t1 cs" by auto
+      with Cons have "all_matches_complete e & (EX c1 c2. cs = c1 # c2 & extract_pattern r c1 & extract_patterns rs' c2) & perfectly_satisfied t1 cs" by auto
       thus ?thesis 
       proof auto
         fix c1 c2
         assume "all_matches_complete e"
-           and "perfectly_satisfied (c1 # c2)"
-           and "extract_constraint_rule r t1 c1"
-           and "extract_constraints rs' t1 c2"
-        moreover from tmch True Cons have "extract_constraints (r # rs') t1 (c1 # c2) ==> perfectly_satisfied (c1 # c2) ==> EX a. eval_rules e (r # rs') a" by simp
+           and "perfectly_satisfied t1 (c1 # c2)"
+           and "extract_pattern r c1"
+           and "extract_patterns rs' c2"
+        moreover from tcse True Cons have "extract_patterns (r # rs') (c1 # c2) ==> perfectly_satisfied t1 (c1 # c2) ==> EX a. eval_rules e (r # rs') a" by simp
         ultimately obtain a where "eval_rules e (r # rs') a" by auto
-        with True have "eval (Match e t1 (r # rs')) a" by simp
-        with Cons show "EX a. (eval (Match e t1 rs)) a" by auto      
+        with True have "eval (Case e t1 (r # rs')) a" by simp
+        with Cons show "EX a. (eval (Case e t1 rs)) a" by auto      
       qed
     qed
   next case False
-    with tmch have "EX a. eval e a" by auto
+    with tcse have "EX a. eval e a" by auto
     then obtain a where "eval e a" by auto
-    hence "eval (Match e t1 rs) (Match a t1 rs)" by simp
+    hence "eval (Case e t1 rs) (Case a t1 rs)" by simp
     thus ?thesis by auto
   qed
 next case tnil

@@ -112,19 +112,6 @@ inductive_cases [elim!]: "typecheck e (Succ x) t"
 inductive_cases [elim!]: "typecheck e (Rec x y z) t"
 inductive_cases [elim!]: "typecheck e (Lam x y) t"
 inductive_cases [elim!]: "typecheck e (Ap x y) t"
-
-lemma inv_var: "typecheck env (Var v) t ==> lookup env v = Some t" 
-by auto
-lemma inv_zer: "typecheck env Zero t ==> t = Nat" 
-by auto
-lemma inv_suc: "typecheck env (Succ n) t ==> t = Nat & typecheck env n Nat"
-by auto
-lemma inv_rec: "typecheck env (Rec e0 e1 e) t ==> typecheck env e Nat & typecheck env e0 t & typecheck (extend_at (extend_at env 0 t) 0 Nat) e1 t"
-by auto
-lemma inv_lam: "typecheck env (Lam r e) t ==> EX t'. t = Arr r t' & typecheck (extend_at env 0 r) e t'"
-by auto
-lemma inv_app: "typecheck env (Ap e1 e2) t ==> EX t2. typecheck env e1 (Arr t2 t) & typecheck env e2 t2"
-by auto
                         
 lemma [simp]: "typecheck env e t ==> typecheck (extend_at env n k) (incr_from n e) t"
 proof (induction env e t arbitrary: n rule: typecheck.induct)
