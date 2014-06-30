@@ -9,10 +9,10 @@ datatype type =
 | Prod type type 
 | Void 
 | Sum type type
-| Tyvar string
-| Rec string type
+| Tyvar nat
+| Rec type
 
-primrec is_valid_type :: "string set => type => bool"
+primrec is_valid_type :: "nat set => type => bool"
 where "is_valid_type tyvars Nat = True"
     | "is_valid_type tyvars (Arr t1 t2) = (is_valid_type tyvars t1 & is_valid_type tyvars t2)"
     | "is_valid_type tyvars Unit = True"
@@ -20,7 +20,63 @@ where "is_valid_type tyvars Nat = True"
     | "is_valid_type tyvars Void = True"
     | "is_valid_type tyvars (Sum t1 t2) = (is_valid_type tyvars t1 & is_valid_type tyvars t2)"
     | "is_valid_type tyvars (Tyvar v) = (v : tyvars)"
-    | "is_valid_type tyvars (Rec v t) = (is_valid_type (insert v tyvars) t)"
+    | "is_valid_type tyvars (Rec t) = (is_valid_type (insert 0 (incr 0 `  tyvars)) t)"
+
+primrec free_type_vars :: "type => nat set"
+where "free_type_vars (Tyvar v) = {v}"
+    | "free_type_vars Nat = {}"
+    | "free_type_vars (Arr e1 e2) = free_type_vars e1 Un free_type_vars e2"
+    | "free_type_vars Unit = {}"
+    | "free_type_vars (Prod e1 e2) = free_type_vars e1 Un free_type_vars e2"
+    | "free_type_vars Void = {}"
+    | "free_type_vars (Sum e1 e2) = free_type_vars e1 Un free_type_vars e2"
+    | "free_type_vars (Rec t) = redr_set (free_type_vars t)"
+
+primrec type_sub_from :: "nat => type => type"
+where "type_sub_from n (Tyvar v) = Tyvar (incr n v)"
+    | "type_sub_from n Nat = Nat"
+    | "type_sub_from n (Arr e1 e2) = Arr (type_sub_from n e1) (type_sub_from n e2)"
+    | "type_sub_from n Unit = Unit"
+    | "type_sub_from n (Prod e1 e2) = Prod (type_sub_from n e1) (type_sub_from n e2)"
+    | "type_sub_from n Void = Void"
+    | "type_sub_from n (Sum e1 e2) = Sum (type_sub_from n e1) (type_sub_from n e2)"
+    | "type_sub_from n (Rec t) = Rec (type_sub_from (Suc n) t)"
+
+primrec type_incr_from :: "nat => type => type"
+where "type_incr_from n (Tyvar v) = Tyvar (incr n v)"
+    | "type_incr_from n Nat = Nat"
+    | "type_incr_from n (Arr e1 e2) = Arr (type_incr_from n e1) (type_incr_from n e2)"
+    | "type_incr_from n Unit = Unit"
+    | "type_incr_from n (Prod e1 e2) = Prod (type_incr_from n e1) (type_incr_from n e2)"
+    | "type_incr_from n Void = Void"
+    | "type_incr_from n (Sum e1 e2) = Sum (type_incr_from n e1) (type_incr_from n e2)"
+    | "type_incr_from n (Rec t) = Rec (type_incr_from (Suc n) t)"
+
+primrec type_subst :: "type => type => nat => type"
+where "type_subst (Tyvar v) t x = (if v = x then t else Tyvar v)"
+    | "type_subst Nat t x = Nat"
+    | "type_subst (Arr t1 t2) t x = Arr (type_subst t1 t x) (type_subst t2 t x)"
+    | "type_subst Unit t x = Unit"
+    | "type_subst (Prod t1 t2) t x = Prod (type_subst t1 t x) (type_subst t2 t x)"
+    | "type_subst Void t x = Void"
+    | "type_subst (Sum t1 t2) t x = Sum (type_subst t1 t x) (type_subst t2 t x)"
+    | "type_subst (Rec t0) t x = Rec (type_subst t0 (type_incr_from 0 t) (Suc x))"
+
+definition safe_type_subst :: "type => type => type"
+where "safe_type_subst e e' = type_sub_from 0 (type_subst e (type_incr_from 0 e') 0)"
+
+lemma [simp]: "free_type_vars (type_incr_from n e) = incr n ` free_type_vars e"
+by (induction e arbitrary: n, auto)
+
+primrec type_incr_by :: "nat => type => type"
+where "type_incr_by 0 e = e"
+    | "type_incr_by (Suc n) e = type_incr_from 0 (type_incr_by n e)"
+
+lemma [simp]:  "redr_set_by n (free_type_vars (type_incr_by n e)) = free_type_vars e" 
+by (induction n, simp_all) 
+
+lemma [simp]: "free_type_vars (type_subst e e' x) = (if x : free_type_vars e then free_type_vars e - {x} Un free_type_vars e' else free_type_vars e)"
+by (induction e arbitrary: e' x, auto)
 
 datatype expr = 
   Var nat 
@@ -79,16 +135,6 @@ where "incr_from n (Var v) = Var (incr n v)"
     | "incr_from n (Fold v t e) = Fold v t (incr_from n e)"
     | "incr_from n (Unfold e) = Unfold (incr_from n e)"
 
-lemma [simp]: "free_vars (incr_from n e) = incr n ` free_vars e"
-by (induction e arbitrary: n, auto)
-
-primrec incr_by :: "nat => expr => expr"
-where "incr_by 0 e = e"
-    | "incr_by (Suc n) e = incr_from 0 (incr_by n e)"
-
-lemma [simp]:  "redr_set_by n (free_vars (incr_by n e)) = free_vars e" 
-by (induction n, simp_all) 
-
 primrec sub_from :: "nat => expr => expr"
 where "sub_from n (Var v) = Var (if v < n then v else if v = n then undefined else v - 1)"
     | "sub_from n Zero = Zero"
@@ -105,6 +151,8 @@ where "sub_from n (Var v) = Var (if v < n then v else if v = n then undefined el
     | "sub_from n (InL t t' e) = InL t t' (sub_from n e)"
     | "sub_from n (InR t t' e) = InR t t' (sub_from n e)"
     | "sub_from n (Case e el er) = Case (sub_from n e) (sub_from (Suc n) el) (sub_from (Suc n) er)"
+    | "sub_from n (Fold v t e) = Fold v t (sub_from n e)"
+    | "sub_from n (Unfold e) = Unfold (sub_from n e)"
 
 primrec subst :: "expr => expr => nat => expr"
 where "subst (Var v) e x = (if v = x then e else Var v)"
@@ -122,9 +170,21 @@ where "subst (Var v) e x = (if v = x then e else Var v)"
     | "subst (InL t t' n) e x = InL t t' (subst n e x)"
     | "subst (InR t t' n) e x = InR t t' (subst n e x)"
     | "subst (Case n el er) e x = Case (subst n e x) (subst el (incr_from 0 e) (Suc x)) (subst er (incr_from 0 e) (Suc x))"
+    | "subst (Fold v t n) e x = Fold v t (subst n e x)"
+    | "subst (Unfold n) e x = Unfold (subst n e x)"
 
 definition safe_subst :: "expr => expr => expr"
 where "safe_subst e e' = sub_from 0 (subst e (incr_from 0 e') 0)"
+
+lemma [simp]: "free_vars (incr_from n e) = incr n ` free_vars e"
+by (induction e arbitrary: n, auto)
+
+primrec incr_by :: "nat => expr => expr"
+where "incr_by 0 e = e"
+    | "incr_by (Suc n) e = incr_from 0 (incr_by n e)"
+
+lemma [simp]:  "redr_set_by n (free_vars (incr_by n e)) = free_vars e" 
+by (induction n, simp_all) 
 
 lemma [simp]: "free_vars (subst e e' x) = (if x : free_vars e then free_vars e - {x} Un free_vars e' else free_vars e)"
 by (induction e arbitrary: e' x, auto)

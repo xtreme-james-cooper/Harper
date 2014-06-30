@@ -18,6 +18,8 @@ where "is_val (Var v) = False"
     | "is_val (InL t t' e) = is_val e"
     | "is_val (InR t t' e) = is_val e"
     | "is_val (Case e el er) = False"
+    | "is_val (Fold t e er) = is_val e"
+    | "is_val (Unfold e) = False"
 
 lemma canonical_nat: "typecheck env e Nat ==> is_val e ==> e = Zero | (EX v. typecheck env v Nat & is_val v & e = Succ v)"
 by (induction e, auto)
