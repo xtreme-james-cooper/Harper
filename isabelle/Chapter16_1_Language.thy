@@ -3,8 +3,7 @@ imports AssocList DeBruijn
 begin
 
 datatype type = 
-  Nat 
-| Arr type type 
+  Arr type type 
 | Unit 
 | Prod type type 
 | Void 
@@ -13,8 +12,7 @@ datatype type =
 | Rec type
 
 primrec is_valid_type :: "nat set => type => bool"
-where "is_valid_type tyvars Nat = True"
-    | "is_valid_type tyvars (Arr t1 t2) = (is_valid_type tyvars t1 & is_valid_type tyvars t2)"
+where "is_valid_type tyvars (Arr t1 t2) = (is_valid_type tyvars t1 & is_valid_type tyvars t2)"
     | "is_valid_type tyvars Unit = True"
     | "is_valid_type tyvars (Prod t1 t2) = (is_valid_type tyvars t1 & is_valid_type tyvars t2)"
     | "is_valid_type tyvars Void = True"
@@ -24,7 +22,6 @@ where "is_valid_type tyvars Nat = True"
 
 primrec free_type_vars :: "type => nat set"
 where "free_type_vars (Tyvar v) = {v}"
-    | "free_type_vars Nat = {}"
     | "free_type_vars (Arr e1 e2) = free_type_vars e1 Un free_type_vars e2"
     | "free_type_vars Unit = {}"
     | "free_type_vars (Prod e1 e2) = free_type_vars e1 Un free_type_vars e2"
@@ -34,7 +31,6 @@ where "free_type_vars (Tyvar v) = {v}"
 
 primrec type_sub_from :: "nat => type => type"
 where "type_sub_from n (Tyvar v) = Tyvar (incr n v)"
-    | "type_sub_from n Nat = Nat"
     | "type_sub_from n (Arr e1 e2) = Arr (type_sub_from n e1) (type_sub_from n e2)"
     | "type_sub_from n Unit = Unit"
     | "type_sub_from n (Prod e1 e2) = Prod (type_sub_from n e1) (type_sub_from n e2)"
@@ -44,7 +40,6 @@ where "type_sub_from n (Tyvar v) = Tyvar (incr n v)"
 
 primrec type_incr_from :: "nat => type => type"
 where "type_incr_from n (Tyvar v) = Tyvar (incr n v)"
-    | "type_incr_from n Nat = Nat"
     | "type_incr_from n (Arr e1 e2) = Arr (type_incr_from n e1) (type_incr_from n e2)"
     | "type_incr_from n Unit = Unit"
     | "type_incr_from n (Prod e1 e2) = Prod (type_incr_from n e1) (type_incr_from n e2)"
@@ -54,7 +49,6 @@ where "type_incr_from n (Tyvar v) = Tyvar (incr n v)"
 
 primrec type_subst :: "type => type => nat => type"
 where "type_subst (Tyvar v) t x = (if v = x then t else Tyvar v)"
-    | "type_subst Nat t x = Nat"
     | "type_subst (Arr t1 t2) t x = Arr (type_subst t1 t x) (type_subst t2 t x)"
     | "type_subst Unit t x = Unit"
     | "type_subst (Prod t1 t2) t x = Prod (type_subst t1 t x) (type_subst t2 t x)"
@@ -80,9 +74,6 @@ by (induction e arbitrary: e' x, auto)
 
 datatype expr = 
   Var nat 
-| Zero
-| Succ expr
-| IsZ expr expr expr
 | Lam type expr
 | Ap expr expr
 | Fix type expr
@@ -99,9 +90,6 @@ datatype expr =
 
 primrec free_vars :: "expr => nat set"
 where "free_vars (Var v) = {v}"
-    | "free_vars Zero = {}"
-    | "free_vars (Succ e) = free_vars e"
-    | "free_vars (IsZ e0 e1 et) = free_vars e0 Un free_vars et Un redr_set (free_vars e1)"
     | "free_vars (Lam t b) = redr_set (free_vars b)"
     | "free_vars (Ap e1 e2) = free_vars e1 Un free_vars e2"
     | "free_vars (Fix t b) = redr_set (free_vars b)"
@@ -118,9 +106,6 @@ where "free_vars (Var v) = {v}"
 
 primrec incr_from :: "nat => expr => expr"
 where "incr_from n (Var v) = Var (incr n v)"
-    | "incr_from n Zero = Zero"
-    | "incr_from n (Succ e) = Succ (incr_from n e)"
-    | "incr_from n (IsZ e0 e1 et) = IsZ (incr_from n e0) (incr_from (Suc n) e1) (incr_from n et)"
     | "incr_from n (Lam t b) = Lam t (incr_from (Suc n) b)"
     | "incr_from n (Ap e1 e2) = Ap (incr_from n e1) (incr_from n e2)"
     | "incr_from n (Fix t b) = Fix t (incr_from (Suc n) b)"
@@ -137,9 +122,6 @@ where "incr_from n (Var v) = Var (incr n v)"
 
 primrec sub_from :: "nat => expr => expr"
 where "sub_from n (Var v) = Var (if v < n then v else if v = n then undefined else v - 1)"
-    | "sub_from n Zero = Zero"
-    | "sub_from n (Succ e) = Succ (sub_from n e)"
-    | "sub_from n (IsZ e0 e1 et) = IsZ (sub_from n e0) (sub_from (Suc n) e1) (sub_from n et)"
     | "sub_from n (Lam t b) = Lam t (sub_from (Suc n) b)"
     | "sub_from n (Ap e1 e2) = Ap (sub_from n e1) (sub_from n e2)"
     | "sub_from n (Fix t b) = Fix t (sub_from (Suc n) b)"
@@ -156,9 +138,6 @@ where "sub_from n (Var v) = Var (if v < n then v else if v = n then undefined el
 
 primrec subst :: "expr => expr => nat => expr"
 where "subst (Var v) e x = (if v = x then e else Var v)"
-    | "subst Zero e x = Zero"
-    | "subst (Succ n) e x = Succ (subst n e x)"
-    | "subst (IsZ e0 e1 et) e x = IsZ (subst e0 e x) (subst e1 (incr_from 0 e) (Suc x)) (subst et e x)"
     | "subst (Lam t b) e x = Lam t (subst b (incr_from 0 e) (Suc x))"
     | "subst (Ap e1 e2) e x = Ap (subst e1 e x) (subst e2 e x)"
     | "subst (Fix t b) e x = Fix t (subst b (incr_from 0 e) (Suc x))"
@@ -188,5 +167,20 @@ by (induction n, simp_all)
 
 lemma [simp]: "free_vars (subst e e' x) = (if x : free_vars e then free_vars e - {x} Un free_vars e' else free_vars e)"
 by (induction e arbitrary: e' x, auto)
+
+lemma [simp]: "m <= n ==> incr_from (Suc n) (incr_from m e) = incr_from m (incr_from n e)"
+by (induction e arbitrary: m n, simp_all add: incr_def)
+
+lemma [simp]: "sub_from (Suc n) (incr_from 0 e) = incr_from 0 (sub_from n e)"
+by simp sorry
+
+lemma [simp]: "subst (incr_from 0 e) (incr_from 0 e') (Suc x) = incr_from 0 (subst e e' x)"
+by simp sorry
+
+lemma [simp]: "sub_from n (subst (incr_from n e) e' n) = e" 
+by (induction e arbitrary: n e', simp_all add: incr_def)
+
+lemma [simp]: "safe_subst (incr_from 0 e) e' = e"
+by (simp add: safe_subst_def) 
 
 end

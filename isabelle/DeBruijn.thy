@@ -5,6 +5,9 @@ begin
 definition redr_set :: "nat set => nat set"
 where "redr_set xs = (%n. case n of 0 => undefined | Suc n => n) ` (xs - {0})"
 
+lemma [simp]: "redr_set {0} = {}"
+by (simp add: redr_set_def)
+
 lemma [simp]: "redr_set (a Un b) = redr_set a Un redr_set b"
 by (auto simp add: redr_set_def)
 
@@ -43,6 +46,9 @@ by (induction n arbitrary: xs, simp_all)
 
 definition incr :: "nat => nat => nat"
 where "incr n v = (if v < n then v else Suc v)"
+
+lemma [simp]: "incr (Suc n) 0 = 0"
+by (simp add: incr_def)
 
 lemma [simp]: "redr_set (incr 0 ` xs) = xs" 
 by (auto simp add: incr_def)

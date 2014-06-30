@@ -4,9 +4,6 @@ begin
 
 fun is_val :: "expr => bool"
 where "is_val (Var v) = False"
-    | "is_val Zero = True"
-    | "is_val (Succ n) = is_val n"
-    | "is_val (IsZ e0 e1 e2) = False"
     | "is_val (Lam t b) = True"
     | "is_val (Ap e1 e2) = False"
     | "is_val (Fix t b) = False"
@@ -20,9 +17,6 @@ where "is_val (Var v) = False"
     | "is_val (Case e el er) = False"
     | "is_val (Fold t e) = is_val e"
     | "is_val (Unfold e) = False"
-
-lemma canonical_nat: "typecheck env e Nat ==> is_val e ==> e = Zero | (EX v. typecheck env v Nat & is_val v & e = Succ v)"
-by (induction e, auto)
 
 lemma canonical_arr: "typecheck env e (Arr t1 t2) ==> is_val e ==> (EX v. e = Lam t1 v & typecheck (extend_at env 0 t1) v t2)"
 by (induction e, auto)
@@ -44,11 +38,7 @@ lemma canonical_rec: "typecheck env e (Rec t) ==> is_val e ==> EX e'. e = Fold t
 by (induction e, auto)
 
 inductive eval :: "expr => expr => bool"
-where esuc [simp]: "eval n n' ==> eval (Succ n) (Succ n')"
-    | eiz1 [simp]: "eval e e' ==> eval (IsZ e0 e1 e) (IsZ e0 e1 e')"
-    | eiz2 [simp]: "eval (IsZ e0 e1 Zero) e0"
-    | eiz3 [simp]: "is_val e ==> eval (IsZ e0 e1 (Succ e)) (safe_subst e1 e)"
-    | eap1 [simp]: "eval e1 e1' ==> eval (Ap e1 e2) (Ap e1' e2)"
+where eap1 [simp]: "eval e1 e1' ==> eval (Ap e1 e2) (Ap e1' e2)"
     | eap2 [simp]: "is_val e1 ==> eval e2 e2' ==> eval (Ap e1 e2) (Ap e1 e2')"
     | eap3 [simp]: "is_val e2 ==> eval (Ap (Lam t b) e2) (safe_subst b e2)"
     | efix [simp]: "eval (Fix t b) (safe_subst b (Fix t b))"
@@ -70,14 +60,6 @@ where esuc [simp]: "eval n n' ==> eval (Succ n) (Succ n')"
 
 theorem preservation: "eval e e' ==> typecheck env e t ==> typecheck env e' t"
 proof (induction e e' arbitrary: t env rule: eval.inducts)
-case esuc
-  thus ?case by auto
-next case eiz1
-  thus ?case by auto
-next case eiz2
-  thus ?case by auto
-next case eiz3
-  thus ?case by auto
 next case (eap1 e1 e1' e2)
   hence "EX t2. typecheck env e1' (Arr t2 t) & typecheck env e2 t2" by auto
   thus ?case by auto
@@ -131,48 +113,6 @@ theorem progress: "typecheck env e t ==> env = empty_map ==> is_val e | (EX e'. 
 proof (induction env e t arbitrary: rule: typecheck.inducts)
 case tvar
   thus ?case by auto
-next case tzer
-  thus ?case by simp
-next case (tsuc env n)
-  thus ?case 
-  proof (cases "is_val n", auto)
-    fix x
-    assume "eval n x"
-    hence "eval (Succ n) (Succ x)" by simp
-    thus "EX y. eval (Succ n) y " by auto
-  qed
-next case (tisz env e e0 t e1)
-  thus ?case
-  proof (cases "is_val e")
-  case True
-    have "EX x. eval (IsZ e0 e1 e) x"
-    proof (cases "e = Zero")
-    case True
-      def e0' == e0
-      have "eval (IsZ e0 e1 Zero) e0'" by (simp add: e0'_def)
-      with True show ?thesis by auto
-    next case False
-      from tisz True have "e = Zero | (EX v. typecheck env v Nat & is_val v & e = Succ v)" by (simp add: canonical_nat)
-      with False have "EX v. typecheck env v Nat & is_val v & e = Succ v" by simp
-      thus ?thesis
-      proof auto
-        fix v
-        assume "is_val v"
-        hence "eval (IsZ e0 e1 (Succ v)) (safe_subst e1 v)" by simp
-        thus "EX x. eval (IsZ e0 e1 (Succ v)) x" by auto
-      qed
-    qed
-    thus ?thesis by simp
-  next case False
-    with tisz have "\<exists>a. eval e a" by simp
-    thus ?thesis
-    proof auto
-      fix a
-      assume "eval e a"
-      hence "eval (IsZ e0 e1 e) (IsZ e0 e1 a)" by simp
-      thus "EX x. eval (IsZ e0 e1 e) x" by auto
-    qed
-  qed
 next case tlam
   thus ?case by simp
 next case (tapp env e1 t2 t e2)

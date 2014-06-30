@@ -4,11 +4,6 @@ begin
 
 inductive typecheck :: "(nat, type) assoc => expr => type => bool"
 where tvar [simp]: "lookup env v = Some t ==> typecheck env (Var v) t"
-    | tzer [simp]: "typecheck env Zero Nat"    
-    | tsuc [simp]: "typecheck env n Nat ==> typecheck env (Succ n) Nat"
-    | tisz [simp]: "typecheck env e Nat ==> typecheck env e0 t ==> 
-                        typecheck (extend_at env 0 Nat) e1 t ==> 
-                            typecheck env (IsZ e0 e1 e) t"
     | tlam [simp]: "typecheck (extend_at env 0 r) e t ==> typecheck env (Lam r e) (Arr r t)"
     | tapp [simp]: "typecheck env e1 (Arr t2 t) ==> typecheck env e2 t2 ==> 
                         typecheck env (Ap e1 e2) t"
@@ -26,9 +21,6 @@ where tvar [simp]: "lookup env v = Some t ==> typecheck env (Var v) t"
     | tufd [simp]: "typecheck env e (Rec t) ==> typecheck env (Unfold e) (safe_type_subst t (Rec t))"
 
 inductive_cases [elim!]: "typecheck e (Var x) t"
-inductive_cases [elim!]: "typecheck e Zero t"
-inductive_cases [elim!]: "typecheck e (Succ x) t"
-inductive_cases [elim!]: "typecheck e (IsZ x y z) t"
 inductive_cases [elim!]: "typecheck e (Lam x y) t"
 inductive_cases [elim!]: "typecheck e (Ap x y) t"
 inductive_cases [elim!]: "typecheck e (Fix x y) t"
@@ -47,13 +39,6 @@ lemma [simp]: "typecheck env e t ==> typecheck (extend_at env n k) (incr_from n 
 proof (induction env e t arbitrary: n rule: typecheck.inducts)
 case tvar
   thus ?case by (simp add: incr_def)
-next case tzer
-  thus ?case by simp
-next case tsuc
-  thus ?case by simp
-next case (tisz env e e0 t e1)
-  hence "typecheck (extend_at (extend_at env 0 Nat) (Suc n) k) (incr_from (Suc n) e1) t" by simp
-  with tisz show ?case by (simp add: extend_at_swap)
 next case (tlam env r b t)
   hence "typecheck (extend_at (extend_at env 0 r) (Suc n) k) (incr_from (Suc n) b) t" by simp
   thus ?case by (simp add: extend_at_swap)
@@ -98,14 +83,6 @@ lemma [simp]: "typecheck (extend_at env n k) e t ==> n ~: free_vars e ==> typech
 proof (induction "extend_at env n k" e t arbitrary: env n rule: typecheck.inducts)
 case (tvar v t)
   thus ?case by (cases "v < n", simp, cases "v = n", simp_all)
-next case tzer
-  thus ?case by simp
-next case tsuc
-  thus ?case by simp
-next case (tisz e e0 t e1)
-  moreover hence "Suc n ~: free_vars e1" by auto
-  moreover have "extend_at (extend_at env n k) 0 Nat = extend_at (extend_at env 0 Nat) (Suc n) k" by (simp add: extend_at_swap)
-  ultimately show ?case by simp
 next case tlam
   thus ?case by (simp add: extend_at_swap)
 next case (tapp e1 t2 t e2)
@@ -145,12 +122,6 @@ lemma [simp]: "typecheck (extend env x t2) e t1 ==> typecheck env eb t2 ==> type
 proof (induction "extend env x t2" e t1 arbitrary: env eb x rule: typecheck.inducts)
 case tvar
   thus ?case by auto
-next case tzer
-  thus ?case by simp
-next case tsuc
-  thus ?case by simp
-next case tisz
-  thus ?case by simp
 next case tlam
   thus ?case by simp
 next case (tapp e1 t2 t e2)
@@ -188,25 +159,5 @@ qed
 
 lemma [simp]: "typecheck (extend_at env 0 t') e t ==> typecheck env e' t' ==> typecheck env (safe_subst e e') t"
 by (simp add: safe_subst_def)
-
-inductive typecheck_subst :: "(nat, type) assoc => expr list => type list => bool"
-where tsubn [simp]: "typecheck_subst env [] []"
-    | tsubc [simp]: "typecheck env e t ==> typecheck_subst env es ts ==> typecheck_subst env (e # es) (t # ts)"
-
-inductive_cases [elim!]: "typecheck_subst e [] t"
-inductive_cases [elim!]: "typecheck_subst e (x # y) t"
-
-lemma [simp]: "typecheck_subst env e1 t1 ==> typecheck_subst env e2 t2 ==> typecheck_subst env (e1 @ e2) (t1 @ t2)"
-by (induction env e1 t1 rule: typecheck_subst.induct, simp_all)
-
-lemma [simp]: "typecheck_subst env ss ts ==> length ss = length ts"
-by (induction env ss ts rule: typecheck_subst.induct, simp_all)
-
-primrec apply_subst :: "expr list => expr => expr"
-where "apply_subst [] e = e"
-    | "apply_subst (e' # e's) e = apply_subst e's (safe_subst e (incr_by (length e's) e'))"
-
-lemma [simp]: "typecheck_subst env s ts ==> typecheck (extend_env ts env) e t ==> typecheck env (apply_subst s e) t"
-by (induction env s ts arbitrary: e rule: typecheck_subst.induct, simp_all)
 
 end
