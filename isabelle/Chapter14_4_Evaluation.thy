@@ -23,8 +23,8 @@ where esuc [simp]: "eval n n' ==> eval (Succ n) (Succ n')"
     | emp1 [simp]: "eval (Map (TyVar 0) e e') (safe_subst e e')"
     | emp2 [simp]: "eval (Map Unit e e') Triv"
     | emp3 [simp]: "eval (Map (Prod t1 t2) e e') (Pair (Map t1 e (ProjL e')) (Map t2 e (ProjR e')))"
-    | emp4 [simp]: "eval (Map Void e e') (Abort ttttt e)"
-    | emp5 [simp]: "eval (Map (Sum t1 t2) e e') (Case e ttttt [Rule PInL (InL ttttt ttttt (Map t1 e (Var 0))), Rule PInR (InR ttttt ttttt (Map t2 e (Var 0)))])"
+    | emp4 [simp]: "eval (Map Void e e') (Abort Void e')"
+    | emp5 [simp]: "eval (Map (Sum t1 t2) e e') (Case e' (Sum t1 t2) [Rule PInL (InL t1 t2 (Map t1 e (Var 0))), Rule PInR (InR t1 t2 (Map t2 e (Var 0)))])"
     | ers1 [simp]: "is_val e ==> matches p e = Some s ==> eval_rules e (Rule p e2 # rs) (apply_subst s e2)"
     | ers2 [simp]: "is_val e ==> matches p e = None ==> eval_rules e rs e' ==> eval_rules e (Rule p e2 # rs) e'"
 
@@ -71,15 +71,38 @@ next case (ecs1 e e' t1 rs)
 next case ecs2
   thus ?case by auto
 next case emp1
-  thus ?case by auto sorry
+  thus ?case by auto
 next case emp2
   thus ?case by auto
 next case emp3
-  thus ?case by auto sorry
+  thus ?case by auto
 next case emp4
-  thus ?case by auto sorry
-next case emp5
-  thus ?case by auto sorry
+  thus ?case by auto
+next case (emp5 t1 t2 e e')
+  hence "typecheck env (Map (Sum t1 t2) e e') t" by simp
+
+  have T: "t = Sum t1 t2" by simp sorry 
+  have X: "typecheck env e' (Sum t1 t2)" by simp sorry
+
+  have S1: "!!r. ty_subst r t1 = t1" by simp sorry
+  have S2: "!!r. ty_subst r t2 = t2" by simp sorry
+
+  def tsp == "[t1]"
+  def ts == "[t2]"
+
+  have "typecheck env e t2 ==> typecheck env (InR t1 t2 e) (Sum t1 t2)" by simp
+
+  have A2: "typecheck (extend_at (extend_at env 0 t1) 0 r) e r'" by simp sorry
+  from S1 have "typecheck (extend_at env 0 t1) (Var 0) (ty_subst r t1)" by simp
+  with emp5 A2 have "typecheck (extend_at env 0 t1) (Map t1 e (Var 0)) (ty_subst r' t1)" by auto
+  with S1 have V: "typecheck (extend_env tsp env) (Map t1 e (Var 0)) t1" by (simp add: tsp_def) 
+
+  have "typecheck (extend_at env 0 t2) (Map t2 e (Var 0)) t2" by simp sorry
+  hence W: "typecheck (extend_env ts env) (Map t2 e (Var 0)) t2" by (simp add: ts_def)
+
+  have Y: "types_from_pat PInL (Sum t1 t2) tsp" by (simp add: tsp_def)
+  have Z: "types_from_pat PInR (Sum t1 t2) ts" by (simp add: ts_def)
+  from Z W X Y V T show ?case by simp
 next case (ers1 e p s e2 rs)
   then obtain ts where "types_from_pat p t ts & typecheck (extend_env ts env) e2 t'" by auto
   moreover with ers1 have "typecheck_subst env s ts" by simp
@@ -336,8 +359,31 @@ next case (tcse env e t1 rs t2)
     hence "eval (Case e t1 rs) (Case a t1 rs)" by simp
     thus ?thesis by auto
   qed
-next case tmap
-  thus ?case by simp sorry
+next case (tmap t env r e' r' e)
+  thus ?case
+  proof (cases t)
+  case Unit
+    hence "EX a. eval (Map Unit e' e) a" by simp sorry
+    with Unit show ?thesis by simp
+  next case Nat
+    hence "EX a. eval (Map Nat e' e) a" by simp sorry
+    with Nat show ?thesis by simp
+  next case (Sum t1 t2)
+    hence "EX a. eval (Map (Sum t1 t2) e' e) a" by simp sorry
+    with Sum show ?thesis by simp
+  next case (Prod t1 t2)
+    hence "EX a. eval (Map (Prod t1 t2) e' e) a" by simp sorry
+    with Prod show ?thesis by simp
+  next case (Arr t1 t2)
+    hence "EX a. eval (Map (Arr t1 t2) e' e) a" by simp sorry
+    with Arr show ?thesis by simp
+  next case Void
+    hence "EX a. eval (Map Void e' e) a" by simp sorry
+    with Void show ?thesis by simp
+  next case (TyVar x)
+    hence "EX a. eval (Map (TyVar x) e' e) a" by simp sorry
+    with TyVar show ?thesis by simp
+  qed
 next case tnil
   thus ?case by auto
 next case (tcns env r t1 t2 rs)

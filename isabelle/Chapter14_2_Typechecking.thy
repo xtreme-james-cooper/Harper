@@ -39,7 +39,7 @@ where tvar [simp]: "lookup env v = Some t ==> typecheck env (Var v) t"
     | tinr [simp]: "typecheck env e t2 ==> typecheck env (InR t1 t2 e) (Sum t1 t2)"
     | tcse [simp]: "typecheck env e t1 ==> typecheck_rules env rs t1 t2 ==> typecheck env (Case e t1 rs) t2" 
     | tmap [simp]: "is_type 1 t ==> typecheck (extend_at env 0 r) e' r' ==> typecheck env e (ty_subst r t) ==> 
-                        typecheck env (Map t e e') (ty_subst r' t)" 
+                        typecheck env (Map t e' e) (ty_subst r' t)" 
     | tnil [simp]: "typecheck_rules env [] t1 t2"
     | tcns [simp]: "typecheck_rule env r t1 t2 ==> typecheck_rules env rs t1 t2 ==> typecheck_rules env (r # rs) t1 t2"
     | trul [simp]: "types_from_pat p t1 ts ==> typecheck (extend_env ts env) e t2 ==> typecheck_rule env (Rule p e) t1 t2"
@@ -105,8 +105,9 @@ next case (tcse env e t1 rs t2)
   hence "typecheck (extend_at env n k) (incr_from n e) t1" by simp
   moreover from tcse have "typecheck_rules (extend_at env n k) (incr_from_rules n rs) t1 t2" by simp
   ultimately show ?case by simp
-next case (tmap t env r e' r' e)
-  thus ?case by simp sorry
+next case (tmap t env r e r' e')
+  hence "typecheck (extend_at (extend_at env 0 r) (Suc n) k) (incr_from (Suc n) e) r'" by simp
+  with tmap show ?case by (simp add: extend_at_swap)
 next case tnil
   thus ?case by simp
 next case tcns
@@ -160,8 +161,9 @@ next case (tcse e t1 rs t2)
   hence "typecheck_rules env (sub_from_rules n rs) t1 t2" by simp 
   moreover from tcse have "typecheck env (sub_from n e) t1" by simp
   ultimately show ?case by simp
-next case (tmap t env r e' r' e)
-  thus ?case by simp sorry
+next case (tmap t r e r' e')
+  hence "typecheck (extend_at env 0 r) (sub_from (Suc n) e) r'" by (simp add: extend_at_swap)
+  with tmap show ?case by simp
 next case tnil
   thus ?case by simp
 next case tcns
@@ -210,8 +212,11 @@ next case (tcse e t1 rs t2)
   hence "typecheck env (subst e eb x) t1" by simp
   moreover from tcse have "typecheck_rules env (subst_rules rs eb x) t1 t2" by simp
   ultimately show ?case by simp
-next case (tmap t env r e' r' e)
-  thus ?case by simp sorry
+next case (tmap t r e r' e')
+  from tmap have "is_type 1 t" by simp
+  moreover from tmap have "typecheck (extend_at env 0 r) (subst e (incr_from 0 eb) (Suc x)) r'" by simp 
+  moreover from tmap have "typecheck env (subst e' eb x) (ty_subst r t)" by simp
+  ultimately show ?case by simp
 next case tnil
   thus ?case by simp
 next case tcns
