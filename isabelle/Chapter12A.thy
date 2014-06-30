@@ -403,7 +403,7 @@ where esuc [simp]: "eval n n' ==> eval (Succ n) (Succ n')"
     | eabt [simp]: "eval e e' ==> eval (Abort t e) (Abort t e')"
     | einl [simp]: "eval e e' ==> eval (InL t t' e) (InL t t' e')"
     | einr [simp]: "eval e e' ==> eval (InR t t' e) (InR t t' e')"
-    | ecs1 [simp]: "eval e e' ==> eval (Case e el er) (Case e el er)"
+    | ecs1 [simp]: "eval e e' ==> eval (Case e el er) (Case e' el er)"
     | ecs2 [simp]: "is_val e ==> eval (Case (InL t t' e) el er) (safe_subst el e)"
     | ecs3 [simp]: "is_val e ==> eval (Case (InR t t' e) el er) (safe_subst er e)"
 
@@ -467,8 +467,12 @@ next case einl
   thus ?case by auto
 next case einr
   thus ?case by auto
-next case ecs1
-  thus ?case by auto
+next case (ecs1 e e' el er)
+  then obtain t1 t2 where T: "typecheck env e (Sum t1 t2) & 
+                            typecheck (extend_at env 0 t1) el t & 
+                            typecheck (extend_at env 0 t2) er t" by auto
+  with ecs1 have "typecheck env e' (Sum t1 t2)" by simp
+  with T show ?case by simp
 next case ecs2
   thus ?case by auto
 next case ecs3
@@ -693,7 +697,7 @@ next case (tcse env e t1 t2 el t er)
     proof auto
       fix a
       assume "eval e a"
-      hence "eval (Case e el er) (Case e el er)" by simp
+      hence "eval (Case e el er) (Case a el er)" by simp
       thus "EX x. eval (Case e el er) x" by auto
     qed
   qed
