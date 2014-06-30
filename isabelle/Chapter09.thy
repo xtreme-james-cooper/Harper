@@ -1,5 +1,5 @@
 theory Chapter09
-imports AssocList
+imports AssocList DeBruijn
 begin
 
 datatype type = Nat | Arr type type
@@ -11,21 +11,6 @@ datatype expr =
 | Rec expr expr expr
 | Lam type expr
 | Ap expr expr
-
-definition redr_set :: "nat set => nat set"
-where "redr_set xs = (%n. case n of 0 => undefined | Suc n => n) ` (xs - {0})"
-
-lemma [simp]: "(n : redr_set xs) = (Suc n : xs)" 
-proof (auto simp add: redr_set_def)
-  fix x
-  assume "x : xs"
-     and "Suc (case x of Suc n => n) ~: xs"
-  thus "x = 0" by (cases x, simp_all)
-next
-  assume "Suc n : xs"
-  hence "n = (case Suc n of Suc n => n) ==> n : (%x. case x of Suc n => n)`(xs - {0})" by blast
-  thus "n : (%x. case x of Suc n => n) ` (xs - {0})" by simp
-qed
 
 primrec free_vars :: "expr => nat set"
 where "free_vars (Var v) = {v}"

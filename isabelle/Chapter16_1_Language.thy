@@ -1,5 +1,5 @@
 theory Chapter16_1_Language
-imports AssocList
+imports AssocList DeBruijn
 begin
 
 datatype type = 
@@ -9,6 +9,18 @@ datatype type =
 | Prod type type 
 | Void 
 | Sum type type
+| Tyvar string
+| Rec string type
+
+primrec is_valid_type :: "string set => type => bool"
+where "is_valid_type tyvars Nat = True"
+    | "is_valid_type tyvars (Arr t1 t2) = (is_valid_type tyvars t1 & is_valid_type tyvars t2)"
+    | "is_valid_type tyvars Unit = True"
+    | "is_valid_type tyvars (Prod t1 t2) = (is_valid_type tyvars t1 & is_valid_type tyvars t2)"
+    | "is_valid_type tyvars Void = True"
+    | "is_valid_type tyvars (Sum t1 t2) = (is_valid_type tyvars t1 & is_valid_type tyvars t2)"
+    | "is_valid_type tyvars (Tyvar v) = (v : tyvars)"
+    | "is_valid_type tyvars (Rec v t) = (is_valid_type (insert v tyvars) t)"
 
 datatype expr = 
   Var nat 
@@ -26,45 +38,8 @@ datatype expr =
 | InL type type expr
 | InR type type expr
 | Case expr expr expr
-
-definition redr_set :: "nat set => nat set"
-where "redr_set xs = (%n. case n of 0 => undefined | Suc n => n) ` (xs - {0})"
-
-lemma [simp]: "redr_set (a Un b) = redr_set a Un redr_set b"
-by (auto simp add: redr_set_def)
-
-lemma [simp]: "redr_set (a - {Suc x}) = redr_set a - {x}"
-proof (auto simp add: redr_set_def) 
-  fix n
-  assume "0 < n" 
-     and "n ~= Suc (case n of 0 => undefined | Suc n => n)"
-  thus False by (cases n, simp_all)
-qed
-
-lemma [simp]: "(n : redr_set xs) = (Suc n : xs)" 
-proof (auto simp add: redr_set_def)
-  fix x
-  assume "x : xs"
-     and "Suc (case x of Suc n => n) ~: xs"
-  thus "x = 0" by (cases x, simp_all)
-next
-  assume "Suc n : xs"
-  hence "n = (case Suc n of Suc n => n) ==> n : (%x. case x of Suc n => n)`(xs - {0})" by blast
-  thus "n : (%x. case x of Suc n => n) ` (xs - {0})" by simp
-qed
-
-primrec redr_set_by :: "nat => nat set => nat set"
-where "redr_set_by 0 xs = xs"
-    | "redr_set_by (Suc n) xs = redr_set_by n (redr_set xs)"
-
-lemma [simp]: "redr_set_by n (a Un b) = redr_set_by n a Un redr_set_by n b"
-by (induction n arbitrary: a b, simp_all)
-
-lemma [simp]: "redr_set_by n (a - {x + n}) = redr_set_by n a - {x}"
-by (induction n arbitrary: a, simp_all)
-
-lemma [simp]: "(x : redr_set_by n xs) = (x + n : xs)" 
-by (induction n arbitrary: xs, simp_all)
+| Fold string type expr
+| Unfold expr
 
 primrec free_vars :: "expr => nat set"
 where "free_vars (Var v) = {v}"
@@ -82,12 +57,8 @@ where "free_vars (Var v) = {v}"
     | "free_vars (InL t t' e) = free_vars e"
     | "free_vars (InR t t' e) = free_vars e"
     | "free_vars (Case e el er) = free_vars e Un redr_set (free_vars el) Un redr_set (free_vars er)"
-
-definition incr :: "nat => nat => nat"
-where "incr n v = (if v < n then v else Suc v)"
-
-lemma [simp]: "redr_set (incr 0 ` xs) = xs" 
-by (auto simp add: incr_def)
+    | "free_vars (Fold v t e) = free_vars e"
+    | "free_vars (Unfold e) = free_vars e"
 
 primrec incr_from :: "nat => expr => expr"
 where "incr_from n (Var v) = Var (incr n v)"
@@ -105,41 +76,11 @@ where "incr_from n (Var v) = Var (incr n v)"
     | "incr_from n (InL t t' e) = InL t t' (incr_from n e)"
     | "incr_from n (InR t t' e) = InR t t' (incr_from n e)"
     | "incr_from n (Case e el er) = Case (incr_from n e) (incr_from (Suc n) el) (incr_from (Suc n) er)"
-
-lemma [simp]: "redr_set (incr (Suc n) ` xs) = incr n ` redr_set xs" 
-proof (auto simp add: incr_def)
-  fix x xa
-  assume "Suc x = (if xa < Suc n then xa else Suc xa)"
-     and "xa : xs" 
-  thus "x : incr n ` redr_set xs"
-  proof (cases xa, auto)
-    fix xb
-    assume "Suc xb : xs"
-       and "Suc x = (if xb < n then Suc xb else Suc (Suc xb))"
-    moreover hence "x = incr n xb" by (auto simp add: incr_def)
-    ultimately show "x : incr n ` redr_set xs" by simp
-  qed
-next
-  show "!!xa. Suc xa : xs ==> xa < n ==> Suc xa : incr (Suc n) ` xs" by (auto simp add: incr_def)
-next 
-  fix xa
-  assume "Suc xa : xs"
-     and "~ xa < n"
-  moreover hence "Suc (Suc xa) = incr (Suc n) (Suc xa)" by (simp add: incr_def)
-  ultimately show "Suc (Suc xa) : incr (Suc n) ` xs" by blast
-qed
-
-lemma [simp]: "redr_set_by k (incr (n + k) ` xs) = incr n ` redr_set_by k xs" 
-by (induction k arbitrary: n xs, simp_all)
+    | "incr_from n (Fold v t e) = Fold v t (incr_from n e)"
+    | "incr_from n (Unfold e) = Unfold (incr_from n e)"
 
 lemma [simp]: "free_vars (incr_from n e) = incr n ` free_vars e"
 by (induction e arbitrary: n, auto)
-
-lemma [simp]: "n ~: incr n ` xs"
-proof (auto simp add: incr_def)
-  fix x
-  show "n = (if x < n then x else Suc x) ==> False" by (cases "x < n", simp_all)
-qed
 
 primrec incr_by :: "nat => expr => expr"
 where "incr_by 0 e = e"
