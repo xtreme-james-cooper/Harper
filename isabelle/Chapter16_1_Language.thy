@@ -94,7 +94,7 @@ datatype expr =
 | InL type type expr
 | InR type type expr
 | Case expr expr expr
-| Fold string type expr
+| Fold type expr
 | Unfold expr
 
 primrec free_vars :: "expr => nat set"
@@ -113,7 +113,7 @@ where "free_vars (Var v) = {v}"
     | "free_vars (InL t t' e) = free_vars e"
     | "free_vars (InR t t' e) = free_vars e"
     | "free_vars (Case e el er) = free_vars e Un redr_set (free_vars el) Un redr_set (free_vars er)"
-    | "free_vars (Fold v t e) = free_vars e"
+    | "free_vars (Fold t e) = free_vars e"
     | "free_vars (Unfold e) = free_vars e"
 
 primrec incr_from :: "nat => expr => expr"
@@ -132,7 +132,7 @@ where "incr_from n (Var v) = Var (incr n v)"
     | "incr_from n (InL t t' e) = InL t t' (incr_from n e)"
     | "incr_from n (InR t t' e) = InR t t' (incr_from n e)"
     | "incr_from n (Case e el er) = Case (incr_from n e) (incr_from (Suc n) el) (incr_from (Suc n) er)"
-    | "incr_from n (Fold v t e) = Fold v t (incr_from n e)"
+    | "incr_from n (Fold t e) = Fold t (incr_from n e)"
     | "incr_from n (Unfold e) = Unfold (incr_from n e)"
 
 primrec sub_from :: "nat => expr => expr"
@@ -151,7 +151,7 @@ where "sub_from n (Var v) = Var (if v < n then v else if v = n then undefined el
     | "sub_from n (InL t t' e) = InL t t' (sub_from n e)"
     | "sub_from n (InR t t' e) = InR t t' (sub_from n e)"
     | "sub_from n (Case e el er) = Case (sub_from n e) (sub_from (Suc n) el) (sub_from (Suc n) er)"
-    | "sub_from n (Fold v t e) = Fold v t (sub_from n e)"
+    | "sub_from n (Fold t e) = Fold t (sub_from n e)"
     | "sub_from n (Unfold e) = Unfold (sub_from n e)"
 
 primrec subst :: "expr => expr => nat => expr"
@@ -170,7 +170,7 @@ where "subst (Var v) e x = (if v = x then e else Var v)"
     | "subst (InL t t' n) e x = InL t t' (subst n e x)"
     | "subst (InR t t' n) e x = InR t t' (subst n e x)"
     | "subst (Case n el er) e x = Case (subst n e x) (subst el (incr_from 0 e) (Suc x)) (subst er (incr_from 0 e) (Suc x))"
-    | "subst (Fold v t n) e x = Fold v t (subst n e x)"
+    | "subst (Fold t n) e x = Fold t (subst n e x)"
     | "subst (Unfold n) e x = Unfold (subst n e x)"
 
 definition safe_subst :: "expr => expr => expr"

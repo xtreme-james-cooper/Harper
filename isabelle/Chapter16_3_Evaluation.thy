@@ -18,7 +18,7 @@ where "is_val (Var v) = False"
     | "is_val (InL t t' e) = is_val e"
     | "is_val (InR t t' e) = is_val e"
     | "is_val (Case e el er) = False"
-    | "is_val (Fold t e er) = is_val e"
+    | "is_val (Fold t e) = is_val e"
     | "is_val (Unfold e) = False"
 
 lemma canonical_nat: "typecheck env e Nat ==> is_val e ==> e = Zero | (EX v. typecheck env v Nat & is_val v & e = Succ v)"
@@ -38,6 +38,9 @@ by (induction e, auto)
 
 lemma canonical_sum: "typecheck env e (Sum t1 t2) ==> is_val e ==> 
       (EX e'. e = InL t1 t2 e' & is_val e' & typecheck env e' t1) | (EX e'. e = InR t1 t2 e' & is_val e' & typecheck env e' t2)"
+by (induction e, auto)
+
+lemma canonical_rec: "typecheck env e (Rec t) ==> is_val e ==> EX e'. e = Fold t e' & is_val e'"
 by (induction e, auto)
 
 inductive eval :: "expr => expr => bool"
@@ -61,6 +64,9 @@ where esuc [simp]: "eval n n' ==> eval (Succ n) (Succ n')"
     | ecs1 [simp]: "eval e e' ==> eval (Case e el er) (Case e el er)"
     | ecs2 [simp]: "is_val e ==> eval (Case (InL t t' e) el er) (safe_subst el e)"
     | ecs3 [simp]: "is_val e ==> eval (Case (InR t t' e) el er) (safe_subst er e)"
+    | efld [simp]: "eval e e' ==> eval (Fold t e) (Fold t e')"
+    | euf1 [simp]: "eval e e' ==> eval (Unfold e) (Unfold e')"
+    | euf2 [simp]: "is_val e ==> eval (Unfold (Fold t e)) e"
 
 theorem preservation: "eval e e' ==> typecheck env e t ==> typecheck env e' t"
 proof (induction e e' arbitrary: t env rule: eval.inducts)
@@ -108,6 +114,12 @@ next case ecs1
 next case ecs2
   thus ?case by auto
 next case ecs3
+  thus ?case by auto
+next case efld
+  thus ?case by auto
+next case euf1
+  thus ?case by auto
+next case euf2
   thus ?case by auto
 qed
 
@@ -329,6 +341,28 @@ next case (tcse env e t1 t2 el t er)
       hence "eval (Case e el er) (Case e el er)" by simp
       thus "EX x. eval (Case e el er) x" by auto
     qed
+  qed
+next case (tfld env e t)
+  thus ?case
+  proof (cases "is_val e", auto)
+    fix a
+    assume "eval e a"
+    hence "eval (Fold t e) (Fold t a)" by auto
+    thus "EX a. eval (Fold t e) a" by auto
+  qed
+next case (tufd env e t)
+  thus ?case
+  proof (cases "is_val e")
+  case True
+    with tufd have "EX e'. e = Fold t e' & is_val e'" by (simp add: canonical_rec)
+    then obtain e' where E': "e = Fold t e' & is_val e'" by auto
+    hence "eval (Unfold (Fold t e')) e'" by simp
+    hence "EX a. eval (Unfold (Fold t e')) a" by auto
+    with E' show ?thesis by auto
+  next case False
+    with tufd obtain a where "eval e a" by auto
+    hence "eval (Unfold e) (Unfold a)" by auto
+    thus ?thesis by auto
   qed
 qed 
 

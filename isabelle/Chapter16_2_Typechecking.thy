@@ -22,6 +22,8 @@ where tvar [simp]: "lookup env v = Some t ==> typecheck env (Var v) t"
     | tinr [simp]: "typecheck env e t2 ==> typecheck env (InR t1 t2 e) (Sum t1 t2)"
     | tcse [simp]: "typecheck env e (Sum t1 t2) ==> typecheck (extend_at env 0 t1) el t ==> 
                         typecheck (extend_at env 0 t2) er t ==> typecheck env (Case e el er) t"
+    | tfld [simp]: "typecheck env e (safe_type_subst t (Rec t)) ==> typecheck env (Fold t e) (Rec t)"
+    | tufd [simp]: "typecheck env e (Rec t) ==> typecheck env (Unfold e) (safe_type_subst t (Rec t))"
 
 inductive_cases [elim!]: "typecheck e (Var x) t"
 inductive_cases [elim!]: "typecheck e Zero t"
@@ -38,6 +40,8 @@ inductive_cases [elim!]: "typecheck e (Abort x y) t"
 inductive_cases [elim!]: "typecheck e (InL x y z) t"
 inductive_cases [elim!]: "typecheck e (InR x y z) t"
 inductive_cases [elim!]: "typecheck e (Case x y z) t"
+inductive_cases [elim!]: "typecheck e (Fold x y) t"
+inductive_cases [elim!]: "typecheck e (Unfold x) t"
 
 lemma [simp]: "typecheck env e t ==> typecheck (extend_at env n k) (incr_from n e) t"
 proof (induction env e t arbitrary: n rule: typecheck.inducts)
@@ -81,6 +85,10 @@ next case (tcse env e t1 t2 el t er)
   moreover from tcse have "typecheck (extend_at (extend_at env 0 t1) (Suc n) k) (incr_from (Suc n) el) t" by simp
   moreover from tcse have "typecheck (extend_at (extend_at env 0 t2) (Suc n) k) (incr_from (Suc n) er) t" by simp
   ultimately show ?case by (simp add: extend_at_swap)
+next case tfld
+  thus ?case by simp
+next case tufd
+  thus ?case by simp
 qed
 
 lemma [simp]: "typecheck env e t ==> typecheck (extend_env ts env) (incr_by (length ts) e) t"
@@ -127,6 +135,10 @@ next case (tcse e t1 t2 el t er)
   moreover from tcse have "typecheck (extend_at env 0 t1) (sub_from (Suc n) el) t" by (simp add: extend_at_swap)
   moreover from tcse have "typecheck (extend_at env 0 t2) (sub_from (Suc n) er) t" by (simp add: extend_at_swap)
   ultimately show ?case by simp
+next case tfld
+  thus ?case by simp
+next case tufd
+  thus ?case by simp
 qed
 
 lemma [simp]: "typecheck (extend env x t2) e t1 ==> typecheck env eb t2 ==> typecheck env (subst e eb x) t1"
@@ -168,6 +180,10 @@ next case (tcse e t1 t2 el t er)
   moreover from tcse have "typecheck (extend_at env 0 t1) (subst el (incr_from 0 eb) (Suc x)) t" by (simp add: extend_at_swap) 
   moreover from tcse have "typecheck (extend_at env 0 t2) (subst er (incr_from 0 eb) (Suc x)) t" by (simp add: extend_at_swap) 
   ultimately show ?case by simp
+next case tfld
+  thus ?case by simp
+next case tufd
+  thus ?case by simp
 qed
 
 lemma [simp]: "typecheck (extend_at env 0 t') e t ==> typecheck env e' t' ==> typecheck env (safe_subst e e') t"
