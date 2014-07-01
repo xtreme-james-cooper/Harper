@@ -160,4 +160,13 @@ by (induction ts, simp_all add: extend_at_swap)
 lemma [simp]: "extend_env ts (extend env x t2) = extend (extend_env ts env) (x + length ts) t2"
 by (induction ts, simp_all add: extend_at_swap)
 
+primrec assoc_map :: "('b => 'c) => ('a, 'b) assoc => ('a, 'c) assoc" 
+where "assoc_map f (ASSOC env) = ASSOC (Option.map f o env)"
+
+lemma [simp]: "lookup env k = None ==> lookup (assoc_map f env) k = None"
+by (induction env, simp_all)
+
+lemma [simp]: "lookup env k = Some v ==> lookup (assoc_map f env) k = Some (f v)"
+by (induction env, simp_all)
+
 end

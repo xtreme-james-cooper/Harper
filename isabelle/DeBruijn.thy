@@ -50,6 +50,9 @@ where "incr n v = (if v < n then v else Suc v)"
 lemma [simp]: "incr (Suc n) 0 = 0"
 by (simp add: incr_def)
 
+definition expand_set :: "nat set => nat set"
+where "expand_set s = insert 0 (incr 0 ` s)"
+
 lemma [simp]: "redr_set (incr 0 ` xs) = xs" 
 by (auto simp add: incr_def)
 

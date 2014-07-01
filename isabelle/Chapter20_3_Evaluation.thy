@@ -17,6 +17,8 @@ where "is_val (Var v) = False"
     | "is_val (Case e el er) = False"
     | "is_val (Fold t e) = is_val e"
     | "is_val (Unfold e) = False"
+    | "is_val (TyLam b) = True"
+    | "is_val (TyAp e1 e2) = False"
 
 lemma canonical_arr: "typecheck env e (Arr t1 t2) ==> is_val e ==> (EX v. e = Lam t1 v & typecheck (extend_at env 0 t1) v t2)"
 by (induction e, auto)
@@ -35,6 +37,9 @@ lemma canonical_sum: "typecheck env e (Sum t1 t2) ==> is_val e ==>
 by (induction e, auto)
 
 lemma canonical_rec: "typecheck env e (Rec t) ==> is_val e ==> EX e'. e = Fold t e' & is_val e'"
+by (induction e, auto)
+
+lemma canonical_all: "typecheck env e (All t) ==> is_val e ==> (EX v. e = TyLam v & typecheck env v t)"
 by (induction e, auto)
 
 inductive eval :: "expr => expr => bool"
@@ -57,6 +62,8 @@ where eap1 [simp]: "eval e1 e1' ==> eval (Ap e1 e2) (Ap e1' e2)"
     | efld [simp]: "eval e e' ==> eval (Fold t e) (Fold t e')"
     | euf1 [simp]: "eval e e' ==> eval (Unfold e) (Unfold e')"
     | euf2 [simp]: "is_val e ==> eval (Unfold (Fold t e)) e"
+    | eta1 [simp]: "eval (TyAp t (TyLam e)) (safe_subst_type e t)"
+    | eta2 [simp]: "eval e e' ==> eval (TyAp t e) (TyAp t e')"
 
 theorem preservation: "eval e e' ==> typecheck env e t ==> typecheck env e' t"
 proof (induction e e' arbitrary: t env rule: eval.inducts)
@@ -106,6 +113,13 @@ next case efld
 next case euf1
   thus ?case by auto
 next case euf2
+  thus ?case by auto
+next case (eta1 t' e)
+  then obtain t1 where T: "typecheck env e t1 & t = safe_type_subst t1 t'" by auto
+
+  hence "typecheck env (safe_subst_type e t') (safe_type_subst t1 t')" by simp sorry
+  with T show ?case by auto
+next case eta2
   thus ?case by auto
 qed
 
@@ -306,6 +320,21 @@ next case (tufd env e t)
   next case False
     with tufd obtain a where "eval e a" by auto
     hence "eval (Unfold e) (Unfold a)" by auto
+    thus ?thesis by auto
+  qed
+next case ttlm
+  thus ?case by simp
+next case (ttap env e t1 t)
+  thus ?case
+  proof (cases "is_val e")
+  case True
+    with ttap have "EX v. e = TyLam v & typecheck env v t1" by (simp add: canonical_all)
+    then obtain v where V: "e = TyLam v & typecheck env v t1" by auto
+    hence "EX a. eval (TyAp t (TyLam v)) a" by (metis eta1)
+    with V show ?thesis by simp
+  next case False
+    from ttap False obtain a where "eval e a" by auto
+    hence "eval (TyAp t e) (TyAp t a)" by simp
     thus ?thesis by auto
   qed
 qed 

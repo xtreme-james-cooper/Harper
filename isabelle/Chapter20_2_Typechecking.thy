@@ -2,6 +2,24 @@ theory Chapter20_2_Typechecking
 imports Chapter20_1_Language
 begin
 
+primrec verify_types :: "nat set => expr => bool"
+where "verify_types tvs (Var v) = True"
+    | "verify_types tvs (Lam t b) = (is_valid_type tvs t & verify_types tvs b)"
+    | "verify_types tvs (Ap e1 e2) = (verify_types tvs e1 & verify_types tvs e2)"
+    | "verify_types tvs (Fix t b) = (is_valid_type tvs t & verify_types tvs b)"
+    | "verify_types tvs Triv = True"
+    | "verify_types tvs (Pair e1 e2) = (verify_types tvs e1 & verify_types tvs e2)"
+    | "verify_types tvs (ProjL n) = verify_types tvs n"
+    | "verify_types tvs (ProjR n) = verify_types tvs n"
+    | "verify_types tvs (Abort t n) = (is_valid_type tvs t & verify_types tvs n)"
+    | "verify_types tvs (InL t t' n) = (is_valid_type tvs t & is_valid_type tvs t' & verify_types tvs n)"
+    | "verify_types tvs (InR t t' n) = (is_valid_type tvs t & is_valid_type tvs t' & verify_types tvs n)"
+    | "verify_types tvs (Case n el er) = (verify_types tvs n & verify_types tvs el & verify_types tvs er)"
+    | "verify_types tvs (Fold t n) = (is_valid_type tvs t & verify_types tvs n)"
+    | "verify_types tvs (Unfold n) = verify_types tvs n"
+    | "verify_types tvs (TyLam n) = verify_types (expand_set tvs) n"
+    | "verify_types tvs (TyAp t n) = (is_valid_type tvs t & verify_types tvs n)"
+
 inductive typecheck :: "(nat, type) assoc => expr => type => bool"
 where tvar [simp]: "lookup env v = Some t ==> typecheck env (Var v) t"
     | tlam [simp]: "typecheck (extend_at env 0 r) e t ==> typecheck env (Lam r e) (Arr r t)"
@@ -19,6 +37,8 @@ where tvar [simp]: "lookup env v = Some t ==> typecheck env (Var v) t"
                         typecheck (extend_at env 0 t2) er t ==> typecheck env (Case e el er) t"
     | tfld [simp]: "typecheck env e (safe_type_subst t (Rec t)) ==> typecheck env (Fold t e) (Rec t)"
     | tufd [simp]: "typecheck env e (Rec t) ==> typecheck env (Unfold e) (safe_type_subst t (Rec t))"
+    | ttlm [simp]: "typecheck env e t ==> typecheck env (TyLam e) (All t)"
+    | ttap [simp]: "typecheck env e (All t1) ==> typecheck env (TyAp t e) (safe_type_subst t1 t)"
 
 inductive_cases [elim!]: "typecheck e (Var x) t"
 inductive_cases [elim!]: "typecheck e (Lam x y) t"
@@ -34,6 +54,8 @@ inductive_cases [elim!]: "typecheck e (InR x y z) t"
 inductive_cases [elim!]: "typecheck e (Case x y z) t"
 inductive_cases [elim!]: "typecheck e (Fold x y) t"
 inductive_cases [elim!]: "typecheck e (Unfold x) t"
+inductive_cases [elim!]: "typecheck e (TyLam x) t"
+inductive_cases [elim!]: "typecheck e (TyAp x y) t"
 
 lemma [simp]: "typecheck env e t ==> typecheck (extend_at env n k) (incr_from n e) t"
 proof (induction env e t arbitrary: n rule: typecheck.inducts)
@@ -73,6 +95,10 @@ next case (tcse env e t1 t2 el t er)
 next case tfld
   thus ?case by simp
 next case tufd
+  thus ?case by simp
+next case ttlm
+  thus ?case by simp
+next case ttap
   thus ?case by simp
 qed
 
@@ -116,6 +142,10 @@ next case tfld
   thus ?case by simp
 next case tufd
   thus ?case by simp
+next case ttlm
+  thus ?case by simp
+next case ttap
+  thus ?case by simp
 qed
 
 lemma [simp]: "typecheck (extend env x t2) e t1 ==> typecheck env eb t2 ==> typecheck env (subst e eb x) t1"
@@ -155,9 +185,49 @@ next case tfld
   thus ?case by simp
 next case tufd
   thus ?case by simp
+next case ttlm
+  thus ?case by simp
+next case ttap
+  thus ?case by simp
 qed
 
 lemma [simp]: "typecheck (extend_at env 0 t') e t ==> typecheck env e' t' ==> typecheck env (safe_subst e e') t"
 by (simp add: safe_subst_def)
+
+lemma [simp]: "typecheck env e t ==> typecheck (assoc_map (%t. safe_type_subst t t') env) (safe_subst_type e t') (safe_type_subst t t')"
+proof (induction env e t rule: typecheck.inducts)
+case tvar
+  thus ?case by (simp add: safe_subst_type_def)
+next case tlam
+  thus ?case by (simp add: safe_subst_type_def safe_type_subst_def) sorry
+next case tapp
+  thus ?case by (simp add: safe_subst_type_def safe_type_subst_def)
+next case tfix
+  thus ?case by (simp add: safe_subst_type_def safe_type_subst_def) sorry
+next case ttrv
+  thus ?case by (simp add: safe_subst_type_def safe_type_subst_def)
+next case tpar
+  thus ?case by (simp add: safe_subst_type_def safe_type_subst_def)
+next case tprl
+  thus ?case by (simp add: safe_subst_type_def safe_type_subst_def)
+next case tprr
+  thus ?case by (simp add: safe_subst_type_def safe_type_subst_def)
+next case tabt
+  thus ?case by (simp add: safe_subst_type_def safe_type_subst_def)
+next case tinl
+  thus ?case by (simp add: safe_subst_type_def safe_type_subst_def)
+next case tinr
+  thus ?case by (simp add: safe_subst_type_def safe_type_subst_def)
+next case tcse
+  thus ?case by (simp add: safe_subst_type_def safe_type_subst_def) sorry
+next case tfld
+  thus ?case by (simp add: safe_subst_type_def safe_type_subst_def) sorry
+next case tufd
+  thus ?case by (simp add: safe_subst_type_def safe_type_subst_def) sorry
+next case ttlm
+  thus ?case by (simp add: safe_subst_type_def safe_type_subst_def) sorry
+next case ttap
+  thus ?case by (simp add: safe_subst_type_def safe_type_subst_def) sorry
+qed
 
 end

@@ -5,7 +5,7 @@ begin
 abbreviation Nat :: type
 where "Nat == Rec (Sum Unit (Tyvar 0))"
 
-lemma "is_valid_type {} Nat" by simp
+lemma "is_valid_type {} Nat" by (simp add: expand_set_def)
 lemma "free_type_vars Nat = {}" by simp
 lemma "type_sub_from n Nat = Nat" by simp
 lemma "type_incr_from n Nat = Nat" by simp

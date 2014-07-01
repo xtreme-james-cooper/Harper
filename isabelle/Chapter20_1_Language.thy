@@ -10,6 +10,7 @@ datatype type =
 | Sum type type
 | Tyvar nat
 | Rec type
+| All type
 
 primrec is_valid_type :: "nat set => type => bool"
 where "is_valid_type tyvars (Arr t1 t2) = (is_valid_type tyvars t1 & is_valid_type tyvars t2)"
@@ -18,7 +19,8 @@ where "is_valid_type tyvars (Arr t1 t2) = (is_valid_type tyvars t1 & is_valid_ty
     | "is_valid_type tyvars Void = True"
     | "is_valid_type tyvars (Sum t1 t2) = (is_valid_type tyvars t1 & is_valid_type tyvars t2)"
     | "is_valid_type tyvars (Tyvar v) = (v : tyvars)"
-    | "is_valid_type tyvars (Rec t) = (is_valid_type (insert 0 (incr 0 `  tyvars)) t)"
+    | "is_valid_type tyvars (Rec t) = (is_valid_type (expand_set tyvars) t)"
+    | "is_valid_type tyvars (All t) = (is_valid_type (expand_set tyvars) t)"
 
 primrec free_type_vars :: "type => nat set"
 where "free_type_vars (Tyvar v) = {v}"
@@ -28,6 +30,7 @@ where "free_type_vars (Tyvar v) = {v}"
     | "free_type_vars Void = {}"
     | "free_type_vars (Sum e1 e2) = free_type_vars e1 Un free_type_vars e2"
     | "free_type_vars (Rec t) = redr_set (free_type_vars t)"
+    | "free_type_vars (All t) = redr_set (free_type_vars t)"
 
 primrec type_sub_from :: "nat => type => type"
 where "type_sub_from n (Tyvar v) = Tyvar (incr n v)"
@@ -37,6 +40,7 @@ where "type_sub_from n (Tyvar v) = Tyvar (incr n v)"
     | "type_sub_from n Void = Void"
     | "type_sub_from n (Sum e1 e2) = Sum (type_sub_from n e1) (type_sub_from n e2)"
     | "type_sub_from n (Rec t) = Rec (type_sub_from (Suc n) t)"
+    | "type_sub_from n (All t) = All (type_sub_from (Suc n) t)"
 
 primrec type_incr_from :: "nat => type => type"
 where "type_incr_from n (Tyvar v) = Tyvar (incr n v)"
@@ -46,6 +50,7 @@ where "type_incr_from n (Tyvar v) = Tyvar (incr n v)"
     | "type_incr_from n Void = Void"
     | "type_incr_from n (Sum e1 e2) = Sum (type_incr_from n e1) (type_incr_from n e2)"
     | "type_incr_from n (Rec t) = Rec (type_incr_from (Suc n) t)"
+    | "type_incr_from n (All t) = All (type_incr_from (Suc n) t)"
 
 primrec type_subst :: "type => type => nat => type"
 where "type_subst (Tyvar v) t x = (if v = x then t else Tyvar v)"
@@ -55,6 +60,7 @@ where "type_subst (Tyvar v) t x = (if v = x then t else Tyvar v)"
     | "type_subst Void t x = Void"
     | "type_subst (Sum t1 t2) t x = Sum (type_subst t1 t x) (type_subst t2 t x)"
     | "type_subst (Rec t0) t x = Rec (type_subst t0 (type_incr_from 0 t) (Suc x))"
+    | "type_subst (All t0) t x = All (type_subst t0 (type_incr_from 0 t) (Suc x))"
 
 definition safe_type_subst :: "type => type => type"
 where "safe_type_subst e e' = type_sub_from 0 (type_subst e (type_incr_from 0 e') 0)"
@@ -87,6 +93,8 @@ datatype expr =
 | Case expr expr expr
 | Fold type expr
 | Unfold expr
+| TyLam expr
+| TyAp type expr
 
 primrec free_vars :: "expr => nat set"
 where "free_vars (Var v) = {v}"
@@ -103,6 +111,8 @@ where "free_vars (Var v) = {v}"
     | "free_vars (Case e el er) = free_vars e Un redr_set (free_vars el) Un redr_set (free_vars er)"
     | "free_vars (Fold t e) = free_vars e"
     | "free_vars (Unfold e) = free_vars e"
+    | "free_vars (TyLam e) = free_vars e"
+    | "free_vars (TyAp t e) = free_vars e"
 
 primrec incr_from :: "nat => expr => expr"
 where "incr_from n (Var v) = Var (incr n v)"
@@ -119,6 +129,8 @@ where "incr_from n (Var v) = Var (incr n v)"
     | "incr_from n (Case e el er) = Case (incr_from n e) (incr_from (Suc n) el) (incr_from (Suc n) er)"
     | "incr_from n (Fold t e) = Fold t (incr_from n e)"
     | "incr_from n (Unfold e) = Unfold (incr_from n e)"
+    | "incr_from n (TyLam e) = TyLam (incr_from n e)"
+    | "incr_from n (TyAp t e) = TyAp t (incr_from n e)"
 
 primrec sub_from :: "nat => expr => expr"
 where "sub_from n (Var v) = Var (if v < n then v else v - 1)"
@@ -135,6 +147,8 @@ where "sub_from n (Var v) = Var (if v < n then v else v - 1)"
     | "sub_from n (Case e el er) = Case (sub_from n e) (sub_from (Suc n) el) (sub_from (Suc n) er)"
     | "sub_from n (Fold t e) = Fold t (sub_from n e)"
     | "sub_from n (Unfold e) = Unfold (sub_from n e)"
+    | "sub_from n (TyLam e) = TyLam (sub_from n e)"
+    | "sub_from n (TyAp t e) = TyAp t (sub_from n e)"
 
 primrec subst :: "expr => expr => nat => expr"
 where "subst (Var v) e x = (if v = x then e else Var v)"
@@ -151,6 +165,8 @@ where "subst (Var v) e x = (if v = x then e else Var v)"
     | "subst (Case n el er) e x = Case (subst n e x) (subst el (incr_from 0 e) (Suc x)) (subst er (incr_from 0 e) (Suc x))"
     | "subst (Fold t n) e x = Fold t (subst n e x)"
     | "subst (Unfold n) e x = Unfold (subst n e x)"
+    | "subst (TyLam n) e x = TyLam (subst n e x)"
+    | "subst (TyAp t n) e x = TyAp t (subst n e x)"
 
 definition safe_subst :: "expr => expr => expr"
 where "safe_subst e e' = sub_from 0 (subst e (incr_from 0 e') 0)"
@@ -209,6 +225,10 @@ next case (Fold t e)
   thus ?case by simp
 next case (Unfold e)
   thus ?case by simp
+next case (TyLam e) 
+  thus ?case by simp
+next case (TyAp t e)
+  thus ?case by simp
 qed 
 
 lemma [simp]: "sub_from n (subst (incr_from n e) e' n) = e" 
@@ -216,5 +236,44 @@ by (induction e arbitrary: n e', simp_all add: incr_def)
 
 lemma [simp]: "safe_subst (incr_from 0 e) e' = e"
 by (simp add: safe_subst_def) 
+
+primrec subst_type :: "expr => type => nat => expr"
+where "subst_type (Var v) e x = Var v"
+    | "subst_type (Lam t b) e x = Lam (type_subst t e x) b"
+    | "subst_type (Ap e1 e2) e x = Ap (subst_type e1 e x) (subst_type e2 e x)"
+    | "subst_type (Fix t b) e x = Fix (type_subst t e x) (subst_type b e x)"
+    | "subst_type Triv e x = Triv"
+    | "subst_type (Pair e1 e2) e x = Pair (subst_type e1 e x) (subst_type e2 e x)"
+    | "subst_type (ProjL n) e x = ProjL (subst_type n e x)"
+    | "subst_type (ProjR n) e x = ProjR (subst_type n e x)"
+    | "subst_type (Abort t n) e x = Abort (type_subst t e x) (subst_type n e x)"
+    | "subst_type (InL t t' n) e x = InL (type_subst t e x) (type_subst t' e x) (subst_type n e x)"
+    | "subst_type (InR t t' n) e x = InR (type_subst t e x) (type_subst t' e x) (subst_type n e x)"
+    | "subst_type (Case n el er) e x = Case (subst_type n e x) (subst_type el e x) (subst_type er e x)"
+    | "subst_type (Fold t n) e x = Fold (type_subst t e x) (subst_type n e x)"
+    | "subst_type (Unfold n) e x = Unfold (subst_type n e x)"
+    | "subst_type (TyLam n) e x = TyLam (subst_type n e (Suc x))"
+    | "subst_type (TyAp t n) e x = TyAp (type_subst t e x) (subst_type n e x)"
+
+primrec sub_type_from :: "expr => nat => expr"
+where "sub_type_from (Var v) n = Var v"
+    | "sub_type_from (Lam t b) n = Lam (type_sub_from n t) (sub_type_from b n)"
+    | "sub_type_from (Ap e1 e2) n = Ap (sub_type_from e1 n) (sub_type_from e2 n)"
+    | "sub_type_from (Fix t b) n = Fix (type_sub_from n t) (sub_type_from b n)"
+    | "sub_type_from Triv n = Triv"
+    | "sub_type_from (Pair e1 e2) n = Pair (sub_type_from e1 n) (sub_type_from e2 n)"
+    | "sub_type_from (ProjL e) n = ProjL (sub_type_from e n)"
+    | "sub_type_from (ProjR e) n = ProjR (sub_type_from e n)"
+    | "sub_type_from (Abort t e) n = Abort (type_sub_from n t) (sub_type_from e n)"
+    | "sub_type_from (InL t t' e) n = InL (type_sub_from n t) (type_sub_from n t') (sub_type_from e n)"
+    | "sub_type_from (InR t t' e) n = InR (type_sub_from n t) (type_sub_from n t') (sub_type_from e n)"
+    | "sub_type_from (Case e el er) n = Case (sub_type_from e n) (sub_type_from el n) (sub_type_from er n)"
+    | "sub_type_from (Fold t e) n = Fold (type_sub_from n t) (sub_type_from e n)"
+    | "sub_type_from (Unfold e) n = Unfold (sub_type_from e n)"
+    | "sub_type_from (TyLam e) n = TyLam (sub_type_from e (Suc n))"
+    | "sub_type_from (TyAp t e) n = TyAp (type_sub_from n t) (sub_type_from e n)"
+
+definition safe_subst_type :: "expr => type => expr"
+where "safe_subst_type e t = sub_type_from (subst_type e (type_incr_from 0 t) 0) 0"
 
 end
