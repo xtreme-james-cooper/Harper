@@ -121,7 +121,7 @@ where "incr_from n (Var v) = Var (incr n v)"
     | "incr_from n (Unfold e) = Unfold (incr_from n e)"
 
 primrec sub_from :: "nat => expr => expr"
-where "sub_from n (Var v) = Var (if v < n then v else if v = n then undefined else v - 1)"
+where "sub_from n (Var v) = Var (if v < n then v else v - 1)"
     | "sub_from n (Lam t b) = Lam t (sub_from (Suc n) b)"
     | "sub_from n (Ap e1 e2) = Ap (sub_from n e1) (sub_from n e2)"
     | "sub_from n (Fix t b) = Fix t (sub_from (Suc n) b)"
@@ -171,11 +171,45 @@ by (induction e arbitrary: e' x, auto)
 lemma [simp]: "m <= n ==> incr_from (Suc n) (incr_from m e) = incr_from m (incr_from n e)"
 by (induction e arbitrary: m n, simp_all add: incr_def)
 
-lemma [simp]: "sub_from (Suc n) (incr_from 0 e) = incr_from 0 (sub_from n e)"
-by simp sorry
+lemma [simp]: "m <= n ==> n ~: free_vars e ==> sub_from (Suc n) (incr_from m e) = incr_from m (sub_from n e)"
+by (induction e arbitrary: n m, auto simp add: incr_def)
 
-lemma [simp]: "subst (incr_from 0 e) (incr_from 0 e') (Suc x) = incr_from 0 (subst e e' x)"
-by simp sorry
+lemma [simp]: "m <= x ==> subst (incr_from m e) (incr_from m e') (Suc x) = incr_from m (subst e e' x)"
+proof (induction e arbitrary: m e' x) 
+case (Var v) 
+  thus ?case by (simp add: incr_def)
+next case (Lam t b) 
+  hence "subst (incr_from (Suc m) b) (incr_from (Suc m) (incr_from 0 e')) (Suc (Suc x)) = incr_from (Suc m) (subst b (incr_from 0 e') (Suc x))" by blast 
+  thus ?case by simp
+next case (Ap e1 e2) 
+  thus ?case by simp
+next case (Fix t b) 
+  hence "subst (incr_from (Suc m) b) (incr_from (Suc m) (incr_from 0 e')) (Suc (Suc x)) = incr_from (Suc m) (subst b (incr_from 0 e') (Suc x))" by blast
+  thus ?case by simp
+next case Triv 
+  thus ?case by simp
+next case (Pair e1 e2) 
+  thus ?case by simp
+next case (ProjL e) 
+  thus ?case by simp
+next case (ProjR e) 
+  thus ?case by simp
+next case (Abort t e) 
+  thus ?case by simp
+next case (InL t t' e) 
+  thus ?case by simp
+next case (InR t t' e) 
+  thus ?case by simp
+next case (Case e el er) 
+  from Case have "subst (incr_from m e) (incr_from m e') (Suc x) = incr_from m (subst e e' x)" by blast
+  moreover from Case have "subst (incr_from (Suc m) el) (incr_from (Suc m) (incr_from 0 e')) (Suc (Suc x)) = incr_from (Suc m) (subst el (incr_from 0 e') (Suc x))" by blast
+  moreover from Case have "subst (incr_from (Suc m) er) (incr_from (Suc m) (incr_from 0 e')) (Suc (Suc x)) = incr_from (Suc m) (subst er (incr_from 0 e') (Suc x))" by (metis Suc_le_mono)
+  ultimately show ?case by simp
+next case (Fold t e) 
+  thus ?case by simp
+next case (Unfold e)
+  thus ?case by simp
+qed 
 
 lemma [simp]: "sub_from n (subst (incr_from n e) e' n) = e" 
 by (induction e arbitrary: n e', simp_all add: incr_def)

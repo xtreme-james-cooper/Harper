@@ -34,66 +34,44 @@ lemma "is_val (Succ n) = is_val n" by simp
 lemma "eval n n' ==> eval (Succ n) (Succ n')" by simp
 
 abbreviation IsZ :: "expr => expr => expr => expr"
-where "IsZ e0 e1 et == Case (Unfold et) (incr_from 0 e0) e1"
+where "IsZ et e0 e1 == Case (Unfold et) (incr_from 0 e0) e1"
 
-lemma "free_vars (IsZ e0 e1 et) = free_vars e0 Un free_vars et Un redr_set (free_vars e1)" by auto
-lemma "incr_from n (IsZ e0 e1 et) = IsZ (incr_from n e0) (incr_from (Suc n) e1) (incr_from n et)" by simp
-lemma "sub_from n (IsZ e0 e1 et) = IsZ (sub_from n e0) (sub_from (Suc n) e1) (sub_from n et)"  by simp
-lemma "subst (IsZ e0 e1 et) e x = IsZ (subst e0 e x) (subst e1 (incr_from 0 e) (Suc x)) (subst et e x)" by simp
-lemma "typecheck env e Nat ==> typecheck env e0 t ==> typecheck (extend_at env 0 Nat) e1 t ==> typecheck env (IsZ e0 e1 e) t" 
+lemma "free_vars (IsZ et e0 e1) = free_vars e0 Un free_vars et Un redr_set (free_vars e1)" by auto
+lemma "incr_from n (IsZ et e0 e1) = IsZ (incr_from n et) (incr_from n e0) (incr_from (Suc n) e1)" by simp
+lemma "n ~: free_vars (IsZ et e0 e1) ==> sub_from n (IsZ et e0 e1) = IsZ (sub_from n et) (sub_from n e0) (sub_from (Suc n) e1)" by simp
+lemma "subst (IsZ et e0 e1) e x = IsZ (subst et e x) (subst e0 e x) (subst e1 (incr_from 0 e) (Suc x))" by simp
+lemma "typecheck env et Nat ==> typecheck env e0 t ==> typecheck (extend_at env 0 Nat) e1 t ==> typecheck env (IsZ et e0 e1) t" 
 proof -
-  assume "typecheck env e Nat" 
+  assume "typecheck env et Nat" 
      and "typecheck env e0 t" 
      and "typecheck (extend_at env 0 Nat) e1 t"
-  moreover hence "typecheck env (Unfold e) (safe_type_subst (Sum Unit (Tyvar 0)) (Rec (Sum Unit (Tyvar 0))))" by simp
-  ultimately show "typecheck env (Case (Unfold e) (incr_from 0 e0) e1) t" by (simp add: safe_type_subst_def)
+  moreover hence "typecheck env (Unfold et) (safe_type_subst (Sum Unit (Tyvar 0)) (Rec (Sum Unit (Tyvar 0))))" by simp
+  ultimately show "typecheck env (Case (Unfold et) (incr_from 0 e0) e1) t" by (simp add: safe_type_subst_def)
 qed
 lemma "is_val (IsZ e0 e1 e2) = False" by simp
-lemma "eval e e' ==> eval (IsZ e0 e1 e) (IsZ e0 e1 e')" by simp
-lemma "EX e'. eval (IsZ e0 e1 Zero) e' & eval e' e0" 
+lemma "eval e e' ==> eval (IsZ e e0 e1) (IsZ e' e0 e1)" by simp
+lemma "EX e'. eval (IsZ Zero e0 e1) e' & eval e' e0" 
 proof -
   have "eval (Case (InL Unit Nat Triv) (incr_from 0 e0) e1) (safe_subst (incr_from 0 e0) Triv)" by (metis ecs2 is_val.simps(5))
   hence "eval (Case (InL Unit Nat Triv) (incr_from 0 e0) e1) e0" by simp
   moreover have "eval (Case (Unfold (Fold (Sum Unit (Tyvar 0)) (InL Unit Nat Triv))) (incr_from 0 e0) e1) (Case (InL Unit Nat Triv) (incr_from 0 e0) e1)" by simp
   ultimately have "EX e'. eval (Case (Unfold (Fold (Sum Unit (Tyvar 0)) (InL Unit Nat Triv))) (incr_from 0 e0) e1) e' & eval e' e0" by fast
-  thus "EX e'. eval (IsZ e0 e1 Zero) e' & eval e' e0" by simp
+  thus "EX e'. eval (IsZ Zero e0 e1) e' & eval e' e0" by simp
 qed
-lemma "is_val e ==> EX e'. eval (IsZ e0 e1 (Succ e)) e' & eval e' (safe_subst e1 e)" 
+lemma "is_val e ==> EX e'. eval (IsZ (Succ e) e0 e1) e' & eval e' (safe_subst e1 e)" 
 proof -
   assume X: "is_val e"
   hence "eval (Case (Unfold (Fold (Sum Unit (Tyvar 0)) (InR Unit Nat e))) (incr_from 0 e0) e1) (Case (InR Unit Nat e) (incr_from 0 e0) e1)" by simp
   moreover with X have "eval (Case (InR Unit Nat e) (incr_from 0 e0) e1) (safe_subst e1 e)" by simp
-  ultimately show "EX e'. eval (IsZ e0 e1 (Succ e)) e' & eval e' (safe_subst e1 e)" by auto
+  ultimately show "EX e'. eval (IsZ (Succ e) e0 e1) e' & eval e' (safe_subst e1 e)" by auto
 qed
+
+lemma canonical_nat_like: "typecheck env e t ==> is_val e ==> 
+    (t = Nat --> e = Zero | (EX v. typecheck env v Nat & is_val v & e = Succ v)) & 
+    (t = Sum Unit Nat --> e = InL Unit Nat Triv | (EX v. typecheck env v Nat & is_val v & e = InR Unit Nat v))"
+by (induction env e t rule: typecheck.induct, auto simp add: canonical_unit safe_type_subst_def) 
 
 lemma canonical_nat: "typecheck env e Nat ==> is_val e ==> e = Zero | (EX v. typecheck env v Nat & is_val v & e = Succ v)"
-proof (induction env e Nat rule: typecheck.induct) 
-case tvar
-  thus ?case by simp
-next case tapp
-  thus ?case by simp
-next case tprl
-  thus ?case by simp
-next case tprr
-  thus ?case by simp
-next case tfix
-  thus ?case by simp
-next case tabt
-  thus ?case by simp
-next case tcse
-  thus ?case by simp
-next case (tfld env e)
-  from tfld have X: "typecheck env e (Sum Unit Nat)" by (simp add: safe_type_subst_def)
-  from tfld have "Sum Unit Nat = Nat \<Longrightarrow> e = Zero \<or> (\<exists>v. typecheck env v Nat \<and> is_val v \<and> e = Succ v)" by (simp add: safe_type_subst_def)
-  from tfld have Y: "is_val e" by simp
-
-  from X Y have "(EX e'. e = InL Unit Nat e' & is_val e' & typecheck env e' Unit) 
-               | (EX e'. e = InR Unit Nat e' & is_val e' & typecheck env e' Nat)" by (simp add: canonical_sum)
-
-  have "e = InL Unit Nat Triv | (EX v. typecheck env v Nat & is_val v & e = InR Unit Nat v)" by simp sorry
-  thus ?case by simp
-next case tufd
-  thus ?case by simp
-qed
+by (simp add: canonical_nat_like)
 
 end
