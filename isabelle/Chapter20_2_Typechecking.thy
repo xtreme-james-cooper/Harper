@@ -35,10 +35,10 @@ where tvar [simp]: "lookup env v = Some t ==> typecheck env (Var v) t"
     | tinr [simp]: "typecheck env e t2 ==> typecheck env (InR t1 t2 e) (Sum t1 t2)"
     | tcse [simp]: "typecheck env e (Sum t1 t2) ==> typecheck (extend_at env 0 t1) el t ==> 
                         typecheck (extend_at env 0 t2) er t ==> typecheck env (Case e el er) t"
-    | tfld [simp]: "typecheck env e (safe_type_subst t (Rec t)) ==> typecheck env (Fold t e) (Rec t)"
-    | tufd [simp]: "typecheck env e (Rec t) ==> typecheck env (Unfold e) (safe_type_subst t (Rec t))"
+    | tfld [simp]: "typecheck env e (type_subst t (Rec t)) ==> typecheck env (Fold t e) (Rec t)"
+    | tufd [simp]: "typecheck env e (Rec t) ==> typecheck env (Unfold e) (type_subst t (Rec t))"
     | ttlm [simp]: "typecheck env e t ==> typecheck env (TyLam e) (All t)"
-    | ttap [simp]: "typecheck env e (All t1) ==> typecheck env (TyAp t e) (safe_type_subst t1 t)"
+    | ttap [simp]: "typecheck env e (All t1) ==> typecheck env (TyAp t e) (type_subst t1 t)"
 
 inductive_cases [elim!]: "typecheck e (Var x) t"
 inductive_cases [elim!]: "typecheck e (Lam x y) t"
@@ -148,15 +148,15 @@ next case ttap
   thus ?case by simp
 qed
 
-lemma [simp]: "typecheck (extend env x t2) e t1 ==> typecheck env eb t2 ==> typecheck env (subst e eb x) t1"
+lemma [simp]: "typecheck (extend env x t2) e t1 ==> typecheck env eb t2 ==> typecheck env (subst' e eb x) t1"
 proof (induction "extend env x t2" e t1 arbitrary: env eb x rule: typecheck.inducts)
 case tvar
   thus ?case by auto
 next case tlam
   thus ?case by simp
 next case (tapp e1 t2 t e2)
-  from tapp have "typecheck env (subst e1 eb x) (Arr t2 t)" by simp
-  moreover from tapp have "typecheck env (subst e2 eb x) t2" by simp
+  from tapp have "typecheck env (subst' e1 eb x) (Arr t2 t)" by simp
+  moreover from tapp have "typecheck env (subst' e2 eb x) t2" by simp
   ultimately show ?case by simp
 next case tfix
   thus ?case by simp
@@ -165,10 +165,10 @@ next case ttrv
 next case tpar
   thus ?case by simp
 next case (tprl e t1 t2)
-  hence "typecheck env (subst e eb x) (Prod t1 t2)" by simp
+  hence "typecheck env (subst' e eb x) (Prod t1 t2)" by simp
   thus ?case by simp
 next case (tprr e t1 t2)
-  hence "typecheck env (subst e eb x) (Prod t1 t2)" by simp
+  hence "typecheck env (subst' e eb x) (Prod t1 t2)" by simp
   thus ?case by simp
 next case tabt
   thus ?case by simp
@@ -177,9 +177,9 @@ next case tinl
 next case tinr
   thus ?case by simp
 next case (tcse e t1 t2 el t er)
-  hence "typecheck env (subst e eb x) (Sum t1 t2)" by (simp add: extend_at_swap) 
-  moreover from tcse have "typecheck (extend_at env 0 t1) (subst el (incr_from 0 eb) (Suc x)) t" by (simp add: extend_at_swap) 
-  moreover from tcse have "typecheck (extend_at env 0 t2) (subst er (incr_from 0 eb) (Suc x)) t" by (simp add: extend_at_swap) 
+  hence "typecheck env (subst' e eb x) (Sum t1 t2)" by (simp add: extend_at_swap) 
+  moreover from tcse have "typecheck (extend_at env 0 t1) (subst' el (incr_from 0 eb) (Suc x)) t" by (simp add: extend_at_swap) 
+  moreover from tcse have "typecheck (extend_at env 0 t2) (subst' er (incr_from 0 eb) (Suc x)) t" by (simp add: extend_at_swap) 
   ultimately show ?case by simp
 next case tfld
   thus ?case by simp
@@ -191,43 +191,52 @@ next case ttap
   thus ?case by simp
 qed
 
-lemma [simp]: "typecheck (extend_at env 0 t') e t ==> typecheck env e' t' ==> typecheck env (safe_subst e e') t"
-by (simp add: safe_subst_def)
+lemma [simp]: "typecheck (extend_at env 0 t') e t ==> typecheck env e' t' ==> typecheck env (subst e e') t"
+by (simp add: subst_def)
 
-lemma [simp]: "typecheck env e t ==> typecheck (assoc_map (%t. safe_type_subst t t') env) (safe_subst_type e t') (safe_type_subst t t')"
+lemma [simp]: "typecheck env e t ==> typecheck (assoc_map (%t. type_subst t t') env) (subst_type e t') (type_subst t t')"
 proof (induction env e t rule: typecheck.inducts)
 case tvar
-  thus ?case by (simp add: safe_subst_type_def)
-next case tlam
-  thus ?case by (simp add: safe_subst_type_def safe_type_subst_def) sorry
+  thus ?case by (simp add: subst_type_def)
+next case (tlam env r e t)
+  from tlam have "typecheck (extend_at env 0 r) e t" by simp
+  from tlam have "typecheck (assoc_map (\<lambda>t. type_subst t t') (extend_at env 0 r)) (subst_type e t')
+   (type_subst t t')" by simp
+
+  have "typecheck (extend_at (assoc_map (\<lambda>t. type_subst t t') env) 0 r) e t ==> 
+          typecheck (assoc_map (\<lambda>t. type_subst t t') env) (Lam r e) (Arr r t)" by simp
+
+  hence "typecheck (assoc_map (\<lambda>t. type_subst t t') env) (subst_type (Lam r e) t')
+     (Arr (type_sub_from 0 (type_subst' r (type_incr_from 0 t') 0)) (type_sub_from 0 (type_subst' t (type_incr_from 0 t') 0)))" by simp sorry
+  thus ?case by (simp add: type_subst_def)
 next case tapp
-  thus ?case by (simp add: safe_subst_type_def safe_type_subst_def)
+  thus ?case by (simp add: subst_type_def type_subst_def)
 next case tfix
-  thus ?case by (simp add: safe_subst_type_def safe_type_subst_def) sorry
+  thus ?case by (simp add: subst_type_def type_subst_def) sorry
 next case ttrv
-  thus ?case by (simp add: safe_subst_type_def safe_type_subst_def)
+  thus ?case by (simp add: subst_type_def type_subst_def)
 next case tpar
-  thus ?case by (simp add: safe_subst_type_def safe_type_subst_def)
+  thus ?case by (simp add: subst_type_def type_subst_def)
 next case tprl
-  thus ?case by (simp add: safe_subst_type_def safe_type_subst_def)
+  thus ?case by (simp add: subst_type_def type_subst_def)
 next case tprr
-  thus ?case by (simp add: safe_subst_type_def safe_type_subst_def)
+  thus ?case by (simp add: subst_type_def type_subst_def)
 next case tabt
-  thus ?case by (simp add: safe_subst_type_def safe_type_subst_def)
+  thus ?case by (simp add: subst_type_def type_subst_def)
 next case tinl
-  thus ?case by (simp add: safe_subst_type_def safe_type_subst_def)
+  thus ?case by (simp add: subst_type_def type_subst_def)
 next case tinr
-  thus ?case by (simp add: safe_subst_type_def safe_type_subst_def)
+  thus ?case by (simp add: subst_type_def type_subst_def)
 next case tcse
-  thus ?case by (simp add: safe_subst_type_def safe_type_subst_def) sorry
+  thus ?case by (simp add: subst_type_def type_subst_def) sorry
 next case tfld
-  thus ?case by (simp add: safe_subst_type_def safe_type_subst_def) sorry
+  thus ?case by (simp add: subst_type_def type_subst_def) sorry
 next case tufd
-  thus ?case by (simp add: safe_subst_type_def safe_type_subst_def) sorry
+  thus ?case by (simp add: subst_type_def type_subst_def) sorry
 next case ttlm
-  thus ?case by (simp add: safe_subst_type_def safe_type_subst_def) sorry
+  thus ?case by (simp add: subst_type_def type_subst_def) sorry
 next case ttap
-  thus ?case by (simp add: safe_subst_type_def safe_type_subst_def) sorry
+  thus ?case by (simp add: subst_type_def type_subst_def) sorry
 qed
 
 end

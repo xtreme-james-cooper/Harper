@@ -45,8 +45,8 @@ by (induction e, auto)
 inductive eval :: "expr => expr => bool"
 where eap1 [simp]: "eval e1 e1' ==> eval (Ap e1 e2) (Ap e1' e2)"
     | eap2 [simp]: "is_val e1 ==> eval e2 e2' ==> eval (Ap e1 e2) (Ap e1 e2')"
-    | eap3 [simp]: "is_val e2 ==> eval (Ap (Lam t b) e2) (safe_subst b e2)"
-    | efix [simp]: "eval (Fix t b) (safe_subst b (Fix t b))"
+    | eap3 [simp]: "is_val e2 ==> eval (Ap (Lam t b) e2) (subst b e2)"
+    | efix [simp]: "eval (Fix t b) (subst b (Fix t b))"
     | epa1 [simp]: "eval e1 e1' ==> eval (Pair e1 e2) (Pair e1' e2)"
     | epa2 [simp]: "is_val e1 ==> eval e2 e2' ==> eval (Pair e1 e2) (Pair e1 e2')"
     | epl1 [simp]: "eval e e' ==> eval (ProjL e) (ProjL e')"
@@ -57,12 +57,12 @@ where eap1 [simp]: "eval e1 e1' ==> eval (Ap e1 e2) (Ap e1' e2)"
     | einl [simp]: "eval e e' ==> eval (InL t t' e) (InL t t' e')"
     | einr [simp]: "eval e e' ==> eval (InR t t' e) (InR t t' e')"
     | ecs1 [simp]: "eval e e' ==> eval (Case e el er) (Case e' el er)"
-    | ecs2 [simp]: "is_val e ==> eval (Case (InL t t' e) el er) (safe_subst el e)"
-    | ecs3 [simp]: "is_val e ==> eval (Case (InR t t' e) el er) (safe_subst er e)"
+    | ecs2 [simp]: "is_val e ==> eval (Case (InL t t' e) el er) (subst el e)"
+    | ecs3 [simp]: "is_val e ==> eval (Case (InR t t' e) el er) (subst er e)"
     | efld [simp]: "eval e e' ==> eval (Fold t e) (Fold t e')"
     | euf1 [simp]: "eval e e' ==> eval (Unfold e) (Unfold e')"
     | euf2 [simp]: "is_val e ==> eval (Unfold (Fold t e)) e"
-    | eta1 [simp]: "eval (TyAp t (TyLam e)) (safe_subst_type e t)"
+    | eta1 [simp]: "eval (TyAp t (TyLam e)) (subst_type e t)"
     | eta2 [simp]: "eval e e' ==> eval (TyAp t e) (TyAp t e')"
 
 theorem preservation: "eval e e' ==> typecheck env e t ==> typecheck env e' t"
@@ -115,9 +115,9 @@ next case euf1
 next case euf2
   thus ?case by auto
 next case (eta1 t' e)
-  then obtain t1 where T: "typecheck env e t1 & t = safe_type_subst t1 t'" by auto
+  then obtain t1 where T: "typecheck env e t1 & t = type_subst t1 t'" by auto
 
-  hence "typecheck env (safe_subst_type e t') (safe_type_subst t1 t')" by simp sorry
+  hence "typecheck env (subst_type e t') (type_subst t1 t')" by simp sorry
   with T show ?case by auto
 next case eta2
   thus ?case by auto
@@ -142,7 +142,7 @@ next case (tapp env e1 t2 t e2)
       proof auto
         fix v
         assume "is_val e2"
-        hence "eval (Ap (Lam t2 v) e2) (safe_subst v e2)" by simp
+        hence "eval (Ap (Lam t2 v) e2) (subst v e2)" by simp
         thus "EX x. eval (Ap (Lam t2 v) e2) x" by auto
       qed
     next case False
@@ -167,7 +167,7 @@ next case (tapp env e1 t2 t e2)
     qed
   qed
 next case (tfix env t b)
-  def b' == "safe_subst b (Fix t b)"
+  def b' == "subst b (Fix t b)"
   have "eval (Fix t b) b'" by (simp add: b'_def)
   thus ?case by auto
 next case ttrv
@@ -282,12 +282,12 @@ next case (tcse env e t1 t2 el t er)
     proof (cases "EX e'. e = InL t1 t2 e'", auto)
       fix e'
       assume "is_val e'" 
-      hence "EX x. eval (Case (InL t1 t2 e') el er) (safe_subst el e')" by simp
+      hence "EX x. eval (Case (InL t1 t2 e') el er) (subst el e')" by simp
       thus "EX x. eval (Case (InL t1 t2 e') el er) x" by auto
     next
       fix e'
       assume "is_val e'" 
-      hence "EX x. eval (Case (InR t1 t2 e') el er) (safe_subst er e')" by simp
+      hence "EX x. eval (Case (InR t1 t2 e') el er) (subst er e')" by simp
       thus "EX x. eval (Case (InR t1 t2 e') el er) x" by auto
     qed
   next case False
