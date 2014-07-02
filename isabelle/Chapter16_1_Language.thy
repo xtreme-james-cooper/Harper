@@ -18,7 +18,7 @@ where "is_valid_type tyvars (Arr t1 t2) = (is_valid_type tyvars t1 & is_valid_ty
     | "is_valid_type tyvars Void = True"
     | "is_valid_type tyvars (Sum t1 t2) = (is_valid_type tyvars t1 & is_valid_type tyvars t2)"
     | "is_valid_type tyvars (Tyvar v) = (v : tyvars)"
-    | "is_valid_type tyvars (Rec t) = (is_valid_type (insert 0 (incr 0 `  tyvars)) t)"
+    | "is_valid_type tyvars (Rec t) = is_valid_type (expand_set tyvars) t"
 
 primrec free_type_vars :: "type => nat set"
 where "free_type_vars (Tyvar v) = {v}"
@@ -30,7 +30,7 @@ where "free_type_vars (Tyvar v) = {v}"
     | "free_type_vars (Rec t) = redr_set (free_type_vars t)"
 
 primrec type_sub_from :: "nat => type => type"
-where "type_sub_from n (Tyvar v) = Tyvar (incr n v)"
+where "type_sub_from n (Tyvar v) = Tyvar (subr n v)"
     | "type_sub_from n (Arr e1 e2) = Arr (type_sub_from n e1) (type_sub_from n e2)"
     | "type_sub_from n Unit = Unit"
     | "type_sub_from n (Prod e1 e2) = Prod (type_sub_from n e1) (type_sub_from n e2)"
@@ -61,6 +61,25 @@ where "safe_type_subst e e' = type_sub_from 0 (type_subst e (type_incr_from 0 e'
 
 lemma [simp]: "free_type_vars (type_incr_from n e) = incr n ` free_type_vars e"
 by (induction e arbitrary: n, auto)
+
+lemma valid_incr_type: "is_valid_type (expand_set_at m s) (type_incr_from m t) = is_valid_type s t"
+by (induction t arbitrary: s m, simp_all)
+
+lemma [simp]: "is_valid_type (expand_set s) (type_incr_from 0 t) = is_valid_type s t"
+proof -
+  from valid_incr_type have X: "is_valid_type (expand_set_at 0 s) (type_incr_from 0 t) = is_valid_type s t" by simp
+  have "expand_set_at 0 s = expand_set s" by simp
+  with X show "is_valid_type (expand_set s) (type_incr_from 0 t) = is_valid_type s t" by simp
+qed
+
+lemma [simp]: "m < n ==> type_incr_from m (type_sub_from n t) = type_sub_from (Suc n) (type_incr_from m t)"
+by (induction t arbitrary: n m, simp_all)
+
+lemma [simp]: "m <= n ==> type_incr_from m (type_incr_from n t) = type_incr_from (Suc n) (type_incr_from m t)"
+by (induction t arbitrary: n m, simp_all)
+
+lemma [simp]: "type_incr_from m (type_subst a t x) = type_subst (type_incr_from m a) (type_incr_from m t) (incr m x)"
+by (induction a arbitrary: t x m, auto simp add: incr_def)
 
 primrec type_incr_by :: "nat => type => type"
 where "type_incr_by 0 e = e"
