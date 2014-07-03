@@ -65,7 +65,7 @@ where eap1 [simp]: "eval e1 e1' ==> eval (Ap e1 e2) (Ap e1' e2)"
     | eta1 [simp]: "eval (TyAp t (TyLam e)) (subst_type e t)"
     | eta2 [simp]: "eval e e' ==> eval (TyAp t e) (TyAp t e')"
 
-theorem preservation: "eval e e' ==> typecheck env e t ==> typecheck env e' t"
+theorem preservation: "eval e e' ==> env = empty_map ==> typecheck env e t ==> typecheck env e' t"
 proof (induction e e' arbitrary: t env rule: eval.inducts)
 next case (eap1 e1 e1' e2)
   hence "EX t2. typecheck env e1' (Arr t2 t) & typecheck env e2 t2" by auto
@@ -115,10 +115,11 @@ next case euf1
 next case euf2
   thus ?case by auto
 next case (eta1 t' e)
-  then obtain t1 where T: "typecheck env e t1 & t = type_subst t1 t'" by auto
-
-  hence "typecheck env (subst_type e t') (type_subst t1 t')" by simp sorry
-  with T show ?case by auto
+  then obtain t1 where T: "typecheck empty_map e t1 & t = type_subst t1 t'" by auto
+  hence T2: "typecheck empty_map e t1" by simp
+  have "!!env. typecheck env e t1 ==> typecheck (assoc_map (%t. type_subst t t') env) (subst_type e t') (type_subst t1 t')" by simp
+  with T2 have "typecheck (assoc_map (%t. type_subst t t') empty_map) (subst_type e t') (type_subst t1 t')" by fast
+  with T eta1 show ?case by simp
 next case eta2
   thus ?case by auto
 qed

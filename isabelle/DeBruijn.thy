@@ -81,8 +81,17 @@ where "subr n v = (if v < n then v else v - 1)"
 lemma [simp]: "subr (Suc n) 0 = 0"
 by (simp add: subr_def)
 
+lemma [simp]: "subr 0 (Suc n) = n"
+by (simp add: subr_def)
+
+lemma [simp]: "subr (Suc m) (Suc m) = m"
+by (simp add: subr_def)
+
 lemma [simp]: "m < n ==> incr m (subr n x) = subr (Suc n) (incr m x)"
 by (auto simp add: incr_def subr_def)
+
+lemma [simp]: "subr n (incr n x) = x"
+by (simp add: incr_def subr_def)
 
 definition expand_set_at :: "nat => nat set => nat set"
 where "expand_set_at n s = insert n (incr n ` s)"
@@ -99,6 +108,27 @@ qed
 
 lemma [simp]: "P (expand_set_at 0 s) ==> P (expand_set s)"
 by (simp add: expand_set_at_def expand_set_def)
+
+definition reduce_set_at :: "nat => nat set => nat set"
+where "reduce_set_at n s = subr n ` (s - {n})"
+
+lemma [simp]: "m ~= n ==> (subr m n : reduce_set_at m s) = (n : s)"
+proof (auto simp add: reduce_set_at_def subr_def)
+  fix x
+  assume "(if x < m then x else x - 1) < m"
+     and "x : s"
+     and "(if x < m then x else x - 1) ~: s"
+  thus "x = m" by (cases "x < m", simp_all)
+next
+  fix x
+  assume "m \<noteq> n" 
+     and "\<not> n < m"
+     and "n - Suc 0 = (if x < m then x else x - 1)"
+     and "x \<in> s" 
+     and "n \<notin> s"
+  thus "x = m"
+  by (cases "x < m", simp, cases x, cases n, simp_all, cases n, simp_all)
+qed
 
 lemma [simp]: "redr_set (incr 0 ` xs) = xs" 
 by (auto simp add: incr_def)
@@ -130,9 +160,51 @@ qed
 lemma [simp]: "(Suc n : incr 0 ` s) = (n : s)"
 using incr_def by (metis image_iff less_nat_zero_code nat.inject)
 
+lemma [simp]: "n ~= 0 ==> (n : subr 0 ` s) = (Suc n : s)"
+by (auto simp add: subr_def, force)
+
+lemma [simp]: "n ~= v ==> v : expand_set tvs ==> subr n v : tvs"
+apply (auto simp add: expand_set_def subr_def)
+by simp
+sorry
+
+lemma [simp]: "(Suc n : expand_set s) = (n : s)"
+by (simp add: expand_set_def)
+
 lemma [simp]: "(incr m v : expand_set_at m s) = (v : s)"
 by (simp add: expand_set_at_def incr_def)
 
+lemma [simp]: "reduce_set_at 0 (expand_set tvs) = tvs"
+proof (auto simp add: reduce_set_at_def expand_set_def incr_def subr_def)
+  fix x
+  show "x : tvs ==> x : subr 0 ` incr 0 ` tvs" by (cases x, auto simp add: subr_def)
+qed
+
+lemma [simp]: "reduce_set_at (Suc m) (expand_set s) = expand_set (reduce_set_at m s)"
+proof (auto simp add: expand_set_def reduce_set_at_def)
+  fix xb
+  assume "subr (Suc m) (Suc xb) ~: incr 0 ` subr m ` (s - {m})"
+     and "0 < subr (Suc m) (Suc xb)"
+     and "xb : s"
+  hence "subr (Suc m) (Suc xb) ~: incr 0 ` subr m ` s - {incr 0 (subr m m)}" by auto
+
+  thus "xb = m" by simp sorry
+next 
+  show "0 : subr (Suc m) ` (insert 0 (incr 0 ` s) - {Suc m})" by force
+next
+  fix xb
+  assume X: "xb : s"
+     and "Suc (subr m xb) ~: subr (Suc m) ` (insert 0 (incr 0 ` s) - {Suc m})"
+  hence Y: "Suc (subr m xb) ~: subr (Suc m) ` (incr 0 ` s) - {m}" by auto 
+  thus "xb = m" 
+  proof (cases "xb < m")
+  case True
+    with X Y show ?thesis by simp sorry
+  next case False
+    with X Y show ?thesis by simp sorry
+  qed
+qed 
+ 
 
 
 end

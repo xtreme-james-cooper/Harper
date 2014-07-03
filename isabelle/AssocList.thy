@@ -169,4 +169,10 @@ by (induction env, simp_all)
 lemma [simp]: "lookup env k = Some v ==> lookup (assoc_map f env) k = Some (f v)"
 by (induction env, simp_all)
 
+lemma [simp]: "assoc_map f empty_map = empty_map"
+by (simp add: empty_map_def)
+
+lemma [simp]: "assoc_map f (extend_at env n x) = extend_at (assoc_map f env) n (f x)"
+by (induction env, auto split: nat.split)
+
 end

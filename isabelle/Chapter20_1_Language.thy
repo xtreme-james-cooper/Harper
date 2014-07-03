@@ -19,8 +19,8 @@ where "is_valid_type tyvars (Arr t1 t2) = (is_valid_type tyvars t1 & is_valid_ty
     | "is_valid_type tyvars Void = True"
     | "is_valid_type tyvars (Sum t1 t2) = (is_valid_type tyvars t1 & is_valid_type tyvars t2)"
     | "is_valid_type tyvars (Tyvar v) = (v : tyvars)"
-    | "is_valid_type tyvars (Rec t) = (is_valid_type (expand_set tyvars) t)"
-    | "is_valid_type tyvars (All t) = (is_valid_type (expand_set tyvars) t)"
+    | "is_valid_type tyvars (Rec t) = is_valid_type (expand_set tyvars) t"
+    | "is_valid_type tyvars (All t) = is_valid_type (expand_set tyvars) t"
 
 primrec type_free_vars :: "type => nat set"
 where "type_free_vars (Tyvar v) = {v}"
@@ -68,6 +68,9 @@ where "type_subst e e' = type_sub_from 0 (type_subst' e (type_incr_from 0 e') 0)
 lemma [simp]: "type_free_vars (type_incr_from n e) = incr n ` type_free_vars e"
 by (induction e arbitrary: n, auto)
 
+lemma [simp]: "m ~: type_free_vars t ==> is_valid_type (reduce_set_at m s) (type_sub_from m t) = is_valid_type s t"
+by (induction t arbitrary: s m, simp_all, force, force)
+
 lemma valid_incr_type: "is_valid_type (expand_set_at m s) (type_incr_from m t) = is_valid_type s t"
 by (induction t arbitrary: s m, simp_all)
 
@@ -80,6 +83,9 @@ qed
 
 lemma [simp]: "m < n ==> type_incr_from m (type_sub_from n t) = type_sub_from (Suc n) (type_incr_from m t)"
 by (induction t arbitrary: n m, simp_all)
+
+lemma [simp]: "type_sub_from n (type_incr_from n t) = t"
+by (induction t arbitrary: n, simp_all)
 
 lemma [simp]: "m <= n ==> type_incr_from m (type_incr_from n t) = type_incr_from (Suc n) (type_incr_from m t)"
 by (induction t arbitrary: n m, simp_all)
@@ -209,6 +215,9 @@ by (induction e arbitrary: m n, simp_all add: incr_def)
 lemma [simp]: "m <= n ==> n ~: free_vars e ==> sub_from (Suc n) (incr_from m e) = incr_from m (sub_from n e)"
 by (induction e arbitrary: n m, auto simp add: incr_def)
 
+lemma [simp]: "sub_from n (incr_from n e) = e"
+by (induction e arbitrary: n, auto simp add: incr_def)
+
 lemma [simp]: "m <= x ==> subst' (incr_from m e) (incr_from m e') (Suc x) = incr_from m (subst' e e' x)"
 proof (induction e arbitrary: m e' x) 
 case (Var v) 
@@ -258,7 +267,7 @@ by (simp add: subst_def)
 
 primrec subst_type' :: "expr => type => nat => expr"
 where "subst_type' (Var v) e x = Var v"
-    | "subst_type' (Lam t b) e x = Lam (type_subst' t e x) b"
+    | "subst_type' (Lam t b) e x = Lam (type_subst' t e x) (subst_type' b e x)"
     | "subst_type' (Ap e1 e2) e x = Ap (subst_type' e1 e x) (subst_type' e2 e x)"
     | "subst_type' (Fix t b) e x = Fix (type_subst' t e x) (subst_type' b e x)"
     | "subst_type' Triv e x = Triv"
