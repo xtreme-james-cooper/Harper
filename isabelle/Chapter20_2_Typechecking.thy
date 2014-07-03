@@ -194,10 +194,9 @@ qed
 lemma [simp]: "typecheck (extend_at env 0 t') e t ==> typecheck env e' t' ==> typecheck env (subst e e') t"
 by (simp add: subst_def)
 
-
-lemma [simp]: "is_valid_type (expand_set tvs) t ==> is_valid_type tvs t' ==> 
+lemma [simp]: "is_valid_type (expand_set_at n tvs) t ==> is_valid_type tvs t' ==> 
       is_valid_type tvs (type_sub_from n (type_subst' t (type_incr_from n t') n))"
-by (induction t arbitrary: tvs t' n, auto)
+by (induction t arbitrary: tvs t' n, auto) 
 
 lemma [simp]: "is_valid_type (expand_set tvs) t ==> is_valid_type tvs t' ==> is_valid_type tvs (type_subst t t')"
 by (simp add: type_subst_def)
@@ -237,22 +236,34 @@ next case tinl
 next case tinr
   thus ?case by simp
 next case (tcse env e t1 t2 el t er)
-
-  have X: "typecheck (assoc_map (\<lambda>t. type_sub_from n (type_subst' t (type_incr_from n t') n)) env) 
-                  (sub_type_from (subst_type' e (type_incr_from n t') n) n) 
-                  (Sum t1 t2)" by simp sorry
-
-  have Y: "typecheck (extend_at (assoc_map (\<lambda>t. type_sub_from n (type_subst' t (type_incr_from n t') n)) env) 0 t1) 
-                  (sub_type_from (subst_type' el (type_incr_from n t') n) n) 
-                  (type_sub_from n (type_subst' t (type_incr_from n t') n))" by simp sorry
-                        
-  have Z: "typecheck (extend_at (assoc_map (\<lambda>t. type_sub_from n (type_subst' t (type_incr_from n t') n)) env) 0 t2) 
-                  (sub_type_from (subst_type' er (type_incr_from n t') n) n) 
-                  (type_sub_from n (type_subst' t (type_incr_from n t') n))" by simp sorry
-
+  from tcse have X: "typecheck 
+   (assoc_map (\<lambda>t. type_sub_from n (type_subst' t (type_incr_from n t') n)) env) 
+   (sub_type_from (subst_type' e (type_incr_from n t') n) n) 
+   (Sum (type_sub_from n (type_subst' t1 (type_incr_from n t') n)) (type_sub_from n (type_subst' t2 (type_incr_from n t') n)))" by simp
+  from tcse have Y: "typecheck 
+    (extend_at (assoc_map (\<lambda>t. type_sub_from n (type_subst' t (type_incr_from n t') n)) env) 0 (type_sub_from n (type_subst' t1 (type_incr_from n t') n))) 
+    (sub_type_from (subst_type' el (type_incr_from n t') n) n) 
+    (type_sub_from n (type_subst' t (type_incr_from n t') n))" by simp
+  from tcse have Z: "typecheck 
+    (extend_at (assoc_map (\<lambda>t. type_sub_from n (type_subst' t (type_incr_from n t') n)) env) 0 (type_sub_from n (type_subst' t2 (type_incr_from n t') n))) 
+    (sub_type_from (subst_type' er (type_incr_from n t') n) n) 
+    (type_sub_from n (type_subst' t (type_incr_from n t') n))" by simp
   from X Y Z show ?case by simp
 next case (tfld env e t)
-  thus ?case by simp sorry
+  from tfld have "typecheck env e (type_subst t (Rec t))" by simp
+  from tfld have "typecheck 
+    (assoc_map (\<lambda>t. type_sub_from nn (type_subst' t (type_incr_from nn tt') nn)) env)
+   (sub_type_from (subst_type' e (type_incr_from nn tt') nn) nn)
+   (type_sub_from nn (type_subst' (type_subst t (Rec t)) (type_incr_from nn tt') nn))" by simp
+
+
+  have "typecheck eenv ee (type_subst tt (Rec tt)) ==> typecheck eenv (Fold tt ee) (Rec tt)" by simp
+
+  hence "typecheck 
+          (assoc_map (\<lambda>t. type_sub_from n (type_subst' t (type_incr_from n t') n)) env)
+          (Fold (type_sub_from n (type_subst' t (type_incr_from n t') n)) (sub_type_from (subst_type' e (type_incr_from n t') n) n))
+           (Rec (type_sub_from (Suc n) (type_subst' t (type_incr_from (Suc n) (type_incr_from 0 t')) (Suc n))))" by simp sorry
+  thus ?case by simp
 next case tufd
   thus ?case by simp sorry
 next case ttlm

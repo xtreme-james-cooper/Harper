@@ -68,15 +68,12 @@ where "type_subst e e' = type_sub_from 0 (type_subst' e (type_incr_from 0 e') 0)
 lemma [simp]: "type_free_vars (type_incr_from n e) = incr n ` type_free_vars e"
 by (induction e arbitrary: n, auto)
 
-lemma [simp]: "m ~: type_free_vars t ==> is_valid_type (reduce_set_at m s) (type_sub_from m t) = is_valid_type s t"
-by (induction t arbitrary: s m, simp_all, force, force)
-
-lemma valid_incr_type: "is_valid_type (expand_set_at m s) (type_incr_from m t) = is_valid_type s t"
+lemma valid_incr_type [simp]: "is_valid_type (expand_set_at m s) (type_incr_from m t) = is_valid_type s t"
 by (induction t arbitrary: s m, simp_all)
 
 lemma [simp]: "is_valid_type (expand_set s) (type_incr_from 0 t) = is_valid_type s t"
 proof -
-  from valid_incr_type have X: "is_valid_type (expand_set_at 0 s) (type_incr_from 0 t) = is_valid_type s t" by simp
+  from valid_incr_type have X: "is_valid_type (expand_set_at 0 s) (type_incr_from 0 t) = is_valid_type s t" by presburger
   have "expand_set_at 0 s = expand_set s" by simp
   with X show "is_valid_type (expand_set s) (type_incr_from 0 t) = is_valid_type s t" by simp
 qed

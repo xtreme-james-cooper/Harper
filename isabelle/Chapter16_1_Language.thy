@@ -67,7 +67,7 @@ by (induction t arbitrary: s m, simp_all)
 
 lemma [simp]: "is_valid_type (expand_set s) (type_incr_from 0 t) = is_valid_type s t"
 proof -
-  from valid_incr_type have X: "is_valid_type (expand_set_at 0 s) (type_incr_from 0 t) = is_valid_type s t" by simp
+  from valid_incr_type have X: "is_valid_type (expand_set_at 0 s) (type_incr_from 0 t) = is_valid_type s t" by presburger
   have "expand_set_at 0 s = expand_set s" by simp
   with X show "is_valid_type (expand_set s) (type_incr_from 0 t) = is_valid_type s t" by simp
 qed
