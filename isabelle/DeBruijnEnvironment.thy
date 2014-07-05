@@ -4,6 +4,9 @@ begin
 
 datatype 'a env = DBEnv "'a list"
 
+definition empty_env :: "'a env"
+where "empty_env = DBEnv []"
+
 primrec size :: "'a env => nat"
 where "size (DBEnv as) = length as"
 
@@ -25,6 +28,9 @@ where "extend_at n (DBEnv as) a' = DBEnv (extend_at' n as a')"
 
 abbreviation extend :: "'a env => 'a => 'a env"
 where "extend == extend_at 0"
+
+lemma [simp]: "lookup empty_env x = None"
+by (simp add: empty_env_def)
 
 lemma [simp]: "n <= length l ==> length (extend_at' n l a) = Suc (length l)"
 by (induction n l a rule: extend_at'.induct, simp_all)
