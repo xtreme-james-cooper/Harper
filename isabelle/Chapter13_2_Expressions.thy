@@ -1,20 +1,12 @@
-theory Chapter14_1_Language
-imports DeBruijnEnvironment
+theory Chapter13_2_Expressions
+imports Chapter13_1_Types
 begin
-
-datatype type = 
-  Nat
-| Arrow type type
-| Unit
-| Prod type type
-| Void
-| Sum type type
 
 datatype expr = 
   Var var
 | Zero
 | Suc expr
-| Rec expr expr expr
+| NatRec expr expr expr
 | Lam type expr
 | Appl expr expr
 | Triv
@@ -25,12 +17,16 @@ datatype expr =
 | Case expr expr expr
 | InL type type expr
 | InR type type expr
+| Fold type expr
+| Rec type expr expr
+| Unfold type expr
+| Gen type expr expr
 
 primrec insert :: "var => expr => expr"
 where "insert n (Var v) = Var (incr n v)"
     | "insert n Zero = Zero"
     | "insert n (Suc e) = Suc (insert n e)"
-    | "insert n (Rec et e0 es) = Rec (insert n et) (insert n e0) (insert (next (next n)) es)"
+    | "insert n (NatRec et e0 es) = NatRec (insert n et) (insert n e0) (insert (next (next n)) es)"
     | "insert n (Lam t e) = Lam t (insert (next n) e)"
     | "insert n (Appl e1 e2) = Appl (insert n e1) (insert n e2)"
     | "insert n Triv = Triv"
@@ -41,12 +37,16 @@ where "insert n (Var v) = Var (incr n v)"
     | "insert n (Case et el er) = Case (insert n et) (insert (next n) el) (insert (next n) er)"
     | "insert n (InL t1 t2 e) = InL t1 t2 (insert n e)"
     | "insert n (InR t1 t2 e) = InR t1 t2 (insert n e)"
+    | "insert n (Fold t e) = Fold t (insert n e)"
+    | "insert n (Rec t e1 e2) = Rec t (insert (next n) e1) (insert n e2)"
+    | "insert n (Unfold t e) = Unfold t (insert n e)"
+    | "insert n (Gen t e1 e2) = Gen t (insert (next n) e1) (insert n e2)"
 
 primrec remove :: "var => expr => expr"
 where "remove n (Var v) = Var (subr n v)"
     | "remove n Zero = Zero"
     | "remove n (Suc e) = Suc (remove n e)"
-    | "remove n (Rec et e0 es) = Rec (remove n et) (remove n e0) (remove (next (next n)) es)"
+    | "remove n (NatRec et e0 es) = NatRec (remove n et) (remove n e0) (remove (next (next n)) es)"
     | "remove n (Lam t e) = Lam t (remove (next n) e)"
     | "remove n (Appl e1 e2) = Appl (remove n e1) (remove n e2)"
     | "remove n Triv = Triv"
@@ -57,13 +57,17 @@ where "remove n (Var v) = Var (subr n v)"
     | "remove n (Case et el er) = Case (remove n et) (remove (next n) el) (remove (next n) er)"
     | "remove n (InL t1 t2 e) = InL t1 t2 (remove n e)"
     | "remove n (InR t1 t2 e) = InR t1 t2 (remove n e)"
+    | "remove n (Fold t e) = Fold t (remove n e)"
+    | "remove n (Rec t e1 e2) = Rec t (remove (next n) e1) (remove n e2)"
+    | "remove n (Unfold t e) = Unfold t (remove n e)"
+    | "remove n (Gen t e1 e2) = Gen t (remove (next n) e1) (remove n e2)"
 
 primrec subst' :: "var => expr => expr => expr"
 where "subst' n e' (Var v) = (if v = n then e' else Var v)"
     | "subst' n e' Zero = Zero"
     | "subst' n e' (Suc e) = Suc (subst' n e' e)"
-    | "subst' n e' (Rec et e0 es) = 
-                      Rec (subst' n e' et) 
+    | "subst' n e' (NatRec et e0 es) = 
+                      NatRec (subst' n e' et) 
                           (subst' n e' e0) 
                           (subst' (next (next n)) (insert first (insert first e')) es)"
     | "subst' n e' (Lam t e) = Lam t (subst' (next n) (insert first e') e)"
@@ -79,6 +83,10 @@ where "subst' n e' (Var v) = (if v = n then e' else Var v)"
                            (subst' (next n) (insert first e') er)"
     | "subst' n e' (InL t1 t2 e) = InL t1 t2 (subst' n e' e)"
     | "subst' n e' (InR t1 t2 e) = InR t1 t2 (subst' n e' e)"
+    | "subst' n e' (Fold t e) = Fold t (subst' n e' e)"
+    | "subst' n e' (Rec t e1 e2) = Rec t (subst' (next n) (insert first e') e1) (subst' n e' e2)"
+    | "subst' n e' (Unfold t e) = Unfold t (subst' n e' e)"
+    | "subst' n e' (Gen t e1 e2) = Gen t (subst' (next n) (insert first e') e1) (subst' n e' e2)"
 
 definition subst :: "expr => expr => expr"
 where "subst e' e = remove first (subst' first (insert first e') e)"

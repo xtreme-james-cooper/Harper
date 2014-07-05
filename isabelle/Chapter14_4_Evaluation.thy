@@ -1,12 +1,12 @@
-theory Chapter14_3_Evaluation
-imports Chapter14_2_Typechecking
+theory Chapter14_4_Evaluation
+imports Chapter14_3_Typechecking
 begin
 
 primrec is_val :: "expr => bool"
 where "is_val (Var v) = False"
     | "is_val Zero = True"
     | "is_val (Suc e) = is_val e"
-    | "is_val (Rec et e0 es) = False"
+    | "is_val (NatRec et e0 es) = False"
     | "is_val (Lam t e) = True"
     | "is_val (Appl e1 e2) = False"
     | "is_val Triv = True"
@@ -17,13 +17,17 @@ where "is_val (Var v) = False"
     | "is_val (Case et el er) = False"
     | "is_val (InL t1 t2 e) = is_val e"
     | "is_val (InR t1 t2 e) = is_val e"
+    | "is_val (Fold t e) = True"
+    | "is_val (Rec t e1 e2) = False"
+    | "is_val (Unfold t e) = False"
+    | "is_val (Gen t e1 e2) = True"
 
 inductive eval :: "expr => expr => bool"
 where eval_suc [simp]: "eval e e' ==> eval (Suc e) (Suc e')"
-    | eval_rec_1 [simp]: "eval et et' ==> eval (Rec et e0 es) (Rec et e0 es)"
-    | eval_rec_2 [simp]: "eval (Rec Zero e0 es) e0"
-    | eval_rec_3 [simp]: "is_val et ==> 
-            eval (Rec (Suc et) e0 es) (subst (Rec et e0 es) (subst et es))"
+    | eval_natrec_1 [simp]: "eval et et' ==> eval (NatRec et e0 es) (NatRec et e0 es)"
+    | eval_natrec_2 [simp]: "eval (NatRec Zero e0 es) e0"
+    | eval_natrec_3 [simp]: "is_val et ==> 
+            eval (NatRec (Suc et) e0 es) (subst (NatRec et e0 es) (subst et es))"
     | eval_appl_1 [simp]: "eval e1 e1' ==> eval (Appl e1 e2) (Appl e1' e2)"
     | eval_appl_2 [simp]: "is_val e1 ==> eval e2 e2' ==> eval (Appl e1 e2) (Appl e1 e2')"
     | eval_appl_3 [simp]: "is_val e2 ==> eval (Appl (Lam t2 e1) e2) (subst e2 e1)"
@@ -39,6 +43,8 @@ where eval_suc [simp]: "eval e e' ==> eval (Suc e) (Suc e')"
     | eval_case_3 [simp]: "is_val e ==> eval (Case (InR t1 t2 e) el er) (subst e er)"
     | eval_inl [simp]: "eval e e' ==> eval (InL t1 t2 e) (InL t1 t2 e')"
     | eval_inr [simp]: "eval e e' ==> eval (InR t1 t2 e) (InR t1 t2 e')"
+    | eval_rec_1 [simp]: "eval e2 e2' ==> eval (Rec t e1 e2) (Rec t e1 e2')"
+    | eval_rec_2 [simp]: "eval (Rec t e1 (Fold t e2)) (Rec t e1 e2)"
 
 lemma canonical_nat: "is_val e ==> typecheck gam e Nat ==> 
           e = Zero | (EX e'. e = Suc e' & typecheck gam e' Nat)"
@@ -66,17 +72,26 @@ lemma canonical_sum: "is_val e ==> typecheck gam e (Sum t1 t2) ==>
           (EX e'. e = InR t1 t2 e' & typecheck gam e' t2)"
 by (induction e, auto)
 
+lemma canonical_ind: "is_val e ==> typecheck gam e (Ind t) ==> 
+          EX e'. e = Fold t e' & typecheck gam e' (type_subst (Ind t) t)"
+by (induction e, auto)
+
+lemma canonical_coind: "is_val e ==> typecheck gam e (Coind t) ==> 
+          EX e1 e2 t2. e = Gen t e1 e2 & typecheck gam e2 t2 & 
+                       typecheck (extend gam t2) e1 (type_subst t2 t)"
+by (induction e, auto)
+
 theorem preservation: "eval e e' ==> typecheck gam e t ==> typecheck gam e' t"
 proof (induction e e' arbitrary: t rule: eval.induct)
 case eval_suc 
   thus ?case by fastforce
-next case eval_rec_1 
+next case eval_natrec_1 
   thus ?case by fastforce
-next case eval_rec_2 
+next case eval_natrec_2 
   thus ?case by fastforce
-next case (eval_rec_3 et e0 es)
-  from eval_rec_3 canonical_nat_no_vars have "typecheck (extend gam t) (subst et es) t" by auto
-  with eval_rec_3 show ?case by fastforce
+next case (eval_natrec_3 et e0 es)
+  from eval_natrec_3 canonical_nat_no_vars have "typecheck (extend gam t) (subst et es) t" by auto
+  with eval_natrec_3 show ?case by fastforce
 next case eval_appl_1 
   thus ?case by fastforce
 next case eval_appl_2 
@@ -107,6 +122,8 @@ next case eval_inl
   thus ?case by fastforce
 next case eval_inr
   thus ?case by fastforce
+next case eval_rec_1
+  thus ?case by fastforce
 qed
 
 theorem progress: "typecheck gam e t ==> gam = empty_env ==> is_val e | (EX e'. eval e e')"
@@ -117,8 +134,8 @@ next case tc_zero
   thus ?case by simp
 next case tc_suc
   thus ?case by (metis eval_suc is_val.simps(3))
-next case tc_rec
-  thus ?case by (metis eval_rec_1 eval_rec_2 eval_rec_3 is_val.simps(3) canonical_nat)
+next case tc_natrec
+  thus ?case by (metis eval_natrec_1 eval_natrec_2 eval_natrec_3 is_val.simps(3) canonical_nat)
 next case tc_lam
   thus ?case by simp
 next case tc_appl
@@ -140,6 +157,14 @@ next case tc_inl
   thus ?case by (metis eval_inl is_val.simps(13))
 next case tc_inr
   thus ?case by (metis eval_inr is_val.simps(14))
+next case tc_fold
+  thus ?case by simp
+next case tc_rec
+  thus ?case by simp sorry
+next case tc_unfold
+  thus ?case by simp sorry
+next case tc_gen
+  thus ?case by simp
 qed
 
 end
