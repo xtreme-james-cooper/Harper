@@ -1,5 +1,5 @@
-theory Chapter05_06
-imports Chapter04
+theory Chapter08_3_Evaluation
+imports Chapter08_2_Typechecking
 begin
 
 primrec is_val :: "expr => bool"
