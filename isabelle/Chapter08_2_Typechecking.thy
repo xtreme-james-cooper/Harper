@@ -15,6 +15,9 @@ where tc_var [simp]: "lookup gam x = Some t ==> typecheck gam (Var x) t"
     | tc_len [simp]: "typecheck gam e StrType ==> typecheck gam (Len e) NumType"
     | tc_let [simp]: "typecheck gam e1 t1 ==> typecheck (extend gam t1) e2 t2 ==> 
                     typecheck gam (Let e1 e2) t2"
+    | tc_lam [simp]: "typecheck (extend gam t1) e t2 ==> typecheck gam (Lam t1 e) (Arrow t1 t2)"
+    | tc_appl [simp]: "typecheck gam e1 (Arrow t2 t) ==> typecheck gam e2 t2 ==> 
+                    typecheck gam (Appl e1 e2) t"
 
 inductive_cases [elim!]: "typecheck gam (Var x) t"
 inductive_cases [elim!]: "typecheck gam (Str s) t"
@@ -24,6 +27,8 @@ inductive_cases [elim!]: "typecheck gam (Times e1 e2) t"
 inductive_cases [elim!]: "typecheck gam (Cat e1 e2) t"
 inductive_cases [elim!]: "typecheck gam (Len e) t"
 inductive_cases [elim!]: "typecheck gam (Let e1 e2) t"
+inductive_cases [elim!]: "typecheck gam (Lam t1 e) t"
+inductive_cases [elim!]: "typecheck gam (Appl e1 e2) t"
 
 lemma [simp]: "typecheck gam e t ==> n in gam ==> 
          typecheck (extend_at n gam t') (insert n e) t"
