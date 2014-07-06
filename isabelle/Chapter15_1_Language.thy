@@ -14,7 +14,7 @@ datatype expr =
   Var var
 | Zero
 | Suc expr
-| Rec expr expr expr
+| IsZ expr expr expr
 | Lam type expr
 | Appl expr expr
 | Triv
@@ -25,12 +25,13 @@ datatype expr =
 | Case expr expr expr
 | InL type type expr
 | InR type type expr
+| Fix type expr
 
 primrec insert :: "var => expr => expr"
 where "insert n (Var v) = Var (incr n v)"
     | "insert n Zero = Zero"
     | "insert n (Suc e) = Suc (insert n e)"
-    | "insert n (Rec et e0 es) = Rec (insert n et) (insert n e0) (insert (next (next n)) es)"
+    | "insert n (IsZ et e0 es) = IsZ (insert n et) (insert n e0) (insert (next n) es)"
     | "insert n (Lam t e) = Lam t (insert (next n) e)"
     | "insert n (Appl e1 e2) = Appl (insert n e1) (insert n e2)"
     | "insert n Triv = Triv"
@@ -41,12 +42,13 @@ where "insert n (Var v) = Var (incr n v)"
     | "insert n (Case et el er) = Case (insert n et) (insert (next n) el) (insert (next n) er)"
     | "insert n (InL t1 t2 e) = InL t1 t2 (insert n e)"
     | "insert n (InR t1 t2 e) = InR t1 t2 (insert n e)"
+    | "insert n (Fix t e) = Fix t (insert (next n) e)"
 
 primrec remove :: "var => expr => expr"
 where "remove n (Var v) = Var (subr n v)"
     | "remove n Zero = Zero"
     | "remove n (Suc e) = Suc (remove n e)"
-    | "remove n (Rec et e0 es) = Rec (remove n et) (remove n e0) (remove (next (next n)) es)"
+    | "remove n (IsZ et e0 es) = IsZ (remove n et) (remove n e0) (remove (next n) es)"
     | "remove n (Lam t e) = Lam t (remove (next n) e)"
     | "remove n (Appl e1 e2) = Appl (remove n e1) (remove n e2)"
     | "remove n Triv = Triv"
@@ -57,15 +59,14 @@ where "remove n (Var v) = Var (subr n v)"
     | "remove n (Case et el er) = Case (remove n et) (remove (next n) el) (remove (next n) er)"
     | "remove n (InL t1 t2 e) = InL t1 t2 (remove n e)"
     | "remove n (InR t1 t2 e) = InR t1 t2 (remove n e)"
+    | "remove n (Fix t e) = Fix t (remove (next n) e)"
 
 primrec subst' :: "var => expr => expr => expr"
 where "subst' n e' (Var v) = (if v = n then e' else Var v)"
     | "subst' n e' Zero = Zero"
     | "subst' n e' (Suc e) = Suc (subst' n e' e)"
-    | "subst' n e' (Rec et e0 es) = 
-                      Rec (subst' n e' et) 
-                          (subst' n e' e0) 
-                          (subst' (next (next n)) (insert first (insert first e')) es)"
+    | "subst' n e' (IsZ et e0 es) = 
+                      IsZ (subst' n e' et) (subst' n e' e0) (subst' (next n) (insert first e') es)"
     | "subst' n e' (Lam t e) = Lam t (subst' (next n) (insert first e') e)"
     | "subst' n e' (Appl e1 e2) = Appl (subst' n e' e1) (subst' n e' e2)"
     | "subst' n e' Triv = Triv"
@@ -79,6 +80,7 @@ where "subst' n e' (Var v) = (if v = n then e' else Var v)"
                            (subst' (next n) (insert first e') er)"
     | "subst' n e' (InL t1 t2 e) = InL t1 t2 (subst' n e' e)"
     | "subst' n e' (InR t1 t2 e) = InR t1 t2 (subst' n e' e)"
+    | "subst' n e' (Fix t e) = Fix t (subst' (next n) (insert first e') e)"
 
 definition subst :: "expr => expr => expr"
 where "subst e' e = remove first (subst' first (insert first e') e)"
