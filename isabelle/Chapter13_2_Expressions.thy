@@ -17,10 +17,7 @@ datatype expr =
 | Case expr expr expr
 | InL type type expr
 | InR type type expr
-| Fold type expr
-| Rec type expr expr
-| Unfold type expr
-| Gen type expr expr
+| Map type expr expr
 
 primrec insert :: "var => expr => expr"
 where "insert n (Var v) = Var (incr n v)"
@@ -37,10 +34,7 @@ where "insert n (Var v) = Var (incr n v)"
     | "insert n (Case et el er) = Case (insert n et) (insert (next n) el) (insert (next n) er)"
     | "insert n (InL t1 t2 e) = InL t1 t2 (insert n e)"
     | "insert n (InR t1 t2 e) = InR t1 t2 (insert n e)"
-    | "insert n (Fold t e) = Fold t (insert n e)"
-    | "insert n (Rec t e1 e2) = Rec t (insert (next n) e1) (insert n e2)"
-    | "insert n (Unfold t e) = Unfold t (insert n e)"
-    | "insert n (Gen t e1 e2) = Gen t (insert (next n) e1) (insert n e2)"
+    | "insert n (Map t e1 e2) = Map t (insert (next n) e1) (insert n e2)"
 
 primrec remove :: "var => expr => expr"
 where "remove n (Var v) = Var (subr n v)"
@@ -57,10 +51,7 @@ where "remove n (Var v) = Var (subr n v)"
     | "remove n (Case et el er) = Case (remove n et) (remove (next n) el) (remove (next n) er)"
     | "remove n (InL t1 t2 e) = InL t1 t2 (remove n e)"
     | "remove n (InR t1 t2 e) = InR t1 t2 (remove n e)"
-    | "remove n (Fold t e) = Fold t (remove n e)"
-    | "remove n (Rec t e1 e2) = Rec t (remove (next n) e1) (remove n e2)"
-    | "remove n (Unfold t e) = Unfold t (remove n e)"
-    | "remove n (Gen t e1 e2) = Gen t (remove (next n) e1) (remove n e2)"
+    | "remove n (Map t e1 e2) = Map t (remove (next n) e1) (remove n e2)"
 
 primrec subst' :: "var => expr => expr => expr"
 where "subst' n e' (Var v) = (if v = n then e' else Var v)"
@@ -83,10 +74,7 @@ where "subst' n e' (Var v) = (if v = n then e' else Var v)"
                            (subst' (next n) (insert first e') er)"
     | "subst' n e' (InL t1 t2 e) = InL t1 t2 (subst' n e' e)"
     | "subst' n e' (InR t1 t2 e) = InR t1 t2 (subst' n e' e)"
-    | "subst' n e' (Fold t e) = Fold t (subst' n e' e)"
-    | "subst' n e' (Rec t e1 e2) = Rec t (subst' (next n) (insert first e') e1) (subst' n e' e2)"
-    | "subst' n e' (Unfold t e) = Unfold t (subst' n e' e)"
-    | "subst' n e' (Gen t e1 e2) = Gen t (subst' (next n) (insert first e') e1) (subst' n e' e2)"
+    | "subst' n e' (Map t e1 e2) = Map t (subst' (next n) (insert first e') e1) (subst' n e' e2)"
 
 definition subst :: "expr => expr => expr"
 where "subst e' e = remove first (subst' first (insert first e') e)"

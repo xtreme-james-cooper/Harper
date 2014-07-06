@@ -17,10 +17,7 @@ where "is_val (Var v) = False"
     | "is_val (Case et el er) = False"
     | "is_val (InL t1 t2 e) = is_val e"
     | "is_val (InR t1 t2 e) = is_val e"
-    | "is_val (Fold t e) = True"
-    | "is_val (Rec t e1 e2) = False"
-    | "is_val (Unfold t e) = False"
-    | "is_val (Gen t e1 e2) = True"
+    | "is_val (Map t e1 e2) = False"
 
 inductive eval :: "expr => expr => bool"
 where eval_suc [simp]: "eval e e' ==> eval (Suc e) (Suc e')"
@@ -43,8 +40,6 @@ where eval_suc [simp]: "eval e e' ==> eval (Suc e) (Suc e')"
     | eval_case_3 [simp]: "is_val e ==> eval (Case (InR t1 t2 e) el er) (subst e er)"
     | eval_inl [simp]: "eval e e' ==> eval (InL t1 t2 e) (InL t1 t2 e')"
     | eval_inr [simp]: "eval e e' ==> eval (InR t1 t2 e) (InR t1 t2 e')"
-    | eval_rec_1 [simp]: "eval e2 e2' ==> eval (Rec t e1 e2) (Rec t e1 e2')"
-    | eval_rec_2 [simp]: "eval (Rec t e1 (Fold t e2)) (Rec t e1 e2)"
 
 lemma canonical_nat: "is_val e ==> typecheck gam e Nat ==> 
           e = Zero | (EX e'. e = Suc e' & typecheck gam e' Nat)"
@@ -70,15 +65,6 @@ by (induction e, auto)
 lemma canonical_sum: "is_val e ==> typecheck gam e (Sum t1 t2) ==> 
           (EX e'. e = InL t1 t2 e' & typecheck gam e' t1) | 
           (EX e'. e = InR t1 t2 e' & typecheck gam e' t2)"
-by (induction e, auto)
-
-lemma canonical_ind: "is_val e ==> typecheck gam e (Ind t) ==> 
-          EX e'. e = Fold t e' & typecheck gam e' (type_subst (Ind t) t)"
-by (induction e, auto)
-
-lemma canonical_coind: "is_val e ==> typecheck gam e (Coind t) ==> 
-          EX e1 e2 t2. e = Gen t e1 e2 & typecheck gam e2 t2 & 
-                       typecheck (extend gam t2) e1 (type_subst t2 t)"
 by (induction e, auto)
 
 theorem preservation: "eval e e' ==> typecheck gam e t ==> typecheck gam e' t"
@@ -122,8 +108,6 @@ next case eval_inl
   thus ?case by fastforce
 next case eval_inr
   thus ?case by fastforce
-next case eval_rec_1
-  thus ?case by fastforce
 qed
 
 theorem progress: "typecheck gam e t ==> gam = empty_env ==> is_val e | (EX e'. eval e e')"
@@ -157,14 +141,8 @@ next case tc_inl
   thus ?case by (metis eval_inl is_val.simps(13))
 next case tc_inr
   thus ?case by (metis eval_inr is_val.simps(14))
-next case tc_fold
-  thus ?case by simp
-next case tc_rec
-  thus ?case by simp sorry
-next case tc_unfold
-  thus ?case by simp sorry
-next case tc_gen
-  thus ?case by simp
+next case tc_map
+  thus ?case try
 qed
 
 end

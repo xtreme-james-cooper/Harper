@@ -21,13 +21,9 @@ where tc_var [simp]: "lookup gam x = Some t ==> typecheck gam (Var x) t"
                 typecheck (extend gam t2) er t ==> typecheck gam (Case et el er) t"
     | tc_inl [simp]: "typecheck gam e t1 ==> typecheck gam (InL t1 t2 e) (Sum t1 t2)"
     | tc_inr [simp]: "typecheck gam e t2 ==> typecheck gam (InR t1 t2 e) (Sum t1 t2)"
-    | tc_fold [simp]: "typecheck gam e (type_subst (Ind t) t) ==> typecheck gam (Fold t e) (Ind t)"
-    | tc_rec [simp]: "typecheck (extend gam (type_subst t' t)) e1 t' ==> 
-                typecheck gam e2 (ind t) ==> typecheck gam (Rec t e1 e2) t'"
-    | tc_unfold [simp]: "typecheck gam e (Coind t) ==> 
-                typecheck gam (Unfold t e) (type_subst (Coind t) t)"
-    | tc_gen [simp]: "typecheck gam e2 t2 ==> typecheck (extend gam t2) e1 (type_subst t2 t) ==> 
-                typecheck gam (Gen t e1 e2) (Coind t)"
+    | tc_map [simp]: "is_positive first t ==> typecheck (extend gam rho) e1 rho' ==> 
+                typecheck gam e2 (type_subst rho t) ==> 
+                        typecheck gam (Map t e1 e2) (type_subst rho' t)"
 
 inductive_cases [elim!]: "typecheck gam (Var x) t"
 inductive_cases [elim!]: "typecheck gam Zero t"
@@ -43,18 +39,84 @@ inductive_cases [elim!]: "typecheck gam (Abort t1 e) t"
 inductive_cases [elim!]: "typecheck gam (Case et el er) t"
 inductive_cases [elim!]: "typecheck gam (InL t1 t2 e) t"
 inductive_cases [elim!]: "typecheck gam (InR t1 t2 e) t"
-inductive_cases [elim!]: "typecheck gam (Fold t1 e) t"
-inductive_cases [elim!]: "typecheck gam (Rec t1 e1 e2) t"
-inductive_cases [elim!]: "typecheck gam (Unfold t1 e) t"
-inductive_cases [elim!]: "typecheck gam (Gen t1 e1 e2) t"
+inductive_cases [elim!]: "typecheck gam (Map t1 e1 e2) t"
 
 lemma [simp]: "typecheck gam e t ==> n in gam ==> 
          typecheck (extend_at n gam t') (insert n e) t"
-by (induction gam e t arbitrary: n rule: typecheck.induct, fastforce+)
+proof (induction gam e t arbitrary: n rule: typecheck.induct)
+case tc_var
+  thus ?case by fastforce
+next case tc_zero
+  thus ?case by fastforce
+next case tc_suc
+  thus ?case by fastforce
+next case tc_natrec
+  thus ?case by fastforce
+next case tc_lam
+  thus ?case by fastforce
+next case tc_appl
+  thus ?case by fastforce
+next case tc_triv
+  thus ?case by fastforce
+next case tc_pair
+  thus ?case by fastforce
+next case tc_projl
+  thus ?case by fastforce
+next case tc_projr
+  thus ?case by fastforce
+next case tc_abort
+  thus ?case by fastforce
+next case tc_case
+  thus ?case by fastforce
+next case tc_inl
+  thus ?case by fastforce
+next case tc_inr
+  thus ?case by fastforce
+next case (tc_map t gam rho e1 rho' e2)
+  hence X: "extend_at first (extend_at n gam t') rho = 
+                extend_at (next n) (extend_at first gam rho) t'" by simp
+  from tc_map have "typecheck (extend_at (next n) (extend gam rho) t') (insert (next n) e1) rho'" by simp
+  with X have "typecheck (extend (extend_at n gam t') rho) (insert (next n) e1) rho'" by simp
+  with tc_map show ?case by fastforce
+qed
 
 lemma [simp]: "typecheck (extend_at n gam t') e t ==> n in gam ==> typecheck gam e' t' ==> 
         typecheck gam (remove n (subst' n (insert n e') e)) t"
-by (induction "extend_at n gam t'" e t arbitrary: n gam t' e' rule: typecheck.induct, fastforce+)
+proof (induction "extend_at n gam t'" e t arbitrary: n gam t' e' rule: typecheck.induct)
+case tc_var
+  thus ?case by fastforce
+next case tc_zero
+  thus ?case by fastforce
+next case tc_suc
+  thus ?case by fastforce
+next case tc_natrec
+  thus ?case by fastforce
+next case tc_lam
+  thus ?case by fastforce
+next case tc_appl
+  thus ?case by fastforce
+next case tc_triv
+  thus ?case by fastforce
+next case tc_pair
+  thus ?case by fastforce
+next case tc_projl
+  thus ?case by fastforce
+next case tc_projr
+  thus ?case by fastforce
+next case tc_abort
+  thus ?case by fastforce
+next case tc_case
+  thus ?case by fastforce
+next case tc_inl
+  thus ?case by fastforce
+next case tc_inr
+  thus ?case by fastforce
+next case (tc_map t rho e1 rho' e2)
+  from tc_map have X: "is_positive first t" by simp
+  from tc_map have Y: "typecheck (extend gam rho) (remove (next n) (subst' (next n) (insert first (insert n e')) e1)) rho'" by simp
+  from tc_map have "typecheck gam (remove n (subst' n (insert n e') e2)) (type_subst rho t)" by simp
+  with X Y show ?case by simp
+qed
 
 lemma [simp]: "typecheck (extend gam t') e t ==> typecheck gam e' t' ==> 
                           typecheck gam (subst e' e) t"

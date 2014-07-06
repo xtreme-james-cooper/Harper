@@ -96,7 +96,7 @@ case 1
   thus ?case by simp
 next case 2
   thus ?case by simp
-next case (3 n a' as a)
+next case 3
   thus ?case by (cases m, simp_all)
 qed
 
