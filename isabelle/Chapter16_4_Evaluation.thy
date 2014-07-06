@@ -18,6 +18,8 @@ where "is_val (Var v) = False"
     | "is_val (InL t1 t2 e) = is_val e"
     | "is_val (InR t1 t2 e) = is_val e"
     | "is_val (Fix t e) = False"
+    | "is_val (Fold t e) = is_val e"
+    | "is_val (Unfold e) = False"
 
 inductive eval :: "expr => expr => bool"
 where eval_suc [simp]: "eval e e' ==> eval (Suc e) (Suc e')"
@@ -40,6 +42,9 @@ where eval_suc [simp]: "eval e e' ==> eval (Suc e) (Suc e')"
     | eval_inl [simp]: "eval e e' ==> eval (InL t1 t2 e) (InL t1 t2 e')"
     | eval_inr [simp]: "eval e e' ==> eval (InR t1 t2 e) (InR t1 t2 e')"
     | eval_fix [simp]: "eval (Fix t e) (subst (Fix t e) e)"
+    | eval_fold [simp]: "eval e e' ==> eval (Fold t e) (Fold t e')"
+    | eval_unfold_1 [simp]: "eval e e' ==> eval (Unfold e) (Unfold e')"
+    | eval_unfold_2 [simp]: "is_val e ==> eval (Unfold (Fold t e)) e"
 
 lemma canonical_nat: "is_val e ==> typecheck gam e Nat ==> 
           e = Zero | (EX e'. e = Suc e' & typecheck gam e' Nat)"
@@ -65,6 +70,10 @@ by (induction e, auto)
 lemma canonical_sum: "is_val e ==> typecheck gam e (Sum t1 t2) ==> 
           (EX e'. e = InL t1 t2 e' & typecheck gam e' t1) | 
           (EX e'. e = InR t1 t2 e' & typecheck gam e' t2)"
+by (induction e, auto)
+
+lemma canonical_rec: "is_val e ==> typecheck gam e (Rec t) ==> 
+              EX e'. e = Fold t e' & typecheck gam e' (type_subst (Rec t) t)"
 by (induction e, auto)
 
 theorem preservation: "eval e e' ==> typecheck gam e t ==> typecheck gam e' t"
@@ -103,6 +112,10 @@ next case tc_inr
   thus ?case by (metis eval_inr is_val.simps(14))
 next case tc_fix
   thus ?case by (metis eval_fix)
+next case tc_fold
+  thus ?case by (metis eval_fold is_val.simps(16))
+next case tc_unfold
+  thus ?case by (metis canonical_rec eval_unfold_1 eval_unfold_2 is_val.simps(16))
 qed
 
 end

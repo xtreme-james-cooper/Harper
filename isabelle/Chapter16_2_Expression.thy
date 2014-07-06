@@ -18,6 +18,8 @@ datatype expr =
 | InL type type expr
 | InR type type expr
 | Fix type expr
+| Fold type expr
+| Unfold expr
 
 primrec insert :: "var => expr => expr"
 where "insert n (Var v) = Var (incr n v)"
@@ -35,6 +37,8 @@ where "insert n (Var v) = Var (incr n v)"
     | "insert n (InL t1 t2 e) = InL t1 t2 (insert n e)"
     | "insert n (InR t1 t2 e) = InR t1 t2 (insert n e)"
     | "insert n (Fix t e) = Fix t (insert (next n) e)"
+    | "insert n (Fold t e) = Fold t (insert n e)"
+    | "insert n (Unfold e) = Unfold (insert n e)"
 
 primrec remove :: "var => expr => expr"
 where "remove n (Var v) = Var (subr n v)"
@@ -52,6 +56,8 @@ where "remove n (Var v) = Var (subr n v)"
     | "remove n (InL t1 t2 e) = InL t1 t2 (remove n e)"
     | "remove n (InR t1 t2 e) = InR t1 t2 (remove n e)"
     | "remove n (Fix t e) = Fix t (remove (next n) e)"
+    | "remove n (Fold t e) = Fold t (remove n e)"
+    | "remove n (Unfold e) = Unfold (remove n e)"
 
 primrec subst' :: "var => expr => expr => expr"
 where "subst' n e' (Var v) = (if v = n then e' else Var v)"
@@ -73,6 +79,8 @@ where "subst' n e' (Var v) = (if v = n then e' else Var v)"
     | "subst' n e' (InL t1 t2 e) = InL t1 t2 (subst' n e' e)"
     | "subst' n e' (InR t1 t2 e) = InR t1 t2 (subst' n e' e)"
     | "subst' n e' (Fix t e) = Fix t (subst' (next n) (insert first e') e)"
+    | "subst' n e' (Fold t e) = Fold t (subst' n e' e)"
+    | "subst' n e' (Unfold e) = Unfold (subst' n e' e)"
 
 definition subst :: "expr => expr => expr"
 where "subst e' e = remove first (subst' first (insert first e') e)"
