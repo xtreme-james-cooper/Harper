@@ -4,9 +4,6 @@ begin
 
 datatype expr = 
   Var var
-| Zero
-| Suc expr
-| IsZ expr expr expr
 | Lam type expr
 | Appl expr expr
 | Triv
@@ -23,9 +20,6 @@ datatype expr =
 
 primrec insert :: "var => expr => expr"
 where "insert n (Var v) = Var (incr n v)"
-    | "insert n Zero = Zero"
-    | "insert n (Suc e) = Suc (insert n e)"
-    | "insert n (IsZ et e0 es) = IsZ (insert n et) (insert n e0) (insert (next n) es)"
     | "insert n (Lam t e) = Lam t (insert (next n) e)"
     | "insert n (Appl e1 e2) = Appl (insert n e1) (insert n e2)"
     | "insert n Triv = Triv"
@@ -42,9 +36,6 @@ where "insert n (Var v) = Var (incr n v)"
 
 primrec remove :: "var => expr => expr"
 where "remove n (Var v) = Var (subr n v)"
-    | "remove n Zero = Zero"
-    | "remove n (Suc e) = Suc (remove n e)"
-    | "remove n (IsZ et e0 es) = IsZ (remove n et) (remove n e0) (remove (next n) es)"
     | "remove n (Lam t e) = Lam t (remove (next n) e)"
     | "remove n (Appl e1 e2) = Appl (remove n e1) (remove n e2)"
     | "remove n Triv = Triv"
@@ -61,10 +52,6 @@ where "remove n (Var v) = Var (subr n v)"
 
 primrec subst' :: "var => expr => expr => expr"
 where "subst' n e' (Var v) = (if v = n then e' else Var v)"
-    | "subst' n e' Zero = Zero"
-    | "subst' n e' (Suc e) = Suc (subst' n e' e)"
-    | "subst' n e' (IsZ et e0 es) = 
-                      IsZ (subst' n e' et) (subst' n e' e0) (subst' (next n) (insert first e') es)"
     | "subst' n e' (Lam t e) = Lam t (subst' (next n) (insert first e') e)"
     | "subst' n e' (Appl e1 e2) = Appl (subst' n e' e1) (subst' n e' e2)"
     | "subst' n e' Triv = Triv"
@@ -90,5 +77,11 @@ by (induction e arbitrary: n, simp_all)
 
 lemma [simp]: "canswap m n ==> insert m (insert n e) = insert (next n) (insert m e)"
 by (induction e arbitrary: n m, simp_all)
+
+lemma [simp]: "remove v (subst' v (insert v e') (insert v e)) = e"
+by (induction e arbitrary: e' v, simp_all)
+
+lemma [simp]: "subst e' (insert first e) = e"
+by (simp add: subst_def)
 
 end

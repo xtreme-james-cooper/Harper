@@ -4,7 +4,6 @@ begin
 
 datatype type = 
   Tyvar var
-| Nat
 | Arrow type type
 | Unit
 | Prod type type
@@ -14,7 +13,6 @@ datatype type =
 
 primrec type_insert :: "var => type => type"
 where "type_insert n (Tyvar v) = Tyvar (incr n v)"
-    | "type_insert n Nat = Nat"
     | "type_insert n (Arrow t1 t2) = Arrow (type_insert n t1) (type_insert n t2)"
     | "type_insert n Unit = Unit"
     | "type_insert n (Prod t1 t2) = Prod (type_insert n t1) (type_insert n t2)"
@@ -24,7 +22,6 @@ where "type_insert n (Tyvar v) = Tyvar (incr n v)"
 
 primrec type_remove :: "var => type => type"
 where "type_remove n (Tyvar v) = Tyvar (subr n v)"
-    | "type_remove n Nat = Nat"
     | "type_remove n (Arrow t1 t2) = Arrow (type_remove n t1) (type_remove n t2)"
     | "type_remove n Unit = Unit"
     | "type_remove n (Prod t1 t2) = Prod (type_remove n t1) (type_remove n t2)"
@@ -34,7 +31,6 @@ where "type_remove n (Tyvar v) = Tyvar (subr n v)"
 
 primrec type_subst' :: "var => type => type => type"
 where "type_subst' n e' (Tyvar v) = (if v = n then e' else Tyvar v)"
-    | "type_subst' n e' Nat = Nat"
     | "type_subst' n e' (Arrow t1 t2) = Arrow (type_subst' n e' t1) (type_subst' n e' t2)"
     | "type_subst' n e' Unit = Unit"
     | "type_subst' n e' (Prod t1 t2) = Prod (type_subst' n e' t1) (type_subst' n e' t2)"

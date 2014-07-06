@@ -4,9 +4,6 @@ begin
 
 primrec is_val :: "expr => bool"
 where "is_val (Var v) = False"
-    | "is_val Zero = True"
-    | "is_val (Suc e) = is_val e"
-    | "is_val (IsZ et e0 es) = False"
     | "is_val (Lam t e) = True"
     | "is_val (Appl e1 e2) = False"
     | "is_val Triv = True"
@@ -22,11 +19,7 @@ where "is_val (Var v) = False"
     | "is_val (Unfold e) = False"
 
 inductive eval :: "expr => expr => bool"
-where eval_suc [simp]: "eval e e' ==> eval (Suc e) (Suc e')"
-    | eval_isz_1 [simp]: "eval et et' ==> eval (IsZ et e0 es) (IsZ et e0 es)"
-    | eval_isz_2 [simp]: "eval (IsZ Zero e0 es) e0"
-    | eval_isz_3 [simp]: "is_val et ==> eval (IsZ (Suc et) e0 es) (subst et es)"
-    | eval_appl_1 [simp]: "eval e1 e1' ==> eval (Appl e1 e2) (Appl e1' e2)"
+where eval_appl_1 [simp]: "eval e1 e1' ==> eval (Appl e1 e2) (Appl e1' e2)"
     | eval_appl_2 [simp]: "is_val e1 ==> eval e2 e2' ==> eval (Appl e1 e2) (Appl e1 e2')"
     | eval_appl_3 [simp]: "is_val e2 ==> eval (Appl (Lam t2 e1) e2) (subst e2 e1)"
     | eval_pair_1 [simp]: "eval e1 e1' ==> eval (Pair e1 e2) (Pair e1' e2)"
@@ -36,7 +29,7 @@ where eval_suc [simp]: "eval e e' ==> eval (Suc e) (Suc e')"
     | eval_projr_1 [simp]: "eval e e' ==> eval (ProjR e) (ProjR e')"
     | eval_projr_2 [simp]: "eval (ProjR (Pair e1 e2)) e2"
     | eval_abort [simp]: "eval e e' ==> eval (Abort t e) (Abort t e')"
-    | eval_case_1 [simp]: "eval et et' ==> eval (Case et el er) (Case et el er)"
+    | eval_case_1 [simp]: "eval et et' ==> eval (Case et el er) (Case et' el er)"
     | eval_case_2 [simp]: "is_val e ==> eval (Case (InL t1 t2 e) el er) (subst e el)"
     | eval_case_3 [simp]: "is_val e ==> eval (Case (InR t1 t2 e) el er) (subst e er)"
     | eval_inl [simp]: "eval e e' ==> eval (InL t1 t2 e) (InL t1 t2 e')"
@@ -46,21 +39,14 @@ where eval_suc [simp]: "eval e e' ==> eval (Suc e) (Suc e')"
     | eval_unfold_1 [simp]: "eval e e' ==> eval (Unfold e) (Unfold e')"
     | eval_unfold_2 [simp]: "is_val e ==> eval (Unfold (Fold t e)) e"
 
-lemma canonical_nat: "is_val e ==> typecheck gam e Nat ==> 
-          e = Zero | (EX e'. e = Suc e' & typecheck gam e' Nat)"
-by (induction e, auto)
-
-lemma canonical_nat_no_vars: "is_val e ==> typecheck gam e Nat ==> typecheck gam' e Nat"
-by (induction e, auto) 
-
 lemma canonical_arrow: "is_val e ==> typecheck gam e (Arrow t1 t2) ==> 
               EX e'. e = Lam t1 e' & typecheck (extend gam t1) e' t2"
 by (induction e, auto)
 
-lemma canonical_triv: "is_val e ==> typecheck gam e Unit ==> e = Triv"
+lemma canonical_unit: "is_val e ==> typecheck gam e Unit ==> e = Triv"
 by (induction e, auto)
 
-lemma canonical_pair: "is_val e ==> typecheck gam e (Prod t1 t2) ==> 
+lemma canonical_prod: "is_val e ==> typecheck gam e (Prod t1 t2) ==> 
               EX e1 e2. e = Pair e1 e2 & typecheck gam e1 t1 & typecheck gam e2 t2"
 by (induction e, auto)
 
@@ -83,12 +69,6 @@ theorem progress: "typecheck gam e t ==> gam = empty_env ==> is_val e | (EX e'. 
 proof (induction gam e t rule: typecheck.induct)
 case tc_var
   thus ?case by simp
-next case tc_zero
-  thus ?case by simp
-next case tc_suc
-  thus ?case by (metis eval_suc is_val.simps(3))
-next case tc_isz
-  thus ?case by (metis eval_isz_1 eval_isz_2 eval_isz_3 is_val.simps(3) canonical_nat)
 next case tc_lam
   thus ?case by simp
 next case tc_appl
@@ -96,26 +76,26 @@ next case tc_appl
 next case tc_triv
   thus ?case by simp
 next case tc_pair
-  thus ?case by (metis eval_pair_1 eval_pair_2 is_val.simps(8))
+  thus ?case by (metis eval_pair_1 eval_pair_2 is_val.simps(5))
 next case tc_projl
-  thus ?case by (metis eval_projl_1 eval_projl_2 canonical_pair)
+  thus ?case by (metis eval_projl_1 eval_projl_2 canonical_prod)
 next case tc_projr
-  thus ?case by (metis eval_projr_1 eval_projr_2 canonical_pair)
+  thus ?case by (metis eval_projr_1 eval_projr_2 canonical_prod)
 next case tc_abort
   thus ?case by (metis eval_abort canonical_void)
 next case tc_case
   thus ?case 
-  by (metis eval_case_1 eval_case_2 eval_case_3 is_val.simps(13) is_val.simps(14) canonical_sum)
+  by (metis eval_case_1 eval_case_2 eval_case_3 is_val.simps(10) is_val.simps(11) canonical_sum)
 next case tc_inl
-  thus ?case by (metis eval_inl is_val.simps(13))
+  thus ?case by (metis eval_inl is_val.simps(10))
 next case tc_inr
-  thus ?case by (metis eval_inr is_val.simps(14))
+  thus ?case by (metis eval_inr is_val.simps(11))
 next case tc_fix
   thus ?case by (metis eval_fix)
 next case tc_fold
-  thus ?case by (metis eval_fold is_val.simps(16))
+  thus ?case by (metis eval_fold is_val.simps(13))
 next case tc_unfold
-  thus ?case by (metis canonical_rec eval_unfold_1 eval_unfold_2 is_val.simps(16))
+  thus ?case by (metis canonical_rec eval_unfold_1 eval_unfold_2 is_val.simps(13))
 qed
 
 end
