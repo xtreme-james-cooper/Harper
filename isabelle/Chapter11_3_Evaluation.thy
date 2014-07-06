@@ -20,7 +20,7 @@ where "is_val (Var v) = False"
 
 inductive eval :: "expr => expr => bool"
 where eval_suc [simp]: "eval e e' ==> eval (Suc e) (Suc e')"
-    | eval_rec_1 [simp]: "eval et et' ==> eval (Rec et e0 es) (Rec et e0 es)"
+    | eval_rec_1 [simp]: "eval et et' ==> eval (Rec et e0 es) (Rec et' e0 es)"
     | eval_rec_2 [simp]: "eval (Rec Zero e0 es) e0"
     | eval_rec_3 [simp]: "is_val et ==> 
             eval (Rec (Suc et) e0 es) (subst (Rec et e0 es) (subst et es))"
@@ -34,7 +34,7 @@ where eval_suc [simp]: "eval e e' ==> eval (Suc e) (Suc e')"
     | eval_projr_1 [simp]: "eval e e' ==> eval (ProjR e) (ProjR e')"
     | eval_projr_2 [simp]: "eval (ProjR (Pair e1 e2)) e2"
     | eval_abort [simp]: "eval e e' ==> eval (Abort t e) (Abort t e')"
-    | eval_case_1 [simp]: "eval et et' ==> eval (Case et el er) (Case et el er)"
+    | eval_case_1 [simp]: "eval et et' ==> eval (Case et el er) (Case et' el er)"
     | eval_case_2 [simp]: "is_val e ==> eval (Case (InL t1 t2 e) el er) (subst e el)"
     | eval_case_3 [simp]: "is_val e ==> eval (Case (InR t1 t2 e) el er) (subst e er)"
     | eval_inl [simp]: "eval e e' ==> eval (InL t1 t2 e) (InL t1 t2 e')"
@@ -51,10 +51,10 @@ lemma canonical_arrow: "is_val e ==> typecheck gam e (Arrow t1 t2) ==>
               EX e'. e = Lam t1 e' & typecheck (extend gam t1) e' t2"
 by (induction e, auto)
 
-lemma canonical_triv: "is_val e ==> typecheck gam e Unit ==> e = Triv"
+lemma canonical_unit: "is_val e ==> typecheck gam e Unit ==> e = Triv"
 by (induction e, auto)
 
-lemma canonical_pair: "is_val e ==> typecheck gam e (Prod t1 t2) ==> 
+lemma canonical_prod: "is_val e ==> typecheck gam e (Prod t1 t2) ==> 
               EX e1 e2. e = Pair e1 e2 & typecheck gam e1 t1 & typecheck gam e2 t2"
 by (induction e, auto)
 
@@ -128,9 +128,9 @@ next case tc_triv
 next case tc_pair
   thus ?case by (metis eval_pair_1 eval_pair_2 is_val.simps(8))
 next case tc_projl
-  thus ?case by (metis eval_projl_1 eval_projl_2 canonical_pair)
+  thus ?case by (metis eval_projl_1 eval_projl_2 canonical_prod)
 next case tc_projr
-  thus ?case by (metis eval_projr_1 eval_projr_2 canonical_pair)
+  thus ?case by (metis eval_projr_1 eval_projr_2 canonical_prod)
 next case tc_abort
   thus ?case by (metis eval_abort canonical_void)
 next case tc_case

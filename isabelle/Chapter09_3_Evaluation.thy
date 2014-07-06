@@ -12,7 +12,7 @@ where "is_val (Var v) = False"
 
 inductive eval :: "expr => expr => bool"
 where eval_suc [simp]: "eval e e' ==> eval (Suc e) (Suc e')"
-    | eval_rec_1 [simp]: "eval et et' ==> eval (Rec et e0 es) (Rec et e0 es)"
+    | eval_rec_1 [simp]: "eval et et' ==> eval (Rec et e0 es) (Rec et' e0 es)"
     | eval_rec_2 [simp]: "eval (Rec Zero e0 es) e0"
     | eval_rec_3 [simp]: "is_val et ==> 
             eval (Rec (Suc et) e0 es) (subst (Rec et e0 es) (subst et es))"

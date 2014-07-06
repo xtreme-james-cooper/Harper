@@ -55,6 +55,18 @@ by (induction gam, induction x, induction n, simp)
 lemma [simp]: "subr n (incr n var) = var"
 by (induction n, induction var, simp)
 
+lemma [simp]: "incr n n = next n"
+by (induction n, simp)
+
+lemma [simp]: "next v ~= v"
+by (induction v, simp)
+
+lemma [simp]: "subr v (next v) = v"
+by (induction v, simp)
+
+lemma [simp]: "incr v x ~= v"
+by (induction v, induction x, simp)
+
 lemma [simp]: "lookup empty_env x = None"
 by (cases x, simp add: empty_env_def)
 
