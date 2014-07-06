@@ -125,10 +125,34 @@ by (induction var, induction n, induction m, simp)
 lemma [simp]: "canswap first x"
 by (induction x, simp add: first_def)
 
+lemma [simp]: "canswap m n ==> canswap m (next n)"
+by (induction n, induction m, simp)
+
 lemma [simp]: "canswap m n ==> canswap (next m) (next n)"
 by (induction n, induction m, simp)
 
 lemma [simp]: "n in gam ==> canswap m n ==> m in gam"
 by (induction gam, induction n, induction m, simp)
+
+lemma [simp]: "canswap var del ==> canswap (incr n var) (next del)"
+by (induction del, induction n, induction var, simp)
+
+primrec env_map :: "('a => 'b) => 'a env => 'b env"
+where "env_map f (DBEnv n) = DBEnv (map f n)" 
+
+lemma [simp]: "env_map f empty_env = empty_env"
+by (simp add: empty_env_def)
+
+lemma [simp]: "lookup' env x = Some v ==> lookup' (map f env) x = Some (f v)"
+by (induction env x rule: lookup'.induct, simp_all)
+
+lemma [simp]: "lookup env x = Some v ==> lookup (env_map f env) x = Some (f v)"
+by (induction env, induction x, simp)
+
+lemma [simp]: "n <= length env ==> extend_at' n (map f env) (f t) = map f (extend_at' n env t)" 
+by (induction n env t rule: extend_at'.induct, simp_all)
+
+lemma [simp]: "n in env ==> extend_at n (env_map f env) (f t) = env_map f (extend_at n env t)" 
+by (induction env, induction n, simp)
 
 end
