@@ -55,7 +55,7 @@ lemma canonical_arrow: "is_val e ==> typecheck del gam e (Arrow t1 t2) ==>
 by (induction e, auto)
 
 lemma canonical_all: "is_val e ==> typecheck del gam e (All t) ==> 
-              EX e'. e = TyLam e' & typecheck (next del) gam e' t"
+              EX e'. e = TyLam e' & typecheck (next del) (env_map (type_insert first) gam) e' t"
 by (induction e, auto)
 
 lemma canonical_unit: "is_val e ==> typecheck del gam e Unit ==> e = Triv"
@@ -93,7 +93,9 @@ next case eval_appl_3
 next case eval_tyappl_1 
   thus ?case by fastforce
 next case (eval_tyappl_2 t' e)
-  then obtain tt where TT: "typecheck (next del) gam e tt & t = type_subst first t' tt" by force
+  then obtain tt where TT: "typecheck (next del) gam e tt & 
+                            is_type del t' & 
+                            t = type_subst first t' tt" by force
   hence "typecheck del (env_map (type_subst first t') gam) 
                        (subst_type first t' e) 
                        (type_subst first t' tt)" by simp

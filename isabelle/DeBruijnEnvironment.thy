@@ -137,6 +137,9 @@ by (induction gam, induction n, induction m, simp)
 lemma [simp]: "canswap var del ==> canswap (incr n var) (next del)"
 by (induction del, induction n, induction var, simp)
 
+lemma [simp]: "canswap n del ==> canswap v (next del) ==> canswap (subr n v) del"
+by (induction del, induction n, induction v, auto)
+
 primrec env_map :: "('a => 'b) => 'a env => 'b env"
 where "env_map f (DBEnv n) = DBEnv (map f n)" 
 
@@ -153,6 +156,9 @@ lemma [simp]: "n <= length env ==> extend_at' n (map f env) (f t) = map f (exten
 by (induction n env t rule: extend_at'.induct, simp_all)
 
 lemma [simp]: "n in env ==> extend_at n (env_map f env) (f t) = env_map f (extend_at n env t)" 
+by (induction env, induction n, simp)
+
+lemma [simp]: "n in env ==> n in (env_map f env)" 
 by (induction env, induction n, simp)
 
 end
