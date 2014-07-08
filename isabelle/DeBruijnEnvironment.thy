@@ -14,7 +14,7 @@ fun incr :: "var => var => var"
 where "incr (DBVar n) (DBVar v) = DBVar (if v < n then v else Suc v)" 
 
 fun subr :: "var => var => var"
-where "subr (DBVar n) (DBVar v) = DBVar (if v < n then v else v - 1)" 
+where "subr (DBVar n) (DBVar v) = DBVar (if v > n then v - 1 else v)" 
 
 datatype 'a env = DBEnv "'a list"
 
@@ -140,6 +140,15 @@ by (induction del, induction n, induction var, simp)
 lemma [simp]: "canswap n del ==> canswap v (next del) ==> canswap (subr n v) del"
 by (induction del, induction n, induction v, auto)
 
+lemma [simp]: "canswap m n ==> incr m (subr n v) = subr (next n) (incr m v)"
+by (induction m, induction n, induction v, auto)
+
+lemma [simp]: "canswap m n ==> incr m n = next n"
+by (induction m, induction n, simp)
+
+lemma [simp]: "canswap m n ==> v ~= n ==> incr m v ~= next n"
+by simp sorry
+
 primrec env_map :: "('a => 'b) => 'a env => 'b env"
 where "env_map f (DBEnv n) = DBEnv (map f n)" 
 
@@ -160,5 +169,8 @@ by (induction env, induction n, simp)
 
 lemma [simp]: "n in env ==> n in (env_map f env)" 
 by (induction env, induction n, simp)
+
+lemma [simp]: "env_map f (env_map g env) = env_map (f o g) env"
+by (induction env, simp)
 
 end

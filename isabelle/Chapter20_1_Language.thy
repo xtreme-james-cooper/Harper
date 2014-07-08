@@ -52,6 +52,31 @@ lemma [simp]: "canswap m n ==>
         type_insert m (type_insert n e) = type_insert (next n) (type_insert m e)"
 by (induction e arbitrary: n m, simp_all)
 
+lemma [simp]: "canswap m n ==> 
+        type_insert m (type_remove n e) = type_remove (next n) (type_insert m e)"
+by (induction e arbitrary: n m, simp_all)
+
+lemma [simp]: "canswap m n ==> type_insert m (type_subst' n t' t) =
+        type_subst' (next n) (type_insert m t') (type_insert m t)"
+by (induction t arbitrary: m n t', simp_all)
+
+lemma [simp]: "
+    (%t. type_remove (next n) 
+          (type_subst' (next n) (type_insert (next n) (type_insert first t')) t)) o 
+          (%t. type_insert first t) =
+    (%t. type_insert first t) o (%t. type_remove n (type_subst' n (type_insert n t') t))"
+proof
+  fix t
+  have "type_insert first (type_subst' n (type_insert n t') t) =
+      type_subst' (next n) (type_insert (next n) (type_insert first t')) (type_insert first t)" 
+  by simp
+  thus "((%t. type_remove (next n)
+               (type_subst' (next n) (type_insert (next n) (type_insert first t')) t)) o
+         type_insert first)
+         t =
+        (type_insert first o (%t. type_remove n (type_subst' n (type_insert n t') t))) t" by simp
+qed
+
 datatype expr = 
   Var var
 | Zero
@@ -162,5 +187,29 @@ where "subst_type n t' (Var v) = Var v"
                       InL (type_subst n t' t1) (type_subst n t' t2) (subst_type n t' e)"
     | "subst_type n t' (InR t1 t2 e) = 
                       InR (type_subst n t' t1) (type_subst n t' t2) (subst_type n t' e)"
+
+primrec expr_insert_type :: "var => expr => expr"
+where "expr_insert_type n (Var v) = Var v"
+    | "expr_insert_type n Zero = Zero"
+    | "expr_insert_type n (Suc e) = Suc (expr_insert_type n e)"
+    | "expr_insert_type n (Iter et e0 es) = 
+                      Iter (expr_insert_type n et) 
+                           (expr_insert_type n e0) 
+                           (expr_insert_type n es)"
+    | "expr_insert_type n (Lam t e) = Lam (type_insert n t) (expr_insert_type n e)"
+    | "expr_insert_type n (Appl e1 e2) = Appl (expr_insert_type n e1) (expr_insert_type n e2)"
+    | "expr_insert_type n (TyLam e) = TyLam (expr_insert_type (next n) e)"
+    | "expr_insert_type n (TyAppl t e) = TyAppl (type_insert n t) (expr_insert_type n e)"
+    | "expr_insert_type n Triv = Triv"
+    | "expr_insert_type n (Pair e1 e2) = Pair (expr_insert_type n e1) (expr_insert_type n e2)"
+    | "expr_insert_type n (ProjL e) = ProjL (expr_insert_type n e)"
+    | "expr_insert_type n (ProjR e) = ProjR (expr_insert_type n e)"
+    | "expr_insert_type n (Abort t e) = Abort (type_insert n t) (expr_insert_type n e)"
+    | "expr_insert_type n (Case et el er) = 
+                      Case (expr_insert_type n et) (expr_insert_type n el) (expr_insert_type n er)"
+    | "expr_insert_type n (InL t1 t2 e) = 
+                      InL (type_insert n t1) (type_insert n t2) (expr_insert_type n e)"
+    | "expr_insert_type n (InR t1 t2 e) = 
+                      InR (type_insert n t1) (type_insert n t2) (expr_insert_type n e)"
 
 end

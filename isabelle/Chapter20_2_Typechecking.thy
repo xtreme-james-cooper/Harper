@@ -89,14 +89,10 @@ next case tc_projr
 next case tc_abort
   thus ?case by simp
 next case (tc_case del gam et t1 t2 el t er)
-
-  have X: "typecheck del (extend_at n gam t') (insert n et) (Sum t1 t2)" by simp sorry
-
-
-  have Y: "typecheck del (extend (extend_at n gam t') t1) (insert (next n) el) t" by simp sorry
-
-
-  have "typecheck del (extend (extend_at n gam t') t2) (insert (next n) er) t" by simp sorry
+  from tc_case have X: "typecheck del (extend_at n gam t') (insert n et) (Sum t1 t2)" by simp
+  from tc_case have Y: "typecheck del (extend (extend_at n gam t') t1) (insert (next n) el) t" 
+  by simp
+  from tc_case have "typecheck del (extend (extend_at n gam t') t2) (insert (next n) er) t" by simp
   with X Y show ?case by simp
 next case tc_inl
   thus ?case by simp
@@ -106,6 +102,46 @@ qed
 
 lemma [simp]: "is_type del t ==> is_type (next del) t"
 by (induction t arbitrary: del, simp_all)
+
+lemma [simp]: "is_type del t ==> is_type (next del) (type_insert n t)"
+by (induction t arbitrary: n del, simp_all)
+
+lemma [simp]: "typecheck del gam e t ==> 
+        typecheck (next del) (env_map (type_insert n) gam) (expr_insert_type n e) (type_insert n t)" 
+proof (induction del gam e t arbitrary: n rule: typecheck.induct)
+case tc_var
+  thus ?case by simp
+next case tc_zero
+  thus ?case by simp
+next case tc_suc
+  thus ?case by simp
+next case tc_rec
+  thus ?case by simp
+next case (tc_lam del t1 gam e t2)
+  thus ?case by simp
+next case tc_appl
+  thus ?case by simp sorry
+next case tc_tylam
+  thus ?case by simp sorry
+next case tc_tyappl
+  thus ?case by simp sorry
+next case tc_triv
+  thus ?case by simp
+next case tc_pair
+  thus ?case by simp
+next case tc_projl
+  thus ?case by simp sorry
+next case tc_projr
+  thus ?case by simp sorry
+next case tc_abort
+  thus ?case by simp
+next case tc_case
+  thus ?case by simp sorry
+next case tc_inl
+  thus ?case by simp
+next case tc_inr
+  thus ?case by simp
+qed
 
 lemma [simp]: "typecheck del gam e t ==> typecheck (next del) gam e t"
 by (induction del gam e t rule: typecheck.induct, simp_all)
@@ -125,7 +161,7 @@ next case tc_lam
   thus ?case by simp
 next case tc_appl
   thus ?case by fastforce
-next case (tc_tylam del gam e t)
+next case (tc_tylam del e t)
   thus ?case by simp sorry
 next case tc_tyappl
   thus ?case by simp
@@ -150,9 +186,6 @@ qed
 lemma [simp]: "typecheck del (extend gam t') e t ==> typecheck del gam e' t' ==> 
                           typecheck del gam (subst e' e) t"
 by (simp add: subst_def)
-
-lemma [simp]: "is_type del t ==> is_type (next del) (type_insert n t)"
-by (induction t arbitrary: n del, simp_all)
 
 lemma [simp]: "canswap n del ==> is_type (next del) t ==> is_type del t' ==> 
                 is_type del (type_remove n (type_subst' n (type_insert n t') t))"
@@ -193,33 +226,9 @@ next case (tc_appl gam e1 t2 t e2)
   from tc_appl f_def have "typecheck del (env_map f gam) (subst_type n t' e2) (f t2)" by simp
   with f_def X show ?case by simp
 next case (tc_tylam gam e t)
-
-  have "typecheck del (env_map (\<lambda>t. type_remove n (type_subst' n (type_insert n t') t)) gam)
-     (subst_type n t' (TyLam e)) (type_remove n (type_subst' n (type_insert n t') (type.All t)))" by simp sorry
-  thus ?case by simp
-next case (tc_tyappl tt' gam e t)
-  from tc_tyappl have "is_type (next del) tt'" by simp
-  from tc_tyappl have "typecheck (next del) gam e (type.All t)" by simp
-  from tc_tyappl have "next del = next ddel \<Longrightarrow>
-  is_type ddel tt' \<Longrightarrow>
-  canswap nn ddel \<Longrightarrow>
-  typecheck ddel (env_map (\<lambda>t. type_remove nn (type_subst' nn (type_insert nn tt') t)) gam)
-   (subst_type nn tt' e) (type_remove nn (type_subst' nn (type_insert nn tt') (type.All t)))" by simp
-  from tc_tyappl have "is_type del t'" by simp
-  from tc_tyappl have "canswap n del" by simp
-
-
-  have "is_type del (type_subst n t' tt') ==> 
-        typecheck del (env_map (\<lambda>t. type_remove n (type_subst' n (type_insert n t') t)) gam) (subst_type n t' e) (All t) ==> 
-        typecheck del (env_map (\<lambda>t. type_remove n (type_subst' n (type_insert n t') t)) gam) 
-     (TyAppl (type_subst n t' tt') (subst_type n t' e)) 
-     (type_subst first (type_subst n t' tt') t)" by simp
-
-
-  have "typecheck del (env_map (\<lambda>t. type_remove n (type_subst' n (type_insert n t') t)) gam)
-     (TyAppl (type_subst n t' tt') (subst_type n t' e))
-     (type_subst n t' (type_subst first tt' t))" by simp sorry
-  with type_subst_def show ?case by simp
+  thus ?case by simp sorry
+next case (tc_tyappl t'' gam e t)
+  thus ?case by simp sorry
 next case tc_triv
   thus ?case by simp
 next case tc_pair
