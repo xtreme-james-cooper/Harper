@@ -147,7 +147,7 @@ lemma [simp]: "canswap m n ==> incr m n = next n"
 by (induction m, induction n, simp)
 
 lemma [simp]: "canswap m n ==> v ~= n ==> incr m v ~= next n"
-by simp sorry
+by (induction m, induction n, induction v, simp)
 
 primrec env_map :: "('a => 'b) => 'a env => 'b env"
 where "env_map f (DBEnv n) = DBEnv (map f n)" 

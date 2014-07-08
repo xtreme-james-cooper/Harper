@@ -53,6 +53,10 @@ lemma [simp]: "canswap m n ==>
 by (induction e arbitrary: n m, simp_all)
 
 lemma [simp]: "canswap m n ==> 
+        type_insert m o type_insert n = type_insert (next n) o type_insert m"
+by auto
+
+lemma [simp]: "canswap m n ==> 
         type_insert m (type_remove n e) = type_remove (next n) (type_insert m e)"
 by (induction e arbitrary: n m, simp_all)
 
@@ -211,5 +215,8 @@ where "expr_insert_type n (Var v) = Var v"
                       InL (type_insert n t1) (type_insert n t2) (expr_insert_type n e)"
     | "expr_insert_type n (InR t1 t2 e) = 
                       InR (type_insert n t1) (type_insert n t2) (expr_insert_type n e)"
+
+lemma [simp]: "insert n (expr_insert_type m e) = expr_insert_type m (insert n e)"
+by (induction e arbitrary: n m, simp_all)
 
 end

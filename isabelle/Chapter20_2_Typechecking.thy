@@ -22,7 +22,8 @@ where tc_var [simp]: "lookup gam x = Some t ==> typecheck del gam (Var x) t"
                 typecheck del gam (Lam t1 e) (Arrow t1 t2)"
     | tc_appl [simp]: "typecheck del gam e1 (Arrow t2 t) ==> typecheck del gam e2 t2 ==> 
                 typecheck del gam (Appl e1 e2) t"
-    | tc_tylam [simp]: "typecheck (next del) (env_map (type_insert first) gam) e t ==> 
+    | tc_tylam [simp]: "typecheck (next del) (env_map (type_insert first) gam) 
+                                  (expr_insert_type first e) t ==> 
                 typecheck del gam (TyLam e) (All t)"
     | tc_tyappl [simp]: "is_type del t' ==> typecheck del gam e (All t) ==> 
                 typecheck del gam (TyAppl t' e) (type_subst first t' t)"
@@ -73,8 +74,11 @@ next case tc_lam
 next case tc_appl
   thus ?case by (metis insert.simps(6) typecheck.tc_appl)
 next case (tc_tylam del gam e t)
-  hence "n in env_map (type_insert first) gam" by simp
-  with tc_tylam have "typecheck (next del) (extend_at n (env_map (type_insert first) gam) (type_insert first t')) (insert n e) t" by metis
+  from tc_tylam have "n in env_map (type_insert first) gam ==>
+      typecheck (next del) (extend_at n (env_map (type_insert first) gam) (type_insert first t'))
+          (insert n (expr_insert_type first e)) t" by fast
+  with tc_tylam have "typecheck (next del) (extend_at n (env_map (type_insert first) gam) 
+          (type_insert first t')) (insert n (expr_insert_type first e)) t" by simp
   with tc_tylam show ?case by simp
 next case tc_tyappl
   thus ?case by simp
@@ -117,12 +121,17 @@ next case tc_suc
   thus ?case by simp
 next case tc_rec
   thus ?case by simp
-next case (tc_lam del t1 gam e t2)
+next case tc_lam
   thus ?case by simp
 next case tc_appl
-  thus ?case by simp sorry
-next case tc_tylam
-  thus ?case by simp sorry
+  thus ?case by (metis expr_insert_type.simps(6) type_insert.simps(3) typecheck.tc_appl)
+next case (tc_tylam del gam e t)
+  hence "typecheck (next (next del)) (env_map (type_insert (next n)) (env_map (type_insert first) gam))
+   (expr_insert_type (next n) (expr_insert_type first e)) (type_insert (next n) t)" by simp
+
+  hence "typecheck (next (next del)) (env_map (type_insert first) (env_map (type_insert n) gam)) 
+   (expr_insert_type first (expr_insert_type (next n) e)) (type_insert (next n) t)" by simp sorry
+  thus ?case by simp
 next case tc_tyappl
   thus ?case by simp sorry
 next case tc_triv
@@ -130,13 +139,19 @@ next case tc_triv
 next case tc_pair
   thus ?case by simp
 next case tc_projl
-  thus ?case by simp sorry
+  thus ?case by (metis expr_insert_type.simps(11) type_insert.simps(6) typecheck.tc_projl)
 next case tc_projr
-  thus ?case by simp sorry
+  thus ?case by (metis expr_insert_type.simps(12) type_insert.simps(6) typecheck.tc_projr)
 next case tc_abort
   thus ?case by simp
-next case tc_case
-  thus ?case by simp sorry
+next case (tc_case del gam et t1 t2 el t er)
+  from tc_case have X: "typecheck (next del) (env_map (type_insert n) gam) 
+              (expr_insert_type n et) (Sum (type_insert n t1) (type_insert n t2))" by simp
+  from tc_case have Y: "typecheck (next del) (extend (env_map (type_insert n) gam) 
+              (type_insert n t1)) (expr_insert_type n el) (type_insert n t)" by simp 
+  from tc_case have "typecheck (next del) (extend (env_map (type_insert n) gam) 
+              (type_insert n t2)) (expr_insert_type n er) (type_insert n t)" by simp
+  with X Y show ?case by simp
 next case tc_inl
   thus ?case by simp
 next case tc_inr
