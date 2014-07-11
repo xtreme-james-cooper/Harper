@@ -9,6 +9,7 @@ imports
   Chapter16_5_Abbreviation
   Chapter17
   Chapter18_3_Evaluation
+  Chapter20_3_Evaluation
 begin
 
 datatype OK = OK

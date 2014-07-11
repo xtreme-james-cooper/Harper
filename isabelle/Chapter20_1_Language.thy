@@ -168,30 +168,6 @@ by (induction e arbitrary: n, simp_all)
 lemma [simp]: "canswap m n ==> insert m (insert n e) = insert (next n) (insert m e)"
 by (induction e arbitrary: n m, simp_all)
 
-primrec subst_type :: "var => type => expr => expr"
-where "subst_type n t' (Var v) = Var v"
-    | "subst_type n t' Zero = Zero"
-    | "subst_type n t' (Suc e) = Suc (subst_type n t' e)"
-    | "subst_type n t' (Iter et e0 es) = 
-                      Iter (subst_type n t' et) 
-                           (subst_type n t' e0) 
-                           (subst_type n t' es)"
-    | "subst_type n t' (Lam t e) = Lam (type_subst n t' t) (subst_type n t' e)"
-    | "subst_type n t' (Appl e1 e2) = Appl (subst_type n t' e1) (subst_type n t' e2)"
-    | "subst_type n t' (TyLam e) = TyLam (subst_type (next n) (type_insert first t') e)"
-    | "subst_type n t' (TyAppl t e) = TyAppl (type_subst n t' t) (subst_type n t' e)"
-    | "subst_type n t' Triv = Triv"
-    | "subst_type n t' (Pair e1 e2) = Pair (subst_type n t' e1) (subst_type n t' e2)"
-    | "subst_type n t' (ProjL e) = ProjL (subst_type n t' e)"
-    | "subst_type n t' (ProjR e) = ProjR (subst_type n t' e)"
-    | "subst_type n t' (Abort t e) = Abort (type_subst n t' t) (subst_type n t' e)"
-    | "subst_type n t' (Case et el er) = 
-                      Case (subst_type n t' et) (subst_type n t' el) (subst_type n t' er)"
-    | "subst_type n t' (InL t1 t2 e) = 
-                      InL (type_subst n t' t1) (type_subst n t' t2) (subst_type n t' e)"
-    | "subst_type n t' (InR t1 t2 e) = 
-                      InR (type_subst n t' t1) (type_subst n t' t2) (subst_type n t' e)"
-
 primrec expr_insert_type :: "var => expr => expr"
 where "expr_insert_type n (Var v) = Var v"
     | "expr_insert_type n Zero = Zero"
@@ -216,7 +192,68 @@ where "expr_insert_type n (Var v) = Var v"
     | "expr_insert_type n (InR t1 t2 e) = 
                       InR (type_insert n t1) (type_insert n t2) (expr_insert_type n e)"
 
+primrec expr_remove_type :: "var => expr => expr"
+where "expr_remove_type n (Var v) = Var v"
+    | "expr_remove_type n Zero = Zero"
+    | "expr_remove_type n (Suc e) = Suc (expr_remove_type n e)"
+    | "expr_remove_type n (Iter et e0 es) = 
+                      Iter (expr_remove_type n et) 
+                           (expr_remove_type n e0) 
+                           (expr_remove_type n es)"
+    | "expr_remove_type n (Lam t e) = Lam (type_remove n t) (expr_remove_type n e)"
+    | "expr_remove_type n (Appl e1 e2) = Appl (expr_remove_type n e1) (expr_remove_type n e2)"
+    | "expr_remove_type n (TyLam e) = TyLam (expr_remove_type (next n) e)"
+    | "expr_remove_type n (TyAppl t e) = TyAppl (type_remove n t) (expr_remove_type n e)"
+    | "expr_remove_type n Triv = Triv"
+    | "expr_remove_type n (Pair e1 e2) = Pair (expr_remove_type n e1) (expr_remove_type n e2)"
+    | "expr_remove_type n (ProjL e) = ProjL (expr_remove_type n e)"
+    | "expr_remove_type n (ProjR e) = ProjR (expr_remove_type n e)"
+    | "expr_remove_type n (Abort t e) = Abort (type_remove n t) (expr_remove_type n e)"
+    | "expr_remove_type n (Case et el er) = 
+                      Case (expr_remove_type n et) (expr_remove_type n el) (expr_remove_type n er)"
+    | "expr_remove_type n (InL t1 t2 e) = 
+                      InL (type_remove n t1) (type_remove n t2) (expr_remove_type n e)"
+    | "expr_remove_type n (InR t1 t2 e) = 
+                      InR (type_remove n t1) (type_remove n t2) (expr_remove_type n e)"
+
+primrec expr_subst_type' :: "var => type => expr => expr"
+where "expr_subst_type' n t' (Var v) = Var v"
+    | "expr_subst_type' n t' Zero = Zero"
+    | "expr_subst_type' n t' (Suc e) = Suc (expr_subst_type' n t' e)"
+    | "expr_subst_type' n t' (Iter et e0 es) = 
+                      Iter (expr_subst_type' n t' et) 
+                           (expr_subst_type' n t' e0) 
+                           (expr_subst_type' n t' es)"
+    | "expr_subst_type' n t' (Lam t e) = Lam (type_subst n t' t) (expr_subst_type' n t' e)"
+    | "expr_subst_type' n t' (Appl e1 e2) = 
+                Appl (expr_subst_type' n t' e1) (expr_subst_type' n t' e2)"
+    | "expr_subst_type' n t' (TyLam e) = TyLam (expr_subst_type' (next n) (type_insert first t') e)"
+    | "expr_subst_type' n t' (TyAppl t e) = TyAppl (type_subst n t' t) (expr_subst_type' n t' e)"
+    | "expr_subst_type' n t' Triv = Triv"
+    | "expr_subst_type' n t' (Pair e1 e2) = 
+            Pair (expr_subst_type' n t' e1) (expr_subst_type' n t' e2)"
+    | "expr_subst_type' n t' (ProjL e) = ProjL (expr_subst_type' n t' e)"
+    | "expr_subst_type' n t' (ProjR e) = ProjR (expr_subst_type' n t' e)"
+    | "expr_subst_type' n t' (Abort t e) = Abort (type_subst n t' t) (expr_subst_type' n t' e)"
+    | "expr_subst_type' n t' (Case et el er) = 
+            Case (expr_subst_type' n t' et) (expr_subst_type' n t' el) (expr_subst_type' n t' er)"
+    | "expr_subst_type' n t' (InL t1 t2 e) = 
+                      InL (type_subst n t' t1) (type_subst n t' t2) (expr_subst_type' n t' e)"
+    | "expr_subst_type' n t' (InR t1 t2 e) = 
+                      InR (type_subst n t' t1) (type_subst n t' t2) (expr_subst_type' n t' e)"
+
+definition expr_subst_type :: "type => expr => expr"
+where "expr_subst_type t e = 
+          expr_remove_type first (expr_subst_type' first (type_insert first t) e)"
+
 lemma [simp]: "insert n (expr_insert_type m e) = expr_insert_type m (insert n e)"
+by (induction e arbitrary: n m, simp_all)
+
+lemma [simp]: "remove n (expr_insert_type m e) = expr_insert_type m (remove n e)"
+by (induction e arbitrary: n m, simp_all)
+
+lemma [simp]: "canswap n m ==> expr_insert_type n (expr_insert_type m e) = 
+                    expr_insert_type (next m) (expr_insert_type n e)"
 by (induction e arbitrary: n m, simp_all)
 
 end

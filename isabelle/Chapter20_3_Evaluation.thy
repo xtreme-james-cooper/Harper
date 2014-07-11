@@ -29,7 +29,7 @@ where eval_suc [simp]: "eval e e' ==> eval (Suc e) (Suc e')"
     | eval_appl_2 [simp]: "is_val e1 ==> eval e2 e2' ==> eval (Appl e1 e2) (Appl e1 e2')"
     | eval_appl_3 [simp]: "is_val e2 ==> eval (Appl (Lam t2 e1) e2) (subst e2 e1)"
     | eval_tyappl_1 [simp]: "eval e e' ==> eval (TyAppl t e) (TyAppl t e')"
-    | eval_tyappl_2 [simp]: "eval (TyAppl t (TyLam e)) (subst_type first t e)"
+    | eval_tyappl_2 [simp]: "eval (TyAppl t (TyLam e)) (expr_subst_type t e)"
     | eval_pair_1 [simp]: "eval e1 e1' ==> eval (Pair e1 e2) (Pair e1' e2)"
     | eval_pair_2 [simp]: "is_val e1 ==> eval e2 e2' ==> eval (Pair e1 e2) (Pair e1 e2')"
     | eval_projl_1 [simp]: "eval e e' ==> eval (ProjL e) (ProjL e')"
@@ -98,11 +98,11 @@ next case (eval_tyappl_2 t' e)
          typecheck (next del) (env_map (type_insert first) gam) (expr_insert_type first e) tt & 
          t = type_subst first t' tt" by fast
 
-  have "typecheck (next del) ggam e tt ==> is_type del t' ==> canswap n del ==> 
-        typecheck del (env_map (type_subst n t') ggam) (subst_type n t' e) (type_subst n t' tt)" by simp
+  from TT have "typecheck (next del) ggam e tt ==> is_type del t' ==> canswap first del ==> 
+        typecheck del (env_map (type_subst first t') ggam) (expr_subst_type t' e) (type_subst first t' tt)" by simp
 
-  have "typecheck del gam (subst_type first t' e) (type_subst first t' tt)" by simp sorry
-  with TT show  ?case by simp
+  have "typecheck del gam (expr_subst_type t' e) (type_subst first t' tt)" by simp sorry
+  with TT show ?case by simp
 next case eval_pair_1 
   thus ?case by fastforce
 next case eval_pair_2 
