@@ -173,4 +173,12 @@ by (induction env, induction n, simp)
 lemma [simp]: "env_map f (env_map g env) = env_map (f o g) env"
 by (induction env, simp)
 
+fun update' :: "'a list => nat => 'a => 'a list"
+where "update' [] n a = undefined"
+    | "update' (b # bs) 0 a = a # bs"
+    | "update' (b # bs) (Suc n) a = b # update' bs n a"
+
+fun update :: "'a env => var => 'a => 'a env"
+where "update (DBEnv e) (DBVar v) a = DBEnv (update' e v a)" 
+
 end

@@ -3,6 +3,7 @@ imports Chapter36_2_Typechecking
 begin
 
 primrec is_val :: "expr => bool"
+    and is_val_cmd :: "cmnd => bool"
 where "is_val (Var v) = False"
     | "is_val Zero = True"
     | "is_val (Suc e) = is_val e"
@@ -18,8 +19,21 @@ where "is_val (Var v) = False"
     | "is_val (InL t1 t2 e) = is_val e"
     | "is_val (InR t1 t2 e) = is_val e"
     | "is_val (Fix t e) = False"
+    | "is_val (Cmd c) = True"
+    | "is_val_cmd (Return e) = is_val e"
+    | "is_val_cmd (Bind e c) = False"
+    | "is_val_cmd (Declare e c) = False"
+    | "is_val_cmd (Get v) = False"
+    | "is_val_cmd (Set v e) = False"
+
+definition conforms_to :: "expr env => type env => bool"
+where "conforms_to s g = 
+          (ALL x. x in s --> x in g &
+              (EX e. lookup s x = Some e & is_val e & 
+                  (EX t. lookup g x = Some t & typecheck empty_env empty_env e t)))"
 
 inductive eval :: "expr => expr => bool"
+      and eval_cmd :: "cmnd => expr env => cmnd => expr env => bool"
 where eval_suc [simp]: "eval e e' ==> eval (Suc e) (Suc e')"
     | eval_isz_1 [simp]: "eval et et' ==> eval (IsZ et e0 es) (IsZ et' e0 es)"
     | eval_isz_2 [simp]: "eval (IsZ Zero e0 es) e0"
@@ -40,46 +54,127 @@ where eval_suc [simp]: "eval e e' ==> eval (Suc e) (Suc e')"
     | eval_inl [simp]: "eval e e' ==> eval (InL t1 t2 e) (InL t1 t2 e')"
     | eval_inr [simp]: "eval e e' ==> eval (InR t1 t2 e) (InR t1 t2 e')"
     | eval_fix [simp]: "eval (Fix t e) (subst (Fix t e) e)"
+    | eval_ret [simp]: "eval e e' ==> eval_cmd (Return e) s (Return e') s"
+    | eval_bind_1 [simp]: "eval e e' ==> eval_cmd (Bind e c) s (Bind e' c) s"
+    | eval_bind_2 [simp]: "eval_cmd c s c' s' ==> eval_cmd (Bind (Cmd c) c2) s (Bind (Cmd c') c2) s'"
+    | eval_bind_3 [simp]: "is_val e ==> eval_cmd (Bind (Cmd (Return e)) c) s (subst_cmd e c) s"
+    | eval_decl_1 [simp]: "eval e e' ==> eval_cmd (Declare e c) s (Declare e' c) s"
+    | eval_decl_2 [simp]: "is_val e ==> eval_cmd c (extend s e) c' s' ==>
+                eval_cmd (Declare e c) s (Declare e c') s'"
+    | eval_decl_3 [simp]: "is_val e ==> is_val e2 ==> 
+                eval_cmd (Delcare e (Return e2)) s (Return e2) s'"
+    | eval_get [simp]: "lookup s v = Some e ==> eval_cmd (Get v) s (Return e) s"
+    | eval_set_1 [simp]: "eval e e' ==> eval_cmd (Set v e) s (Set v e') s"
+    | eval_set_2 [simp]: "is_val e ==> eval_cmd (Set v e) s (Return e) (update s v e)"
 
-lemma canonical_nat: "is_val e ==> typecheck gam e Nat ==> 
-          e = Zero | (EX e'. e = Suc e' & typecheck gam e' Nat)"
-by (induction e, auto) sorry
+lemma canonical_nat: "is_val e ==> typecheck gam sig e Nat ==> 
+          e = Zero | (EX e'. e = Suc e' & typecheck gam sig e' Nat)"
+by (induction e, auto)
 
-lemma canonical_nat_no_vars: "is_val e ==> typecheck gam e Nat ==> typecheck gam' e Nat"
-by (induction e, auto) sorry
+lemma canonical_nat_no_vars: "is_val e ==> typecheck gam sig e Nat ==> typecheck gam' sig e Nat"
+by (induction e, auto)
 
-lemma canonical_arrow: "is_val e ==> typecheck gam e (Arrow t1 t2) ==> 
-              EX e'. e = Lam t1 e' & typecheck (extend gam t1) e' t2"
-by (induction e, auto) sorry
+lemma canonical_arrow: "is_val e ==> typecheck gam sig e (Arrow t1 t2) ==> 
+              EX e'. e = Lam t1 e' & typecheck (extend gam t1) sig e' t2"
+by (induction e, auto)
 
-lemma canonical_unit: "is_val e ==> typecheck gam e Unit ==> e = Triv"
-by (induction e, auto) sorry
+lemma canonical_unit: "is_val e ==> typecheck gam sig e Unit ==> e = Triv"
+by (induction e, auto)
 
-lemma canonical_prod: "is_val e ==> typecheck gam e (Prod t1 t2) ==> 
-              EX e1 e2. e = Pair e1 e2 & typecheck gam e1 t1 & typecheck gam e2 t2"
-by (induction e, auto) sorry
+lemma canonical_prod: "is_val e ==> typecheck gam sig e (Prod t1 t2) ==> 
+              EX e1 e2. e = Pair e1 e2 & typecheck gam sig e1 t1 & typecheck gam sig e2 t2"
+by (induction e, auto)
 
-lemma canonical_void: "is_val e ==> typecheck gam e Void ==> False"
-by (induction e, auto) sorry
+lemma canonical_void: "is_val e ==> typecheck gam sig e Void ==> False"
+by (induction e, auto)
 
-lemma canonical_sum: "is_val e ==> typecheck gam e (Sum t1 t2) ==> 
-          (EX e'. e = InL t1 t2 e' & typecheck gam e' t1) | 
-          (EX e'. e = InR t1 t2 e' & typecheck gam e' t2)"
-by (induction e, auto) sorry
+lemma canonical_sum: "is_val e ==> typecheck gam sig e (Sum t1 t2) ==> 
+          (EX e'. e = InL t1 t2 e' & typecheck gam sig e' t1) | 
+          (EX e'. e = InR t1 t2 e' & typecheck gam sig e' t2)"
+by (induction e, auto)
 
-theorem preservation: "eval e e' ==> typecheck gam e t ==> typecheck gam e' t"
-by (induction e e' arbitrary: t rule: eval.induct, fastforce+)
+lemma canonical_command: "is_val e ==> typecheck gam sig e (Command t) ==> 
+          EX c. e = Cmd c & typecheck_cmd gam sig c t"
+by (induction e, auto)
 
-theorem progress: "typecheck gam e t ==> gam = empty_env ==> is_val e | (EX e'. eval e e')"
-proof (induction gam e t rule: typecheck.induct)
+theorem preservation: "eval e e' ==> typecheck gam sig e t ==> typecheck gam sig e' t"
+    and preservation_cmd: "eval_cmd c s c' s' ==> conforms_to s sig ==> typecheck_cmd gam sig c t ==> 
+              typecheck_cmd gam sig c' t & conforms_to s' sig"
+proof (induction arbitrary: t and rule: eval_eval_cmd.inducts)
+case eval_suc
+  thus ?case by fastforce
+next case eval_isz_1
+  thus ?case by fastforce
+next case eval_isz_2
+  thus ?case by fastforce
+next case eval_isz_3
+  thus ?case by fastforce
+next case eval_appl_1
+  thus ?case by fastforce
+next case eval_appl_2
+  thus ?case by fastforce
+next case eval_appl_3
+  thus ?case by fastforce
+next case eval_pair_1
+  thus ?case by fastforce
+next case eval_pair_2
+  thus ?case by fastforce
+next case eval_projl_1
+  thus ?case by fastforce
+next case eval_projl_2
+  thus ?case by fastforce
+next case eval_projr_1
+  thus ?case by fastforce
+next case eval_projr_2
+  thus ?case by fastforce
+next case eval_abort
+  thus ?case by fastforce
+next case eval_case_1
+  thus ?case by fastforce
+next case eval_case_2
+  thus ?case by fastforce
+next case eval_case_3
+  thus ?case by fastforce
+next case eval_inl
+  thus ?case by fastforce
+next case eval_inr
+  thus ?case by fastforce
+next case eval_fix
+  thus ?case by fastforce
+next case eval_ret
+  thus ?case by fastforce
+next case eval_bind_1
+  thus ?case by fastforce
+next case eval_bind_2
+  thus ?case by simp sorry
+next case eval_bind_3
+  thus ?case by fastforce
+next case eval_decl_1
+  thus ?case by fastforce
+next case (eval_decl_2 e c s c' s')
+  thus ?case by simp sorry
+next case eval_decl_3
+  thus ?case by simp sorry
+next case eval_get
+  thus ?case by simp sorry
+next case eval_set_1
+  thus ?case by fastforce
+next case eval_set_2
+  thus ?case by simp sorry
+qed
+
+theorem progress: "typecheck gam sig e t ==> gam = empty_env ==> is_val e | (EX e'. eval e e')"
+    and progress_cmd: "typecheck_cmd gam sig c ==> gam = empty_env ==> 
+              is_val_cmd c | (EX c' s'. eval_cmd c s c' s')"
+proof (induction rule: typecheck_typecheck_cmd.inducts)
 case tc_var
   thus ?case by simp
 next case tc_zero
   thus ?case by simp
 next case tc_suc
-  thus ?case by (metis eval_suc is_val.simps(3))
+  thus ?case by (metis eval_suc is_val_is_val_cmd.simps(3))
 next case tc_isz
-  thus ?case by (metis eval_isz_1 eval_isz_2 eval_isz_3 is_val.simps(3) canonical_nat)
+  thus ?case by (metis eval_isz_1 eval_isz_2 eval_isz_3 is_val_is_val_cmd.simps(3) canonical_nat)
 next case tc_lam
   thus ?case by simp
 next case tc_appl
@@ -87,7 +182,7 @@ next case tc_appl
 next case tc_triv
   thus ?case by simp
 next case tc_pair
-  thus ?case by (metis eval_pair_1 eval_pair_2 is_val.simps(8))
+  thus ?case by (metis eval_pair_1 eval_pair_2 is_val_is_val_cmd.simps(8))
 next case tc_projl
   thus ?case by (metis eval_projl_1 eval_projl_2 canonical_prod)
 next case tc_projr
@@ -96,13 +191,41 @@ next case tc_abort
   thus ?case by (metis eval_abort canonical_void)
 next case tc_case
   thus ?case 
-  by (metis eval_case_1 eval_case_2 eval_case_3 is_val.simps(13) is_val.simps(14) canonical_sum)
+  by (metis eval_case_1 eval_case_2 eval_case_3 is_val_is_val_cmd.simps(13) 
+            is_val_is_val_cmd.simps(14) canonical_sum)
 next case tc_inl
-  thus ?case by (metis eval_inl is_val.simps(13))
+  thus ?case by (metis eval_inl is_val_is_val_cmd.simps(13))
 next case tc_inr
-  thus ?case by (metis eval_inr is_val.simps(14))
+  thus ?case by (metis eval_inr is_val_is_val_cmd.simps(14))
 next case tc_fix
   thus ?case by (metis eval_fix)
+next case tc_cmd
+  thus ?case by simp
+next case tc_retn
+  thus ?case by (metis eval_ret is_val_is_val_cmd.simps(17))
+next case (tc_bind gam sig e c)
+  thus ?case
+  proof (cases "is_val e")
+  case True
+    from tc_bind have "typecheck gam sig e Command" by simp
+    from tc_bind have "typecheck_cmd (extend gam type.Nat) sig c" by simp
+    from tc_bind have "extend gam type.Nat = empty_env \<Longrightarrow> is_val_cmd c \<or> (\<exists>c' a. eval_cmd c s c' a)" by simp
+
+
+
+    have "EX c' a. eval_cmd (Bind e c) s c' a" by simp sorry
+    thus ?thesis by simp
+  next case False
+    with tc_bind show ?thesis by (metis eval_bind_1)
+  qed
+next case tc_decl
+  thus ?case by simp sorry
+next case (tc_get v sig gam)
+
+  have "\<exists>c' s'. eval_cmd (Get v) s c' s'" by simp sorry
+  thus ?case by simp
+next case tc_set
+  thus ?case by simp sorry
 qed
 
 end
