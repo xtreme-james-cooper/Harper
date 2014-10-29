@@ -10,6 +10,9 @@ where "first = DBVar 0"
 primrec "next" :: "var => var"
 where "next (DBVar v) = DBVar (Suc v)"
 
+primrec next_by :: "nat => var => var"
+where "next_by n (DBVar v) = DBVar (v + n)"
+
 fun incr :: "var => var => var"
 where "incr (DBVar n) (DBVar v) = DBVar (if v < n then v else Suc v)" 
 
@@ -17,6 +20,9 @@ fun subr :: "var => var => var"
 where "subr (DBVar n) (DBVar v) = DBVar (if v > n then v - 1 else v)" 
 
 datatype 'a env = DBEnv "'a list"
+
+primrec env_size :: "'a env => nat"
+where "env_size (DBEnv as) = length as"
 
 definition empty_env :: "'a env"
 where "empty_env = DBEnv []"
@@ -43,6 +49,9 @@ where "extend_at (DBVar n) (DBEnv as) a' = DBEnv (extend_at' n as a')"
 abbreviation extend :: "'a env => 'a => 'a env"
 where "extend == extend_at first"
 
+fun append :: "'a env => 'a env => 'a env" (infix "+++" 65)
+where "DBEnv a +++ DBEnv b = DBEnv (a @ b)"
+
 lemma [simp]: "first in gam"
 by (induction gam, simp add: first_def)
 
@@ -51,6 +60,9 @@ by (induction x list y rule: extend_at'.induct, simp_all)
 
 lemma [simp]: "x in gam ==> n in gam ==> next n in extend_at x gam y"
 by (induction gam, induction x, induction n, simp)
+
+lemma [simp]: "n in g2 ==> (next_by (env_size g1) n) in (g1 +++ g2)"
+by (induction g1, induction g2, induction n, simp)
 
 lemma [simp]: "subr n (incr n var) = var"
 by (induction n, induction var, simp)
@@ -66,6 +78,24 @@ by (induction v, simp)
 
 lemma [simp]: "incr v x ~= v"
 by (induction v, induction x, simp)
+
+lemma [simp]: "next_by 0 v = v"
+by (induction v, simp)
+
+lemma [simp]: "next_by x (next v) = next (next_by x v)"
+by (induction v, simp)
+
+lemma [simp]: "next_by (Suc x) v = next (next_by x v)"
+by (induction v, simp)
+
+lemma [simp]: "x in e ==> env_size (extend_at x e y) = Suc (env_size e)"
+by (induction x e y rule: extend_at.induct, simp)
+
+lemma [simp]: "env_size empty_env = 0"
+by (simp add: empty_env_def)
+
+lemma [simp]: "env_size (e1 +++ e2) = env_size e1 + env_size e2"
+by (induction e1, induction e2, simp)
 
 lemma [simp]: "lookup empty_env x = None"
 by (cases x, simp add: empty_env_def)
@@ -112,6 +142,12 @@ next case 3
   thus ?case by (cases m, simp_all)
 qed
 
+lemma [simp]: "extend_at' (n + length e1) (e1 @ e2) t = e1 @ extend_at' n e2 t"
+by (induction e1, simp_all)
+
+lemma [simp]: "extend_at (next_by (env_size e1) n) (e1 +++ e2) t = e1 +++ extend_at n e2 t"
+by (induction e1, induction e2, induction n, simp)
+
 fun canswap :: "var => var => bool"
 where "canswap (DBVar m) (DBVar n) = (m <= n)" 
 
@@ -129,6 +165,9 @@ lemma [simp]: "canswap m n ==> canswap m (next n)"
 by (induction n, induction m, simp)
 
 lemma [simp]: "canswap m n ==> canswap (next m) (next n)"
+by (induction n, induction m, simp)
+
+lemma [simp]: "canswap m n ==> canswap (next_by x m) (next_by x n)"
 by (induction n, induction m, simp)
 
 lemma [simp]: "n in gam ==> canswap m n ==> m in gam"
@@ -167,7 +206,7 @@ by (induction n env t rule: extend_at'.induct, simp_all)
 lemma [simp]: "n in env ==> extend_at n (env_map f env) (f t) = env_map f (extend_at n env t)" 
 by (induction env, induction n, simp)
 
-lemma [simp]: "n in env ==> n in (env_map f env)" 
+lemma [simp]: "n in env ==> n in env_map f env" 
 by (induction env, induction n, simp)
 
 lemma [simp]: "env_map f (env_map g env) = env_map (f o g) env"
