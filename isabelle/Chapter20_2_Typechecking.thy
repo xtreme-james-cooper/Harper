@@ -22,8 +22,7 @@ where tc_var [simp]: "lookup gam x = Some t ==> typecheck del gam (Var x) t"
                 typecheck del gam (Lam t1 e) (Arrow t1 t2)"
     | tc_appl [simp]: "typecheck del gam e1 (Arrow t2 t) ==> typecheck del gam e2 t2 ==> 
                 typecheck del gam (Appl e1 e2) t"
-    | tc_tylam [simp]: "typecheck (next del) (env_map (type_insert first) gam) 
-                                  (expr_insert_type first e) t ==> 
+    | tc_tylam [simp]: "typecheck (next del) (env_map (type_insert first) gam) e t ==> 
                 typecheck del gam (TyLam e) (All t)"
     | tc_tyappl [simp]: "is_type del t' ==> typecheck del gam e (All t) ==> 
                 typecheck del gam (TyAppl t' e) (type_subst first t' t)"
@@ -74,12 +73,10 @@ next case tc_lam
 next case tc_appl
   thus ?case by (metis insert.simps(6) typecheck.tc_appl)
 next case (tc_tylam del gam e t)
-  from tc_tylam have "n in env_map (type_insert first) gam ==>
-      typecheck (next del) (extend_at n (env_map (type_insert first) gam) (type_insert first t'))
-          (insert n (expr_insert_type first e)) t" by fast
-  with tc_tylam have "typecheck (next del) (extend_at n (env_map (type_insert first) gam) 
-          (type_insert first t')) (insert n (expr_insert_type first e)) t" by simp
-  with tc_tylam show ?case by simp
+  from tc_tylam(3) have "n in env_map (type_insert first) gam" by force
+  moreover from tc_tylam have "n in env_map (type_insert first) gam ==> typecheck (next del) (extend_at n (env_map (type_insert first) gam) (type_insert first t')) (insert n e) t" by fast
+  ultimately have "typecheck (next del) (extend_at n (env_map (type_insert first) gam) (type_insert first t')) (insert n e) t" by fastforce
+  with tc_tylam(3) show ?case by simp
 next case tc_tyappl
   thus ?case by simp
 next case tc_triv
@@ -125,33 +122,14 @@ next case tc_lam
   thus ?case by simp
 next case tc_appl
   thus ?case by (metis expr_insert_type.simps(6) type_insert.simps(3) typecheck.tc_appl)
-next case (tc_tylam del gam e t)
-  from tc_tylam have "typecheck (next del) (env_map (type_insert first) gam) (expr_insert_type first e) t" by simp
-  from tc_tylam have "typecheck (next (next del)) 
-                                (env_map (type_insert nn) (env_map (type_insert first) gam))
-                                (expr_insert_type nn (expr_insert_type first e)) 
-                                (type_insert nn t)" by simp
-
-
-  hence "typecheck (next (next del)) 
-                  (env_map (type_insert (next n)) (env_map (type_insert first) gam))
-                  (expr_insert_type (next (next n)) (expr_insert_type first e))
-                  (type_insert (next n) t)" by simp sorry
+next case tc_tylam
   thus ?case by simp
 next case (tc_tyappl del t' gam e t)
-  from tc_tyappl have " 
-       typecheck (next del) 
-                 (env_map (type_insert n) gam) 
-                 (TyAppl (type_insert n t') (expr_insert_type n e)) 
-                 (type_subst first (type_insert n t') (type_insert (next n) t))" by simp
 
-  have "is_type del t' ==> typecheck del gam e (All t) ==> 
-                typecheck del gam (TyAppl t' e) (type_subst first t' t)" by simp
+have "is_type (next del) (type_insert n t') ==> typecheck (next del) (env_map (type_insert n) gam) (expr_insert_type n e) (All t) ==> 
+                typecheck (next del) (env_map (type_insert n) gam) (TyAppl (type_insert n t') (expr_insert_type n e)) (type_subst first (type_insert n t') t)" by (rule typecheck.tc_tyappl)
 
-  hence "typecheck (next del) 
-                  (env_map (type_insert n) gam) 
-                  (TyAppl (type_insert n t') (expr_insert_type n e))
-                  (type_insert n (type_subst first t' t))" by simp sorry
+  have "typecheck (next del) (env_map (type_insert n) gam) (TyAppl (type_insert n t') (expr_insert_type n e)) (type_insert n (type_subst first t' t))" by simp sorry
   thus ?case by simp
 next case tc_triv
   thus ?case by simp
@@ -196,9 +174,18 @@ next case tc_lam
 next case tc_appl
   thus ?case by fastforce
 next case (tc_tylam del e t)
+  from tc_tylam have X: "n in gam" by simp
+  from tc_tylam have "typecheck (next del) (env_map (type_insert first) (extend_at n gam t')) e t" by simp
+  from tc_tylam have "env_map (type_insert first) (extend_at n gam t') = extend_at n (env_map (type_insert first) gam) (type_insert first t') \<Longrightarrow>
+  typecheck (next del) (env_map (type_insert first) gam) e' (type_insert first t') \<Longrightarrow> 
+  typecheck (next del) (env_map (type_insert first) gam) (remove n (subst' n (insert n e') e)) t" by fastforce
+  with X have Y: "typecheck (next del) (env_map (type_insert first) gam) e' (type_insert first t') \<Longrightarrow> 
+  typecheck (next del) (env_map (type_insert first) gam) (remove n (subst' n (insert n e') e)) t" by simp
+  from tc_tylam have "typecheck del gam e' t'" by simp
 
 
-  thus ?case by simp sorry
+  hence "typecheck (next del) (env_map (type_insert first) gam) e' (type_insert first t')" by simp sorry
+  with Y show ?case by simp
 next case tc_tyappl
   thus ?case by simp
 next case tc_triv

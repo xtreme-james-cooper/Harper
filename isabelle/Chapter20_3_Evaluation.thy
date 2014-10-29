@@ -56,7 +56,7 @@ by (induction e, auto)
 
 lemma canonical_all: "is_val e ==> typecheck del gam e (All t) ==> 
               EX e'. e = TyLam e' & 
-           typecheck (next del) (env_map (type_insert first) gam) (expr_insert_type first e') t"
+           typecheck (next del) (env_map (type_insert first) gam) e' t"
 by (induction e, auto)
 
 lemma canonical_unit: "is_val e ==> typecheck del gam e Unit ==> e = Triv"
@@ -94,15 +94,17 @@ next case eval_appl_3
 next case eval_tyappl_1 
   thus ?case by fastforce
 next case (eval_tyappl_2 t' e)
-  then obtain tt where TT: "is_type del t' & 
-         typecheck (next del) (env_map (type_insert first) gam) (expr_insert_type first e) tt & 
-         t = type_subst first t' tt" by fast
+  from eval_tyappl_2 have "typecheck del gam (TyAppl t' (TyLam e)) t" by simp
 
-  from TT have "typecheck (next del) ggam e tt ==> is_type del t' ==> canswap first del ==> 
-        typecheck del (env_map (type_subst first t') ggam) (expr_subst_type t' e) (type_subst first t' tt)" by simp
+  have "is_type del t' ==> typecheck (next del) (env_map (type_insert first) gam) e t ==> 
+                typecheck del gam (TyAppl t' (TyLam e)) (type_subst first t' t)" by simp
 
-  have "typecheck del gam (expr_subst_type t' e) (type_subst first t' tt)" by simp sorry
-  with TT show ?case by simp
+  have "typecheck (next del) gam e t ==> is_type del t' ==> 
+        typecheck del (env_map (type_subst first t') gam) 
+                  (expr_subst_type t' e) (type_subst first t' t)" by simp
+
+  have "typecheck del gam (expr_subst_type t' e) t" by simp sorry
+  thus ?case by simp
 next case eval_pair_1 
   thus ?case by fastforce
 next case eval_pair_2 

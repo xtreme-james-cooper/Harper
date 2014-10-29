@@ -35,8 +35,9 @@ where tc_var [simp]: "lookup gam x = Some t ==> typecheck gam sig (Var x) t"
     | tc_fix [simp]: "typecheck (extend gam t) sig e t ==> typecheck gam sig (Fix t e) t"
     | tc_cmd [simp]: "typecheck_cmd gam sig c t ==> typecheck gam sig (Cmd c) (Command t)"
     | tc_retn [simp]: "is_mobile t ==> typecheck gam sig e t ==> typecheck_cmd gam sig (Return e) t"
-    | tc_bind [simp]: "typecheck gam sig e (Command t) ==> typecheck_cmd (extend gam t) sig c t' ==> 
-                typecheck_cmd gam sig (Bind e c) t'"
+    | tc_bind [simp]: "typecheck gam sig e (Command t) ==> 
+                typecheck_cmd (extend gam t) sig c t' ==> 
+                      typecheck_cmd gam sig (Bind e c) t'"
     | tc_decl [simp]: "is_mobile t ==> typecheck gam sig e t ==> 
                 typecheck_cmd gam (extend sig t) c t' ==>  typecheck_cmd gam sig (Declare e c) t'"
     | tc_get [simp]: "lookup sig v = Some t ==> typecheck_cmd gam sig (Get v) t"
@@ -64,12 +65,6 @@ inductive_cases [elim!]: "typecheck_cmd gam sig (Bind e c) t"
 inductive_cases [elim!]: "typecheck_cmd gam sig (Declare e c) t"
 inductive_cases [elim!]: "typecheck_cmd gam sig (Get v) t"
 inductive_cases [elim!]: "typecheck_cmd gam sig (Set v e) t"
-
-(*
-lemma [simp]: "typecheck gam sig e t ==> typecheck gam (next sig) e t"
-  and [simp]: "typecheck_cmd gam sig c t ==> typecheck_cmd gam (next sig) c t"
-by (induction rule: typecheck_typecheck_cmd.inducts, simp_all)
-*)
 
 lemma [simp]: "typecheck gam sig e t ==> n in gam ==> 
          typecheck (extend_at n gam t') sig (insert n e) t"
@@ -120,25 +115,10 @@ next case tc_retn
   thus ?case by fastforce
 next case tc_bind
   thus ?case by fastforce
-next case (tc_decl t sig e c t'')
-  from tc_decl have "is_mobile t" by simp
-  from tc_decl have "typecheck (extend_at n gam t') sig e t" by simp
-  from tc_decl have "extend_at n gam t' = extend_at nn ggam tt' \<Longrightarrow>
-  nn in ggam \<Longrightarrow>
-  typecheck ggam sig ee' tt' \<Longrightarrow>
-  typecheck ggam sig (remove nn (subst' nn (insert nn ee') e)) t" by simp
-  from tc_decl have "typecheck_cmd (extend_at n gam t') (extend sig t) c t''" by simp
-  from tc_decl have "extend_at n gam t' = extend_at nn ggam tt' \<Longrightarrow>
-  nn in ggam \<Longrightarrow>
-  typecheck ggam (extend sig t) ee' tt' \<Longrightarrow>
-  typecheck_cmd ggam (extend sig t)
-   (remove_cmd nn (subst_cmd' nn (insert nn ee') c)) t''" by simp
-  from tc_decl have "n in gam" by simp
-  from tc_decl have "typecheck gam sig e' t'" by simp
+next case (tc_decl t sig e)
 
-
-  have "typecheck_cmd gam sig (remove_cmd n (subst_cmd' n (insert n e') (Declare e c))) t''" by simp sorry
-  thus ?case by simp
+  hence "typecheck gam (extend sig t) e' t'" by simp sorry
+  with tc_decl show ?case by simp
 next case tc_get
   thus ?case by fastforce
 next case tc_set

@@ -26,11 +26,14 @@ where "is_val (Var v) = False"
     | "is_val_cmd (Get v) = False"
     | "is_val_cmd (Set v e) = False"
 
+lemma mobile_indep_sig: "typecheck gam sig e t ==> gam = empty_env ==> is_mobile t ==> is_val e ==> 
+      typecheck gam' sig' e t"
+  and mobile_indep_sig_cmd: "typecheck_cmd gam sig c t ==> gam = empty_env ==> is_mobile t ==> is_val_cmd c ==> 
+      typecheck_cmd gam' sig' c t"
+by (induction rule: typecheck_typecheck_cmd.inducts, simp_all)
+
 definition conforms_to :: "expr env => type env => bool"
-where "conforms_to s g = 
-          (ALL x. x in s --> x in g &
-              (EX e. lookup s x = Some e & is_val e & 
-                  (EX t. lookup g x = Some t & typecheck empty_env empty_env e t)))"
+where "conforms_to = conform_envs (%e t. is_val e & is_mobile t & typecheck empty_env empty_env e t)"
 
 inductive eval :: "expr => expr => bool"
       and eval_cmd :: "cmnd => expr env => cmnd => expr env => bool"
@@ -100,7 +103,7 @@ by (induction e, auto)
 theorem preservation: "eval e e' ==> typecheck gam sig e t ==> typecheck gam sig e' t"
     and preservation_cmd: "eval_cmd c s c' s' ==> conforms_to s sig ==> typecheck_cmd gam sig c t ==> 
               typecheck_cmd gam sig c' t & conforms_to s' sig"
-proof (induction arbitrary: t and rule: eval_eval_cmd.inducts)
+proof (induction arbitrary: t and t rule: eval_eval_cmd.inducts)
 case eval_suc
   thus ?case by fastforce
 next case eval_isz_1
@@ -145,18 +148,30 @@ next case eval_ret
   thus ?case by fastforce
 next case eval_bind_1
   thus ?case by fastforce
-next case eval_bind_2
-  thus ?case by simp sorry
+next case (eval_bind_2 c s c' s' c2)
+  then obtain tt where "typecheck_cmd gam sig c tt & typecheck_cmd (extend gam tt) sig c2 t" 
+  by force
+  with eval_bind_2 show ?case by (metis tc_bind tc_cmd)
 next case eval_bind_3
   thus ?case by fastforce
 next case eval_decl_1
   thus ?case by fastforce
 next case (eval_decl_2 e c s c' s')
-  thus ?case by simp sorry
+  then obtain tt where "is_mobile tt & typecheck gam sig e tt & 
+          typecheck_cmd gam (extend sig tt) c t" by fast
+
+  have "typecheck_cmd gam sig (Declare e c') t & conforms_to s' sig" by simp sorry
+  thus ?case by simp
 next case eval_decl_3
   thus ?case by simp sorry
-next case eval_get
-  thus ?case by simp sorry
+next case (eval_get s v e)
+  from eval_get have X: "lookup s v = Some e" by simp
+  from eval_get have Y: "lookup sig v = Some t" by fast
+  from eval_get have "conform_envs (%e t. is_val e & is_mobile t & typecheck empty_env empty_env e t) s sig" by (simp add: conforms_to_def) 
+
+  with X Y have "is_val e & is_mobile t & typecheck empty_env empty_env e t" by simp sorry
+  with mobile_indep_sig have "is_mobile t & typecheck gam sig e t" by fast
+  with eval_get show ?case by simp
 next case eval_set_1
   thus ?case by fastforce
 next case eval_set_2
@@ -164,7 +179,7 @@ next case eval_set_2
 qed
 
 theorem progress: "typecheck gam sig e t ==> gam = empty_env ==> is_val e | (EX e'. eval e e')"
-    and progress_cmd: "typecheck_cmd gam sig c ==> gam = empty_env ==> 
+    and progress_cmd: "typecheck_cmd gam sig c t ==> gam = empty_env ==> conforms_to s sig ==>
               is_val_cmd c | (EX c' s'. eval_cmd c s c' s')"
 proof (induction rule: typecheck_typecheck_cmd.inducts)
 case tc_var
@@ -204,26 +219,11 @@ next case tc_cmd
 next case tc_retn
   thus ?case by (metis eval_ret is_val_is_val_cmd.simps(17))
 next case (tc_bind gam sig e c)
-  thus ?case
-  proof (cases "is_val e")
-  case True
-    from tc_bind have "typecheck gam sig e Command" by simp
-    from tc_bind have "typecheck_cmd (extend gam type.Nat) sig c" by simp
-    from tc_bind have "extend gam type.Nat = empty_env \<Longrightarrow> is_val_cmd c \<or> (\<exists>c' a. eval_cmd c s c' a)" by simp
-
-
-
-    have "EX c' a. eval_cmd (Bind e c) s c' a" by simp sorry
-    thus ?thesis by simp
-  next case False
-    with tc_bind show ?thesis by (metis eval_bind_1)
-  qed
+  thus ?case by simp sorry
 next case tc_decl
   thus ?case by simp sorry
 next case (tc_get v sig gam)
-
-  have "\<exists>c' s'. eval_cmd (Get v) s c' s'" by simp sorry
-  thus ?case by simp
+  thus ?case by simp sorry
 next case tc_set
   thus ?case by simp sorry
 qed
