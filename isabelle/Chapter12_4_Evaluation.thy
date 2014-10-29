@@ -1,5 +1,5 @@
-theory Chapter12_3_Evaluation
-imports Chapter12_2_Typechecking
+theory Chapter12_4_Evaluation
+imports Chapter12_3_PatternMatching
 begin
 
 primrec is_val :: "expr => bool"
