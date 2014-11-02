@@ -2,7 +2,7 @@ theory Chapter12_4_Evaluation
 imports Chapter12_3_PatternMatching
 begin
 
-primrec is_val :: "expr => bool"
+fun is_val :: "expr => bool"
 where "is_val (Var v) = False"
     | "is_val Zero = True"
     | "is_val (Suc e) = is_val e"
@@ -17,8 +17,10 @@ where "is_val (Var v) = False"
     | "is_val (Case et el er) = False"
     | "is_val (InL t1 t2 e) = is_val e"
     | "is_val (InR t1 t2 e) = is_val e"
+    | "is_val (Match e rs) = False"
 
 inductive eval :: "expr => expr => bool"
+      and eval_rules :: "expr => rule list => expr => bool"
 where eval_suc [simp]: "eval e e' ==> eval (Suc e) (Suc e')"
     | eval_rec_1 [simp]: "eval et et' ==> eval (Rec et e0 es) (Rec et' e0 es)"
     | eval_rec_2 [simp]: "eval (Rec Zero e0 es) e0"
@@ -39,6 +41,12 @@ where eval_suc [simp]: "eval e e' ==> eval (Suc e) (Suc e')"
     | eval_case_3 [simp]: "is_val e ==> eval (Case (InR t1 t2 e) el er) (subst e er)"
     | eval_inl [simp]: "eval e e' ==> eval (InL t1 t2 e) (InL t1 t2 e')"
     | eval_inr [simp]: "eval e e' ==> eval (InR t1 t2 e) (InR t1 t2 e')"
+    | eval_match_1 [simp]: "eval e e' ==> eval (Match e rs) (Match e' rs)"
+    | eval_match_2 [simp]: "is_val e ==> eval_rules e rs e' ==> eval (Match e rs) e'"
+    | eval_rules_1 [simp]: "is_val e ==> matches p e s ==> 
+            eval (Match e (Rule p e' # rs)) (apply_subst s e')"
+    | eval_rules_2 [simp]: "is_val e ==> eval_rules e rs e' ==> no_match p e ==> 
+            eval (Match e (Rule p e2 # rs)) e'"
 
 lemma canonical_nat: "is_val e ==> typecheck gam e Nat ==> 
           e = Zero | (EX e'. e = Suc e' & typecheck gam e' Nat)"
@@ -66,8 +74,43 @@ lemma canonical_sum: "is_val e ==> typecheck gam e (Sum t1 t2) ==>
           (EX e'. e = InR t1 t2 e' & typecheck gam e' t2)"
 by (induction e, auto)
 
+lemma "typecheck_patn p t sig ==> typecheck gam e t ==> is_val e ==> 
+          (EX s. matches p e s & typecheck_subst gam s sig) | no_match p e" 
+proof (induction p t sig arbitrary: e gam rule: typecheck_patn.induct)
+case tc_vpat
+  thus ?case by (metis matches.intros(1) typecheck_subst.intros(1) typecheck_subst.intros(2))
+next case tc_wpat
+  thus ?case by (metis matches.intros(2) typecheck_subst.intros(1))
+next case tc_tpat
+  thus ?case by (metis canonical_unit matches.intros(3) typecheck_subst.intros(1))
+next case (tc_ppat p1 t1 s1 p2 t2 s2)
+  then obtain e1 e2 where E1E2: "e = Pair e1 e2 & typecheck gam e1 t1 & typecheck gam e2 t2" by (metis canonical_prod)
+  thus ?case proof (cases "no_match p1 e1")
+  case True
+    with E1E2 show ?thesis by (metis no_match.intros(1))
+  next case False
+    with tc_ppat E1E2 obtain s where SDEF: "matches p1 e1 s \<and> typecheck_subst gam s s1" by fastforce
+    thus ?thesis proof (cases "no_match p2 e2")
+    case True
+      with E1E2 show ?thesis by (metis no_match.intros(2))
+    next case False
+      with tc_ppat E1E2 obtain s' where "matches p2 e2 s' \<and> typecheck_subst gam s' s2" by fastforce
+      with SDEF have "matches (PairPat p1 p2) (Pair e1 e2) (s @ s') & typecheck_subst gam (s @ s') (s1 +++ s2)" by simp
+      with E1E2 show ?thesis by metis
+    qed
+  qed
+next case tc_lpat
+  thus ?case 
+  by (metis canonical_sum is_val.simps(13) matches.intros(5) no_match.intros(3) no_match.intros(4))
+next case tc_rpat
+  thus ?case 
+  by (metis canonical_sum is_val.simps(14) matches.intros(6) no_match.intros(5) no_match.intros(6))
+qed
+
 theorem preservation: "eval e e' ==> typecheck gam e t ==> typecheck gam e' t"
-proof (induction e e' arbitrary: t rule: eval.induct)
+    and "eval_rules e rs e' ==> typecheck gam e tt ==> typecheck_rules gam tt rs t ==> 
+            typecheck gam e' t"
+proof (induction e e' and e rs e' arbitrary: t and tt t rule: eval_eval_rules.inducts)
 case eval_suc 
   thus ?case by fastforce
 next case eval_rec_1 
@@ -107,10 +150,24 @@ next case eval_inl
   thus ?case by fastforce
 next case eval_inr
   thus ?case by fastforce
+next case eval_match_1
+  thus ?case by fastforce
+next case eval_match_2
+  thus ?case by (metis eval_rules.simps)
+next case (eval_rules_1 e p s e' rs)
+  then obtain t1 sig where T1S: "typecheck gam e t1 & typecheck_patn p t1 sig & 
+                                 typecheck (sig +++ gam) e' t & typecheck_rules gam t1 rs t" by auto
+  with eval_rules_1 have "typecheck_subst gam s sig" by fastforce 
+  with T1S show ?case by simp
+next case eval_rules_2
+  thus ?case by (metis eval_rules.simps)
 qed
 
 theorem progress: "typecheck gam e t ==> gam = empty_env ==> is_val e | (EX e'. eval e e')"
-proof (induction gam e t rule: typecheck.induct)
+    and "typecheck_rules gam tt rs t ==> typecheck gam e tt ==> gam = empty_env ==> 
+            EX e'. eval_rules e rs e'"
+    and "typecheck_rule gam tt r t ==> True"
+proof (induction gam e t and gam tt rs t rule: typecheck_typecheck_rules_typecheck_rule.inducts)
 case tc_var
   thus ?case by simp
 next case tc_zero
@@ -140,6 +197,14 @@ next case tc_inl
   thus ?case by (metis eval_inl is_val.simps(13))
 next case tc_inr
   thus ?case by (metis eval_inr is_val.simps(14))
+next case tc_match
+  thus ?case by simp sorry
+next case tc_rules_nil
+  thus ?case by simp sorry
+next case tc_rules_cons
+  thus ?case by simp sorry
+next case tc_rule
+  thus ?case by simp
 qed
 
 end

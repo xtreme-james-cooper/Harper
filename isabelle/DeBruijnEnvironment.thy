@@ -94,8 +94,24 @@ by (induction x e y rule: extend_at.induct, simp)
 lemma [simp]: "env_size empty_env = 0"
 by (simp add: empty_env_def)
 
+lemma [elim!]: "env_size gam = 0 ==> gam = empty_env"
+by (induction gam, simp add: empty_env_def)
+
+lemma [elim!]: "env_size gam = Suc n ==> EX gam' t. gam = extend gam' t & env_size gam' = n"
+by (induction gam, 
+    metis env_size.simps extend_at'.simps(1) extend_at.simps first_def length_Suc_conv)
+
 lemma [simp]: "env_size (e1 +++ e2) = env_size e1 + env_size e2"
 by (induction e1, induction e2, simp)
+
+lemma [simp]: "empty_env +++ e = e"
+by (induction e, simp add: empty_env_def)
+
+lemma [simp]: "e +++ empty_env = e"
+by (induction e, simp add: empty_env_def)
+
+lemma [simp]: "extend e t +++ e' = extend (e +++ e') t"
+by (induction e, induction e', simp add: first_def)
 
 lemma [simp]: "lookup empty_env x = None"
 by (cases x, simp add: empty_env_def)

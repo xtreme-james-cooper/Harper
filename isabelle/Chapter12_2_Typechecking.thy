@@ -3,13 +3,13 @@ imports Chapter12_1_Language
 begin
 
 inductive typecheck_patn :: "patn => type => type env => bool"
-where [simp]: "typecheck_patn VarPat t (extend empty_env t)"
-    | [simp]: "typecheck_patn WildPat t empty_env"
-    | [simp]: "typecheck_patn TrivPat Unit empty_env"
-    | [simp]: "typecheck_patn p1 t1 e1 ==> typecheck_patn p2 t2 e2 ==> 
+where tc_vpat [simp]: "typecheck_patn VarPat t (extend empty_env t)"
+    | tc_wpat [simp]: "typecheck_patn WildPat t empty_env"
+    | tc_tpat [simp]: "typecheck_patn TrivPat Unit empty_env"
+    | tc_ppat [simp]: "typecheck_patn p1 t1 e1 ==> typecheck_patn p2 t2 e2 ==> 
           typecheck_patn (PairPat p1 p2) (Prod t1 t2) (e1 +++ e2)"
-    | [simp]: "typecheck_patn p t e ==> typecheck_patn (InLPat p) (Sum t t2) e"
-    | [simp]: "typecheck_patn p t e ==> typecheck_patn (InRPat p) (Sum t2 t) e"
+    | tc_lpat [simp]: "typecheck_patn p t e ==> typecheck_patn (InLPat p) (Sum t t2) e"
+    | tc_rpat [simp]: "typecheck_patn p t e ==> typecheck_patn (InRPat p) (Sum t2 t) e"
 
 inductive_cases [elim!]: "typecheck_patn VarPat t gam"
 inductive_cases [elim!]: "typecheck_patn WildPat t gam"
@@ -39,7 +39,8 @@ where tc_var [simp]: "lookup gam x = Some t ==> typecheck gam (Var x) t"
                 typecheck (extend gam t2) er t ==> typecheck gam (Case et el er) t"
     | tc_inl [simp]: "typecheck gam e t1 ==> typecheck gam (InL t1 t2 e) (Sum t1 t2)"
     | tc_inr [simp]: "typecheck gam e t2 ==> typecheck gam (InR t1 t2 e) (Sum t1 t2)"
-    | tc_match [simp]: "typecheck gam (Match e rs) t"
+    | tc_match [simp]: "typecheck gam e t1 ==> typecheck_rules gam t1 rs t ==> 
+                typecheck gam (Match e rs) t"
     | tc_rules_nil [simp]: "typecheck_rules gam t1 [] t"
     | tc_rules_cons [simp]: "typecheck_rule gam t1 r t ==> typecheck_rules gam t1 rs t ==> 
                 typecheck_rules gam t1 (r # rs) t"
@@ -81,9 +82,19 @@ case (tc_rule p t1 gam1 gam e t)
   with tc_rule show ?case by fastforce
 qed 
 
-lemma [simp]: "typecheck gam e t ==> typecheck (gam1 +++ gam) (mult_insert (env_size gam1) e) t"
-by simp 
-sorry
+lemma [simp]: "typecheck gam e t ==> typecheck (sig +++ gam) (mult_insert (env_size sig) e) t"
+proof (induction "env_size sig" arbitrary: sig)
+case 0
+  hence "sig = empty_env" by auto
+  with 0 show ?case by simp
+next case (Suc n)
+  from Suc have "env_size sig = Nat.Suc n" by simp
+  hence "EX sig' s. sig = extend sig' s & env_size sig' = n" by fast
+  then obtain sig' s where SDEF: "sig = extend sig' s & env_size sig' = n" by fast
+  with Suc have "typecheck (sig' +++ gam) (mult_insert n e) t" by fast
+  hence "typecheck (extend sig' s +++ gam) (insert first (mult_insert n e)) t" by simp
+  with Suc SDEF show ?case by (metis mult_insert.simps(2))
+qed
 
 lemma [simp]: "typecheck (extend_at n gam t') e t ==> n in gam ==> typecheck gam e' t' ==> 
         typecheck gam (remove n (subst' n (insert n e') e)) t"

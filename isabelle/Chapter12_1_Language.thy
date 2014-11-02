@@ -69,7 +69,7 @@ where "insert n (Var v) = Var (incr n v)"
 
 primrec mult_insert :: "nat => expr => expr"
 where "mult_insert 0 e = e"
-    | "mult_insert (Nat.Suc n) e = mult_insert n (insert first e)"
+    | "mult_insert (Nat.Suc n) e = insert first (mult_insert n e)"
 
 primrec remove :: "var => expr => expr"
     and remove_rules :: "var => rule list => rule list"
