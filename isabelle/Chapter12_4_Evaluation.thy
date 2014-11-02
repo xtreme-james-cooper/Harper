@@ -20,7 +20,8 @@ where "is_val (Var v) = False"
     | "is_val (Match e rs) = False"
 
 inductive eval :: "expr => expr => bool"
-      and eval_rules :: "expr => rule list => constraint => expr => bool"
+      and eval_rules :: "expr => rule list => expr => bool"
+      and eval_rule :: "expr => rule => expr option => bool"
 where eval_suc [simp]: "eval e e' ==> eval (Suc e) (Suc e')"
     | eval_rec_1 [simp]: "eval et et' ==> eval (Rec et e0 es) (Rec et' e0 es)"
     | eval_rec_2 [simp]: "eval (Rec Zero e0 es) e0"
@@ -42,11 +43,13 @@ where eval_suc [simp]: "eval e e' ==> eval (Suc e) (Suc e')"
     | eval_inl [simp]: "eval e e' ==> eval (InL t1 t2 e) (InL t1 t2 e')"
     | eval_inr [simp]: "eval e e' ==> eval (InR t1 t2 e) (InR t1 t2 e')"
     | eval_match_1 [simp]: "eval e e' ==> eval (Match e rs) (Match e' rs)"
-    | eval_match_2 [simp]: "is_val e ==> eval_rules e rs Falsity e' ==> eval (Match e rs) e'"
-    | eval_rules_1 [simp]: "is_val e ==> matches p e s ==> 
-            eval_rules e (Rule p e' # rs) c (apply_subst s e')"
-    | eval_rules_2 [simp]: "is_val e ==> eval_rules e rs (Or c (extract_constraint p)) e' ==> 
-            no_match p e ==> eval_rules e (Rule p e2 # rs) c e'"
+    | eval_match_2 [simp]: "is_val e ==> eval_rules e rs e' ==> eval (Match e rs) e'"
+    | eval_rules_1 [simp]: "is_val e ==> eval_rule e r (Some e') ==> eval_rules e (r # rs) e'"
+    | eval_rules_2 [simp]: "is_val e ==> eval_rule e r None ==> eval_rules e rs e' ==> 
+            eval_rules e (r # rs) e'"
+    | eval_rule_1 [simp]: "is_val e ==> matches p e s ==> 
+            eval_rule e (Rule p e') (Some (apply_subst s e'))"
+    | eval_rule_2 [simp]: "is_val e ==> no_match p e ==> eval_rule e (Rule p e2) None"
 
 lemma canonical_nat: "is_val e ==> typecheck gam e Nat ==> 
           e = Zero | (EX e'. e = Suc e' & typecheck gam e' Nat)"
@@ -108,9 +111,12 @@ next case tc_rpat
 qed
 
 theorem preservation: "eval e e' ==> typecheck gam e t ==> typecheck gam e' t"
-    and "eval_rules e rs c e' ==> typecheck gam e tt ==> typecheck_rules gam tt rs t ==> 
+    and "eval_rules e rs e' ==> typecheck gam e tt ==> typecheck_rules gam tt rs t ==> 
             typecheck gam e' t"
-proof (induction e e' and e rs c e' arbitrary: t and tt t rule: eval_eval_rules.inducts)
+    and "eval_rule e r oe' ==> oe' = Some e' ==> typecheck gam e tt ==> typecheck_rule gam tt r t ==> 
+            typecheck gam e' t"
+proof (induction e e' and e rs e' and e r oe' arbitrary: t and tt t and tt t e'
+       rule: eval_eval_rules_eval_rule.inducts)
 case eval_suc 
   thus ?case by fastforce
 next case eval_rec_1 
@@ -153,18 +159,27 @@ next case eval_inr
 next case eval_match_1
   thus ?case by fastforce
 next case eval_match_2
-  thus ?case by simp sorry
-next case (eval_rules_1 e p s e' rs)
-  thus ?case by simp sorry
+  thus ?case by fastforce
+next case eval_rules_1
+  thus ?case by fastforce
 next case eval_rules_2
-  thus ?case by simp sorry
+  thus ?case by fastforce
+next case (eval_rule_1 e p s e'' tt)
+  then obtain sig where SIG: "typecheck_patn p tt sig & typecheck (sig +++ gam) e'' t" by fast
+  from eval_rule_1 SIG have "typecheck_subst gam s sig" by simp
+  with SIG have "typecheck gam (apply_subst s e'') t" by simp
+  with eval_rule_1 show ?case by simp
+next case eval_rule_2
+  thus ?case by fastforce
 qed
 
 theorem progress: "typecheck gam e t ==> gam = empty_env ==> is_val e | (EX e'. eval e e')"
-    and "typecheck_rules gam tt rs t ==> satisfies_all (rules_constraint rs) ==> 
-            typecheck gam e tt ==>  gam = empty_env ==> EX e'. eval_rules e rs c e'"
-    and "typecheck_rule gam tt r t ==> True"
-proof (induction gam e t and gam tt rs t and gam tt r t arbitrary: and e and
+    and "typecheck_rules gam tt rs t ==> is_val e ==> satisfies e (rules_constraint rs) ==> 
+            typecheck gam e tt ==> gam = empty_env ==> EX e'. eval_rules e rs e'"
+    and "typecheck_rule gam tt r t ==> is_val e ==> typecheck gam e tt ==> gam = empty_env ==> 
+              (satisfies e (rule_constraint r) --> (EX e'. eval_rule e r (Some e'))) & 
+              (~ satisfies e (rule_constraint r) --> eval_rule e r None)"
+proof (induction gam e t and gam tt rs t and gam tt r t arbitrary: and e and e rs
        rule: typecheck_typecheck_rules_typecheck_rule.inducts)
 case tc_var
   thus ?case by simp
@@ -195,14 +210,34 @@ next case tc_inl
   thus ?case by (metis eval_inl is_val.simps(13))
 next case tc_inr
   thus ?case by (metis eval_inr is_val.simps(14))
-next case tc_match
-  thus ?case by simp sorry
+next case (tc_match gam e t1 rs t)
+  thus ?case
+  proof (cases "is_val e")
+  case False
+    with tc_match show ?thesis by (metis eval_match_1)
+  next case True
+    with tc_match have "EX a. eval_rules e rs a" by simp
+    with True show ?thesis by (metis eval_match_2)
+  qed
 next case tc_rules_nil
-  thus ?case by (simp add: satisfies_all_def)
+  thus ?case by auto
 next case (tc_rules_cons gam t1 r t rs)
-  thus ?case by simp sorry
-next case tc_rule
-  thus ?case by simp
+  thus ?case
+  proof (cases "satisfies e (rule_constraint r)")
+  case True
+    with tc_rules_cons show ?thesis by (metis eval_rules_1)
+  next case False
+    from tc_rules_cons have "satisfies e (rules_constraint (r # rs))" by simp
+    with False have "satisfies e (rules_constraint rs)" by force
+    with tc_rules_cons False show ?thesis by (metis eval_rules_2)
+  qed
+next case (tc_rule p t1 sig gam e' t)
+  thus ?case
+  proof auto
+    assume V: "is_val e" and "satisfies e (patn_constraint p)"
+    hence "EX s. matches p e s" by simp
+    with V show "EX a. eval_rule e (Rule p e') (Some a)" by (metis eval_rule_1)
+  qed
 qed
 
 end

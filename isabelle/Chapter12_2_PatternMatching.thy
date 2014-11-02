@@ -57,31 +57,27 @@ primrec rules_constraint :: "rule list => constraint"
 where "rules_constraint [] = Falsity"
     | "rules_constraint (r # rs) = Or (rule_constraint r) (rules_constraint rs)"
 
-primrec negate :: "constraint => constraint"
-where "negate Truth = Falsity"
-    | "negate Falsity = Truth"
-    | "negate (And c1 c2) = Or (negate c1) (negate c2)"
-    | "negate (Or c1 c2) = And (negate c1) (negate c2)"
-    | "negate (InLCon c) = Or (InLCon (negate c)) (InRCon Truth)"
-    | "negate (InRCon c) = Or (InRCon (negate c)) (InLCon Truth)"
-    | "negate TrivCon = Falsity"
-    | "negate (PairCon c1 c2) = Or (PairCon c1 (negate c2)) 
-                               (Or (PairCon (negate c1) c2) 
-                                   (PairCon (negate c1) (negate c2)))"
+inductive satisfies :: "expr => constraint => bool"
+where [simp]: "satisfies e Truth"
+    | [simp]: "satisfies e c1 ==> satisfies e c2 ==> satisfies e (And c1 c2)"
+    | [simp]: "satisfies e c1 ==> satisfies e (Or c1 c2)"
+    | [simp]: "satisfies e c2 ==> satisfies e (Or c1 c2)"
+    | [simp]: "satisfies e c ==> satisfies (InL t t' e) (InLCon c)"
+    | [simp]: "satisfies e c ==> satisfies (InR t t' e) (InRCon c)"
+    | [simp]: "satisfies Triv TrivCon"
+    | [simp]: "satisfies e1 c1 ==> satisfies e2 c2 ==> satisfies (Pair e1 e2) (PairCon c1 c2)"
 
-fun is_incon :: "constraint list => bool"
-where "is_incon [] = False"
-    | "is_incon (Truth # cs) = is_incon cs"
-    | "is_incon (Falsity # cs) = True"
-    | "is_incon (And c1 c2 # cs) = undefined"
-    | "is_incon (Or c1 c2 # cs) = undefined"
-    | "is_incon (InLCon c # cs) = undefined"
-    | "is_incon (InRCon c # cs) = undefined"
-    | "is_incon (TrivCon # cs) = undefined"
-    | "is_incon (PairCon c1 c2 # cs) = undefined"
+inductive_cases [elim!]: "satisfies e Truth"
+inductive_cases [elim!]: "satisfies e Falsity"
+inductive_cases [elim!]: "satisfies e (And c1 c2)"
+inductive_cases [elim!]: "satisfies e (Or c1 c2)"
+inductive_cases [elim!]: "satisfies e (InLCon c)"
+inductive_cases [elim!]: "satisfies e (InRCon c)"
+inductive_cases [elim!]: "satisfies e TrivCon"
+inductive_cases [elim!]: "satisfies e (PairCon c1 c2)"
 
 definition satisfies_all :: "constraint => bool"
-where "satisfies_all c = is_incon [negate c]"
+where "satisfies_all = undefined"
 
 lemma [simp]: "rule_constraint (insert_rule n r) = rule_constraint r"
 by (induction r, simp_all)
@@ -100,5 +96,18 @@ by (induction r, simp_all)
 
 lemma [simp]: "rules_constraint (remove_rules n rs) = rules_constraint rs"
 by (induction rs, simp_all)
+
+lemma [simp]: "satisfies_all c ==> satisfies e c"
+by simp sorry
+
+lemma [simp]: "satisfies e (patn_constraint p) ==> (EX s. matches p e s)"
+by simp sorry
+
+lemma [simp]: "~ satisfies e (patn_constraint p) ==> no_match p e"
+by simp sorry
+
+lemma [elim!]: "satisfies e (Or r1 r2) ==> ~ satisfies e r1 ==> satisfies e r2"
+by (induction e "Or r1 r2" rule: satisfies.induct, simp_all)
+
 
 end
