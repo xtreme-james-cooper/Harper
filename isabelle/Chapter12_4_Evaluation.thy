@@ -1,5 +1,5 @@
 theory Chapter12_4_Evaluation
-imports Chapter12_3_PatternMatching
+imports Chapter12_3_Typechecking
 begin
 
 fun is_val :: "expr => bool"

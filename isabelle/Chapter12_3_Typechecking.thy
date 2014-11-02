@@ -1,5 +1,5 @@
-theory Chapter12_2_Typechecking
-imports Chapter12_1_Language
+theory Chapter12_3_Typechecking
+imports Chapter12_2_PatternMatching
 begin
 
 inductive typecheck_patn :: "patn => type => type env => bool"
@@ -66,6 +66,14 @@ inductive_cases [elim!]: "typecheck_rules gam t1 [] t"
 inductive_cases [elim!]: "typecheck_rules gam t1 (r # rs) t"
 inductive_cases [elim!]: "typecheck_rule gam t1 (Rule p e) t"
 
+inductive typecheck_subst :: "type env => substitution => type env => bool"
+where tc_sub_nil [simp]: "typecheck_subst gam [] empty_env"
+    | tc_sub_cons [simp]: "typecheck gam e t ==> typecheck_subst gam es sig ==> 
+          typecheck_subst gam (e # es) (extend sig t)"
+
+inductive_cases [elim!]: "typecheck_subst g [] sig"
+inductive_cases [elim!]: "typecheck_subst g (e # es) sig"
+
 lemma [simp]: "typecheck_patn p t gam ==> pat_var_count p = env_size gam"
 by (induction p t gam rule: typecheck_patn.induct, simp_all)
 
@@ -110,5 +118,20 @@ by (induction "extend_at n gam t'" e t and "extend_at n gam t'" tt rs t
 lemma [simp]: "typecheck (extend gam t') e t ==> typecheck gam e' t' ==> 
                           typecheck gam (subst e' e) t"
 by (simp add: subst_def)
+
+lemma [simp]: "typecheck_subst gam s sig ==> length s = env_size sig"
+by (induction gam s sig rule: typecheck_subst.induct, simp_all)
+
+lemma [simp]: "typecheck_subst gg s g ==> typecheck_subst gg s' g' ==> 
+        typecheck_subst gg (s @ s') (g +++ g')"
+by (induction s g rule: typecheck_subst.induct, simp_all) 
+
+lemma [simp]: "typecheck_subst gam s sig ==> typecheck (sig +++ gam) e t ==> 
+        typecheck gam (apply_subst s e) t"
+by (induction gam s sig arbitrary: e rule: typecheck_subst.induct, simp_all)
+
+lemma [simp]: "matches p e s ==> typecheck gam e t1 ==> typecheck_patn p t1 sig ==> 
+        typecheck_subst gam s sig"
+by (induction p e s arbitrary: gam t1 sig rule: matches.induct, auto)
 
 end
