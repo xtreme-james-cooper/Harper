@@ -20,7 +20,7 @@ where "is_val (Var v) = False"
     | "is_val (Match e rs) = False"
 
 inductive eval :: "expr => expr => bool"
-      and eval_rules :: "expr => rule list => expr => bool"
+      and eval_rules :: "expr => rule list => constraint => expr => bool"
 where eval_suc [simp]: "eval e e' ==> eval (Suc e) (Suc e')"
     | eval_rec_1 [simp]: "eval et et' ==> eval (Rec et e0 es) (Rec et' e0 es)"
     | eval_rec_2 [simp]: "eval (Rec Zero e0 es) e0"
@@ -42,11 +42,11 @@ where eval_suc [simp]: "eval e e' ==> eval (Suc e) (Suc e')"
     | eval_inl [simp]: "eval e e' ==> eval (InL t1 t2 e) (InL t1 t2 e')"
     | eval_inr [simp]: "eval e e' ==> eval (InR t1 t2 e) (InR t1 t2 e')"
     | eval_match_1 [simp]: "eval e e' ==> eval (Match e rs) (Match e' rs)"
-    | eval_match_2 [simp]: "is_val e ==> eval_rules e rs e' ==> eval (Match e rs) e'"
+    | eval_match_2 [simp]: "is_val e ==> eval_rules e rs Falsity e' ==> eval (Match e rs) e'"
     | eval_rules_1 [simp]: "is_val e ==> matches p e s ==> 
-            eval (Match e (Rule p e' # rs)) (apply_subst s e')"
-    | eval_rules_2 [simp]: "is_val e ==> eval_rules e rs e' ==> no_match p e ==> 
-            eval (Match e (Rule p e2 # rs)) e'"
+            eval_rules e (Rule p e' # rs) c (apply_subst s e')"
+    | eval_rules_2 [simp]: "is_val e ==> eval_rules e rs (Or c (extract_constraint p)) e' ==> 
+            no_match p e ==> eval_rules e (Rule p e2 # rs) c e'"
 
 lemma canonical_nat: "is_val e ==> typecheck gam e Nat ==> 
           e = Zero | (EX e'. e = Suc e' & typecheck gam e' Nat)"
@@ -108,9 +108,9 @@ next case tc_rpat
 qed
 
 theorem preservation: "eval e e' ==> typecheck gam e t ==> typecheck gam e' t"
-    and "eval_rules e rs e' ==> typecheck gam e tt ==> typecheck_rules gam tt rs t ==> 
+    and "eval_rules e rs c e' ==> typecheck gam e tt ==> typecheck_rules gam tt rs t ==> 
             typecheck gam e' t"
-proof (induction e e' and e rs e' arbitrary: t and tt t rule: eval_eval_rules.inducts)
+proof (induction e e' and e rs c e' arbitrary: t and tt t rule: eval_eval_rules.inducts)
 case eval_suc 
   thus ?case by fastforce
 next case eval_rec_1 
@@ -153,21 +153,19 @@ next case eval_inr
 next case eval_match_1
   thus ?case by fastforce
 next case eval_match_2
-  thus ?case by (metis eval_rules.simps)
+  thus ?case by simp sorry
 next case (eval_rules_1 e p s e' rs)
-  then obtain t1 sig where T1S: "typecheck gam e t1 & typecheck_patn p t1 sig & 
-                                 typecheck (sig +++ gam) e' t & typecheck_rules gam t1 rs t" by auto
-  with eval_rules_1 have "typecheck_subst gam s sig" by fastforce 
-  with T1S show ?case by simp
+  thus ?case by simp sorry
 next case eval_rules_2
-  thus ?case by (metis eval_rules.simps)
+  thus ?case by simp sorry
 qed
 
 theorem progress: "typecheck gam e t ==> gam = empty_env ==> is_val e | (EX e'. eval e e')"
-    and "typecheck_rules gam tt rs t ==> typecheck gam e tt ==> gam = empty_env ==> 
-            EX e'. eval_rules e rs e'"
+    and "typecheck_rules gam tt rs t ==> satisfies_all (rules_constraint rs) ==> 
+            typecheck gam e tt ==>  gam = empty_env ==> EX e'. eval_rules e rs c e'"
     and "typecheck_rule gam tt r t ==> True"
-proof (induction gam e t and gam tt rs t rule: typecheck_typecheck_rules_typecheck_rule.inducts)
+proof (induction gam e t and gam tt rs t and gam tt r t arbitrary: and e and
+       rule: typecheck_typecheck_rules_typecheck_rule.inducts)
 case tc_var
   thus ?case by simp
 next case tc_zero
@@ -200,8 +198,8 @@ next case tc_inr
 next case tc_match
   thus ?case by simp sorry
 next case tc_rules_nil
-  thus ?case by simp sorry
-next case tc_rules_cons
+  thus ?case by (simp add: satisfies_all_def)
+next case (tc_rules_cons gam t1 r t rs)
   thus ?case by simp sorry
 next case tc_rule
   thus ?case by simp

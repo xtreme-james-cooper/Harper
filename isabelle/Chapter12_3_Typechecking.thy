@@ -40,7 +40,7 @@ where tc_var [simp]: "lookup gam x = Some t ==> typecheck gam (Var x) t"
     | tc_inl [simp]: "typecheck gam e t1 ==> typecheck gam (InL t1 t2 e) (Sum t1 t2)"
     | tc_inr [simp]: "typecheck gam e t2 ==> typecheck gam (InR t1 t2 e) (Sum t1 t2)"
     | tc_match [simp]: "typecheck gam e t1 ==> typecheck_rules gam t1 rs t ==> 
-                typecheck gam (Match e rs) t"
+                satisfies_all (rules_constraint rs) ==> typecheck gam (Match e rs) t"
     | tc_rules_nil [simp]: "typecheck_rules gam t1 [] t"
     | tc_rules_cons [simp]: "typecheck_rule gam t1 r t ==> typecheck_rules gam t1 rs t ==> 
                 typecheck_rules gam t1 (r # rs) t"
@@ -85,8 +85,8 @@ lemma [simp]: "typecheck gam e t ==> n in gam ==>
          typecheck_rule (extend_at n gam t') tt (insert_rule n r) t"
 proof (induction gam e t and gam tt rs t and gam tt r t arbitrary: n and n and n 
        rule: typecheck_typecheck_rules_typecheck_rule.inducts, fastforce+)
-case (tc_rule p t1 gam1 gam e t)
-  hence "(next_by (env_size gam1) n) in (gam1 +++ gam)" by simp
+case (tc_rule p t1 sig gam e t)
+  hence "(next_by (env_size sig) n) in (sig +++ gam)" by simp
   with tc_rule show ?case by fastforce
 qed 
 
@@ -106,12 +106,14 @@ qed
 
 lemma [simp]: "typecheck (extend_at n gam t') e t ==> n in gam ==> typecheck gam e' t' ==> 
         typecheck gam (remove n (subst' n (insert n e') e)) t"
-  and [simp]: "typecheck_rules (extend_at n gam t') tt rs t ==> n in gam ==> typecheck gam e' t' ==> 
-        typecheck_rules  gam tt (remove_rules n (subst_rules n (insert n e') rs)) t"
-  and [simp]: "typecheck_rule (extend_at n gam t') tt r t ==> n in gam ==> typecheck gam e' t' ==> 
-        typecheck_rule gam tt (remove_rule n (subst_rule n (insert n e') r)) t"
-by (induction "extend_at n gam t'" e t and "extend_at n gam t'" tt rs t 
-          and "extend_at n gam t'" tt r t 
+  and [simp]: "typecheck_rules (extend_at n gam t') tt rs t ==> n in gam ==> 
+        typecheck gam e' t' ==> 
+              typecheck_rules  gam tt (remove_rules n (subst_rules n (insert n e') rs)) t"
+  and [simp]: "typecheck_rule (extend_at n gam t') tt r t ==> n in gam ==> 
+        typecheck gam e' t' ==> 
+              typecheck_rule gam tt (remove_rule n (subst_rule n (insert n e') r)) t"
+by (induction "extend_at n gam t'" e t and "extend_at n gam t'" tt rs t
+          and "extend_at n gam t'" tt r t
     arbitrary: n gam t' e' and n gam t' e' and n gam t' e'
     rule: typecheck_typecheck_rules_typecheck_rule.inducts, fastforce+)
 
