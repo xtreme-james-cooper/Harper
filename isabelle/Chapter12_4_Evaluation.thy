@@ -90,12 +90,12 @@ next case (tc_ppat p1 t1 s1 p2 t2 s2)
   then obtain e1 e2 where E1E2: "e = Pair e1 e2 & typecheck gam e1 t1 & typecheck gam e2 t2" by (metis canonical_prod)
   thus ?case proof (cases "no_match p1 e1")
   case True
-    with E1E2 show ?thesis by (metis no_match.intros(1))
+    with E1E2 show ?thesis by (metis no_match.intros(2))
   next case False
     with tc_ppat E1E2 obtain s where SDEF: "matches p1 e1 s \<and> typecheck_subst gam s s1" by fastforce
     thus ?thesis proof (cases "no_match p2 e2")
     case True
-      with E1E2 show ?thesis by (metis no_match.intros(2))
+      with E1E2 show ?thesis by (metis no_match.intros(3))
     next case False
       with tc_ppat E1E2 obtain s' where "matches p2 e2 s' \<and> typecheck_subst gam s' s2" by fastforce
       with SDEF have "matches (PairPat p1 p2) (Pair e1 e2) (s @ s') & typecheck_subst gam (s @ s') (s1 +++ s2)" by simp
@@ -104,10 +104,10 @@ next case (tc_ppat p1 t1 s1 p2 t2 s2)
   qed
 next case tc_lpat
   thus ?case 
-  by (metis canonical_sum is_val.simps(13) matches.intros(5) no_match.intros(3) no_match.intros(4))
+  by (metis canonical_sum is_val.simps(13) matches.intros(5) no_match.intros(6) no_match.intros(5))
 next case tc_rpat
   thus ?case 
-  by (metis canonical_sum is_val.simps(14) matches.intros(6) no_match.intros(5) no_match.intros(6))
+  by (metis canonical_sum is_val.simps(14) matches.intros(6) no_match.intros(9) no_match.intros(8))
 qed
 
 theorem preservation: "eval e e' ==> typecheck gam e t ==> typecheck gam e' t"

@@ -25,12 +25,16 @@ inductive_cases [elim!]: "matches (InLPat p) e s"
 inductive_cases [elim!]: "matches (InRPat p) e s"
 
 inductive no_match :: "patn => expr => bool"
-where "no_match p1 e1 ==> no_match (PairPat p1 p2) (Pair e1 e2)"
+where "e ~= Triv ==> no_match TrivPat e"
+    | "no_match p1 e1 ==> no_match (PairPat p1 p2) (Pair e1 e2)"
     | "no_match p2 e2 ==> no_match (PairPat p1 p2) (Pair e1 e2)"
+    | "~ (EX e1 e2. e = Pair e1 e2) ==> no_match (PairPat p1 p2) e"
     | "no_match (InLPat p) (InR t t' e)"
     | "no_match p e ==> no_match (InLPat p) (InL t t' e)"
+    | "~ (EX e' t1 t2. e = InL t1 t2 e') ==> no_match (InLPat p) e"
     | "no_match (InRPat p) (InL t t' e)"
     | "no_match p e ==> no_match (InRPat p) (InR t t' e)"
+    | "~ (EX e' t1 t2. e = InR t1 t2 e') ==> no_match (InRPat p) e"
 
 datatype constraint = 
   Truth
@@ -101,10 +105,49 @@ lemma [simp]: "satisfies_all c ==> satisfies e c"
 by simp sorry
 
 lemma [simp]: "satisfies e (patn_constraint p) ==> (EX s. matches p e s)"
-by simp sorry
+proof (induction p arbitrary: e)
+case WildPat
+  thus ?case by (metis matches.intros(2))
+next case VarPat
+  thus ?case by (metis matches.intros(1))
+next case TrivPat
+  hence "e = Triv" by auto
+  thus ?case by (metis matches.intros(3))
+next case (PairPat p1 p2)
+  hence "EX e1 e2. e = Pair e1 e2 & satisfies e1 (patn_constraint p1) 
+                                  & satisfies e2 (patn_constraint p2)" by auto
+  with PairPat show ?case by (metis (full_types) matches.intros(4))
+next case (InLPat p)
+  hence "EX e' t t'. e = InL t t' e' & satisfies e' (patn_constraint p)" by auto
+  with InLPat show ?case by (metis matches.intros(5))
+next case (InRPat p)
+  hence "EX e' t t'. e = InR t t' e' & satisfies e' (patn_constraint p)" by auto
+  with InRPat show ?case by (metis matches.intros(6))
+qed
 
 lemma [simp]: "~ satisfies e (patn_constraint p) ==> no_match p e"
-by simp sorry
+proof (induction p arbitrary: e)
+case WildPat
+  thus ?case by simp
+next case VarPat
+  thus ?case by simp
+next case TrivPat
+  hence "e ~= Triv" by auto
+  thus ?case by (metis no_match.intros(1))
+next case (PairPat p1 p2)
+  hence "~ (EX e1 e2. e = Pair e1 e2) |
+           (EX e1 e2. e = Pair e1 e2 & (~ satisfies e1 (patn_constraint p1) |
+                                        ~ satisfies e2 (patn_constraint p2)))" by auto
+  thus ?case by (metis PairPat(1) PairPat(2) no_match.intros(2) no_match.intros(3) no_match.intros(4))
+next case (InLPat p)
+  hence "~ (EX e' t t'. e = InL t t' e') | 
+           (EX e' t t'. e = InL t t' e' & ~ satisfies e' (patn_constraint p))" by auto
+  with InLPat show ?case by (metis no_match.intros(6) no_match.intros(7))
+next case (InRPat p)
+  hence "~ (EX e' t t'. e = InR t t' e') | 
+           (EX e' t t'. e = InR t t' e' & ~ satisfies e' (patn_constraint p))" by auto
+  with InRPat show ?case by (metis no_match.intros(10) no_match.intros(9))
+qed
 
 lemma [elim!]: "satisfies e (Or r1 r2) ==> ~ satisfies e r1 ==> satisfies e r2"
 by (induction e "Or r1 r2" rule: satisfies.induct, simp_all)
