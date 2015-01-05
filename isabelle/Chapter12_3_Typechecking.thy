@@ -77,8 +77,7 @@ inductive_cases [elim!]: "typecheck_subst g (e # es) sig"
 lemma [simp]: "typecheck_patn p t gam ==> pat_var_count p = env_size gam"
 by (induction p t gam rule: typecheck_patn.induct, simp_all)
 
-lemma [simp]: "typecheck gam e t ==> n in gam ==> 
-         typecheck (extend_at n gam t') (insert n e) t"
+lemma [simp]: "typecheck gam e t ==> n in gam ==> typecheck (extend_at n gam t') (insert n e) t"
   and [simp]: "typecheck_rules gam tt rs t ==> n in gam ==> 
          typecheck_rules (extend_at n gam t') tt (insert_rules n rs) t"
   and [simp]: "typecheck_rule gam tt r t ==> n in gam ==> 
@@ -105,21 +104,15 @@ next case (Suc n)
 qed
 
 lemma [simp]: "typecheck (extend_at n gam t') e t ==> n in gam ==> typecheck gam e' t' ==> 
-        typecheck gam (remove n (subst' n (insert n e') e)) t"
+                  typecheck gam (subst e' n e) t"
   and [simp]: "typecheck_rules (extend_at n gam t') tt rs t ==> n in gam ==> 
-        typecheck gam e' t' ==> 
-              typecheck_rules  gam tt (remove_rules n (subst_rules n (insert n e') rs)) t"
-  and [simp]: "typecheck_rule (extend_at n gam t') tt r t ==> n in gam ==> 
-        typecheck gam e' t' ==> 
-              typecheck_rule gam tt (remove_rule n (subst_rule n (insert n e') r)) t"
+                  typecheck gam e' t' ==> typecheck_rules gam tt (subst_rules e' n rs) t"
+  and [simp]: "typecheck_rule (extend_at n gam t') tt r t ==> n in gam ==> typecheck gam e' t' ==> 
+                  typecheck_rule gam tt (subst_rule e' n r) t"
 by (induction "extend_at n gam t'" e t and "extend_at n gam t'" tt rs t
           and "extend_at n gam t'" tt r t
     arbitrary: n gam t' e' and n gam t' e' and n gam t' e'
     rule: typecheck_typecheck_rules_typecheck_rule.inducts, fastforce+)
-
-lemma [simp]: "typecheck (extend gam t') e t ==> typecheck gam e' t' ==> 
-                          typecheck gam (subst e' first e) t"
-by (simp add: subst_def)
 
 lemma [simp]: "typecheck_subst gam s sig ==> length s = env_size sig"
 by (induction gam s sig rule: typecheck_subst.induct, simp_all)

@@ -167,12 +167,6 @@ by (induction r, simp_all)
 lemma [simp]: "rules_constraint (subst_rules n e rs) = rules_constraint rs"
 by (induction rs, simp_all)
 
-lemma [simp]: "rule_constraint (remove_rule n r) = rule_constraint r"
-by (induction r, simp_all)
-
-lemma [simp]: "rules_constraint (remove_rules n rs) = rules_constraint rs"
-by (induction rs, simp_all)
-
 lemma [simp]: "satisfies e (patn_constraint p) ==> (EX s. matches p e s)"
 proof (induction p arbitrary: e)
 case WildPat

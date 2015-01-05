@@ -69,7 +69,6 @@ next case tc_abort
 next case tc_case
   thus ?case by simp
 next case (tc_inl gam e t1 t2)
-
   with canonical_unit have "t1 = Unit ==> e = Triv" by force
   thus ?case by (simp add: Nat_def canonical_unit)
 next case (tc_inr gam e t1 t2)
