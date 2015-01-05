@@ -38,8 +38,8 @@ where "type_subst' n e' (Tyvar v) = (if v = n then e' else Tyvar v)"
     | "type_subst' n e' (Sum t1 t2) = Sum (type_subst' n e' t1) (type_subst' n e' t2)"
     | "type_subst' n e' (Rec t) = Rec (type_subst' (next n) (type_insert first e') t)"
 
-definition type_subst :: "type => type => type"
-where "type_subst e' e = type_remove first (type_subst' first (type_insert first e') e)"
+definition type_subst :: "type => var => type => type"
+where "type_subst e' n e = type_remove first (type_subst' first (type_insert first e') e)"
 
 lemma [simp]: "type_remove n (type_insert n e) = e"
 by (induction e arbitrary: n, simp_all)

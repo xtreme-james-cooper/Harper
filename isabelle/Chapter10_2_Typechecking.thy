@@ -37,7 +37,7 @@ lemma [simp]: "typecheck (extend_at n gam t') e t ==> n in gam ==> typecheck gam
 by (induction "extend_at n gam t'" e t arbitrary: n gam t' e' rule: typecheck.induct, fastforce+)
 
 lemma [simp]: "typecheck (extend gam t') e t ==> typecheck gam e' t' ==> 
-                          typecheck gam (subst e' e) t"
+                          typecheck gam (subst e' first e) t"
 by (simp add: subst_def)
 
 end

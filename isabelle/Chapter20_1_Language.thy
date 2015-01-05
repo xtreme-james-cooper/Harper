@@ -159,8 +159,8 @@ where "subst' n e' (Var v) = (if v = n then e' else Var v)"
     | "subst' n e' (InL t1 t2 e) = InL t1 t2 (subst' n e' e)"
     | "subst' n e' (InR t1 t2 e) = InR t1 t2 (subst' n e' e)"
 
-definition subst :: "expr => expr => expr"
-where "subst e' e = remove first (subst' first (insert first e') e)"
+definition subst :: "expr => var => expr => expr"
+where "subst e' n e = remove first (subst' first (insert first e') e)"
 
 lemma [simp]: "remove n (insert n e) = e"
 by (induction e arbitrary: n, simp_all)

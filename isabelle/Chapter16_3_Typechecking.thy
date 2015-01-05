@@ -18,9 +18,9 @@ where tc_var [simp]: "lookup gam x = Some t ==> typecheck gam (Var x) t"
     | tc_inl [simp]: "typecheck gam e t1 ==> typecheck gam (InL t1 t2 e) (Sum t1 t2)"
     | tc_inr [simp]: "typecheck gam e t2 ==> typecheck gam (InR t1 t2 e) (Sum t1 t2)"
     | tc_fix [simp]: "typecheck (extend gam t) e t ==> typecheck gam (Fix t e) t"
-    | tc_fold [simp]: "typecheck gam e (type_subst (Rec t) t) ==> typecheck gam (Fold t e) (Rec t)"
+    | tc_fold [simp]: "typecheck gam e (type_subst (Rec t) first t) ==> typecheck gam (Fold t e) (Rec t)"
     | tc_unfold [simp]: "typecheck gam e (Rec t) ==> 
-                typecheck gam (Unfold e) (type_subst (Rec t) t)"
+                typecheck gam (Unfold e) (type_subst (Rec t) first t)"
 
 inductive_cases [elim!]: "typecheck gam (Var x) t"
 inductive_cases [elim!]: "typecheck gam (Lam t1 e) t"
@@ -46,7 +46,7 @@ lemma [simp]: "typecheck (extend_at n gam t') e t ==> n in gam ==> typecheck gam
 by (induction "extend_at n gam t'" e t arbitrary: n gam t' e' rule: typecheck.induct, fastforce+)
 
 lemma [simp]: "typecheck (extend gam t') e t ==> typecheck gam e' t' ==> 
-                          typecheck gam (subst e' e) t"
+                          typecheck gam (subst e' first e) t"
 by (simp add: subst_def)
 
 end

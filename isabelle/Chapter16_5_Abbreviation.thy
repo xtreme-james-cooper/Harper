@@ -35,13 +35,14 @@ lemma [simp]: "eval et et' ==> eval (IsZ et e0 es) (IsZ et' e0 es)"
 by (simp add: IsZ_def)
 lemma [simp]: "EX e'. eval (IsZ Zero e0 es) e' & eval e' e0"
 proof (simp add: IsZ_def Zero_def)
-  have "eval (Case (InL Unit Nat Triv) (insert first e0) es) (subst Triv (insert first e0))" 
+  have "eval (Case (InL Unit Nat Triv) (insert first e0) es) (subst Triv first (insert first e0))" 
   by (metis eval_case_2 is_val.simps(4))
   thus "EX e'. eval (Case (Unfold (Fold (Sum Unit (Tyvar first)) (InL Unit Nat Triv)))
                           (insert first e0) es) e' &
          eval e' e0 " by force
 qed
-lemma [simp]: "is_val et ==> EX e'. eval (IsZ (Suc et) e0 es) e' & eval e' (subst et es)"
+
+lemma [simp]: "is_val et ==> EX e'. eval (IsZ (Suc et) e0 es) e' & eval e' (subst et first es)"
 by (metis Suc_def IsZ_def eval_case_1 eval_case_3 eval_unfold_2 is_val.simps(11))
 
 lemma canonical_nat_like: "typecheck env e t ==> is_val e ==> 

@@ -207,7 +207,7 @@ next case tc_inr
 qed
 
 lemma [simp]: "typecheck del (extend gam t') e t ==> typecheck del gam e' t' ==> 
-                          typecheck del gam (subst e' e) t"
+                          typecheck del gam (subst e' first e) t"
 by (simp add: subst_def)
 
 lemma [simp]: "canswap n del ==> is_type (next del) t ==> is_type del t' ==> 

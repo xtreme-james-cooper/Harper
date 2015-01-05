@@ -122,8 +122,8 @@ where "subst' n e' (Var v) = (if v = n then e' else Var v)"
     | "subst_rule n e' (Rule p e) = Rule p (subst' (next_by (pat_var_count p) n) 
                                                    (mult_insert (pat_var_count p) e') e)"
 
-definition subst :: "expr => expr => expr"
-where "subst e' e = remove first (subst' first (insert first e') e)"
+definition subst :: "expr => var => expr => expr"
+where "subst e' n e = remove first (subst' first (insert first e') e)"
 
 lemma [simp]: "remove n (insert n e) = e"
   and [simp]: "remove_rules n (insert_rules n rs) = rs"

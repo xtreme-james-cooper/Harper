@@ -21,7 +21,7 @@ where "is_val (Var v) = False"
 inductive eval :: "expr => expr => bool"
 where eval_appl_1 [simp]: "eval e1 e1' ==> eval (Appl e1 e2) (Appl e1' e2)"
     | eval_appl_2 [simp]: "is_val e1 ==> eval e2 e2' ==> eval (Appl e1 e2) (Appl e1 e2')"
-    | eval_appl_3 [simp]: "is_val e2 ==> eval (Appl (Lam t2 e1) e2) (subst e2 e1)"
+    | eval_appl_3 [simp]: "is_val e2 ==> eval (Appl (Lam t2 e1) e2) (subst e2 first e1)"
     | eval_pair_1 [simp]: "eval e1 e1' ==> eval (Pair e1 e2) (Pair e1' e2)"
     | eval_pair_2 [simp]: "is_val e1 ==> eval e2 e2' ==> eval (Pair e1 e2) (Pair e1 e2')"
     | eval_projl_1 [simp]: "eval e e' ==> eval (ProjL e) (ProjL e')"
@@ -30,11 +30,11 @@ where eval_appl_1 [simp]: "eval e1 e1' ==> eval (Appl e1 e2) (Appl e1' e2)"
     | eval_projr_2 [simp]: "eval (ProjR (Pair e1 e2)) e2"
     | eval_abort [simp]: "eval e e' ==> eval (Abort t e) (Abort t e')"
     | eval_case_1 [simp]: "eval et et' ==> eval (Case et el er) (Case et' el er)"
-    | eval_case_2 [simp]: "is_val e ==> eval (Case (InL t1 t2 e) el er) (subst e el)"
-    | eval_case_3 [simp]: "is_val e ==> eval (Case (InR t1 t2 e) el er) (subst e er)"
+    | eval_case_2 [simp]: "is_val e ==> eval (Case (InL t1 t2 e) el er) (subst e first el)"
+    | eval_case_3 [simp]: "is_val e ==> eval (Case (InR t1 t2 e) el er) (subst e first er)"
     | eval_inl [simp]: "eval e e' ==> eval (InL t1 t2 e) (InL t1 t2 e')"
     | eval_inr [simp]: "eval e e' ==> eval (InR t1 t2 e) (InR t1 t2 e')"
-    | eval_fix [simp]: "eval (Fix t e) (subst (Fix t e) e)"
+    | eval_fix [simp]: "eval (Fix t e) (subst (Fix t e) first e)"
     | eval_fold [simp]: "eval e e' ==> eval (Fold t e) (Fold t e')"
     | eval_unfold_1 [simp]: "eval e e' ==> eval (Unfold e) (Unfold e')"
     | eval_unfold_2 [simp]: "is_val e ==> eval (Unfold (Fold t e)) e"
@@ -59,7 +59,7 @@ lemma canonical_sum: "is_val e ==> typecheck gam e (Sum t1 t2) ==>
 by (induction e, auto)
 
 lemma canonical_rec: "is_val e ==> typecheck gam e (Rec t) ==> 
-              EX e'. e = Fold t e' & typecheck gam e' (type_subst (Rec t) t)"
+              EX e'. e = Fold t e' & typecheck gam e' (type_subst (Rec t) first t)"
 by (induction e, auto)
 
 theorem preservation: "eval e e' ==> typecheck gam e t ==> typecheck gam e' t"

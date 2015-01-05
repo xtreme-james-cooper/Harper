@@ -6,7 +6,7 @@ type_synonym substitution = "expr list"
 
 primrec apply_subst :: "substitution => expr => expr"
 where "apply_subst [] e = e"
-    | "apply_subst (s # sig) e = apply_subst sig (subst (mult_insert (length sig) s) e)"
+    | "apply_subst (s # sig) e = apply_subst sig (subst (mult_insert (length sig) s) first e)"
 
 inductive matches :: "patn => expr => substitution => bool"
 where [simp]: "matches VarPat e [e]"

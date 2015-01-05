@@ -19,7 +19,7 @@ lemma [simp]: "is_ok (extend_at n del ()) e ==> n in del ==> is_ok del e' ==>
         is_ok del (remove n (subst' n (insert n e') e))"
 by (induction e arbitrary: n del e', fastforce+)
 
-lemma [simp]: "is_ok (extend del ()) e ==> is_ok del e' ==> is_ok del (subst e' e)"
+lemma [simp]: "is_ok (extend del ()) e ==> is_ok del e' ==> is_ok del (subst e' first e)"
 by (simp add: subst_def)
 
 end

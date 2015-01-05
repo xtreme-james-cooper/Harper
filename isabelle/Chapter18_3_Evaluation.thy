@@ -22,13 +22,13 @@ where eval_zero [simp]: "eval Zero (Num 0)"
     | eval_isz_1 [simp]: "eval et et' ==> eval (IsZ et e0 es) (IsZ et' e0 es)"
     | eval_isz_2 [simp]: "error d ==> error (IsZ d e0 es)"
     | eval_isz_3 [simp]: "eval (IsZ (Num 0) e0 es) e0"
-    | eval_isz_4 [simp]: "eval (IsZ (Num (Suc et)) e0 es) (subst (Num et) es)"
+    | eval_isz_4 [simp]: "eval (IsZ (Num (Suc et)) e0 es) (subst (Num et) first es)"
     | eval_isz_5 [simp]: "error (IsZ (Lam et) e0 es)"
     | eval_appl_1 [simp]: "eval e1 e1' ==> eval (Appl e1 e2) (Appl e1' e2)"
     | eval_appl_2 [simp]: "error e1 ==> error (Appl e1 e2)"
     | eval_appl_3 [simp]: "error (Appl (Num e1) e2)"
-    | eval_appl_4 [simp]: "eval (Appl (Lam e1) e2) (subst e2 e1)"
-    | eval_fix [simp]: "eval (Fix e) (subst (Fix e) e)"
+    | eval_appl_4 [simp]: "eval (Appl (Lam e1) e2) (subst e2 first e1)"
+    | eval_fix [simp]: "eval (Fix e) (subst (Fix e) first e)"
 
 theorem preservation: "eval e e' ==> is_ok del e ==> is_ok del e'" and "error f ==> True"
 by (induction e e' and f arbitrary: del rule: eval_error.inducts, fastforce+)
@@ -73,7 +73,7 @@ next case (Appl e1 e2)
     with Appl eval_appl_1 show ?thesis by fastforce
   qed
 next case (Fix e)
-  hence "eval (Fix e) (subst (Fix e) e)" by simp
+  hence "eval (Fix e) (subst (Fix e) first e)" by simp
   thus ?case by fast
 qed
 

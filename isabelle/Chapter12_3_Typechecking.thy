@@ -118,7 +118,7 @@ by (induction "extend_at n gam t'" e t and "extend_at n gam t'" tt rs t
     rule: typecheck_typecheck_rules_typecheck_rule.inducts, fastforce+)
 
 lemma [simp]: "typecheck (extend gam t') e t ==> typecheck gam e' t' ==> 
-                          typecheck gam (subst e' e) t"
+                          typecheck gam (subst e' first e) t"
 by (simp add: subst_def)
 
 lemma [simp]: "typecheck_subst gam s sig ==> length s = env_size sig"

@@ -22,8 +22,8 @@ where "subst' n e' (Var v) = (if v = n then e' else Var v)"
     | "subst' n e' (Lam e) = Lam (subst' (next n) (insert first e') e)"
     | "subst' n e' (Appl e1 e2) = Appl (subst' n e' e1) (subst' n e' e2)"
 
-definition subst :: "expr => expr => expr"
-where "subst e' e = remove first (subst' first (insert first e') e)"
+definition subst :: "expr => var => expr => expr"
+where "subst e' n e = remove first (subst' first (insert first e') e)"
 
 lemma [simp]: "remove n (insert n e) = e"
 by (induction e arbitrary: n, simp_all)
@@ -34,7 +34,7 @@ by (induction e arbitrary: n m, simp_all)
 lemma [simp]: "remove v (subst' v (insert v e') (insert v e)) = e"
 by (induction e arbitrary: e' v, simp_all)
 
-lemma [simp]: "subst e' (insert first e) = e"
+lemma [simp]: "subst e' first (insert first e) = e"
 by (simp add: subst_def)
 
 primrec is_ok :: "unit env => expr => bool"
@@ -50,7 +50,7 @@ lemma [simp]: "is_ok (extend_at n gam ()) e ==> n in gam ==> is_ok gam e' ==>
         is_ok gam (remove n (subst' n (insert n e') e))"
 by (induction e arbitrary: n gam e', fastforce+)
 
-lemma [simp]: "is_ok (extend gam ()) e ==> is_ok gam e' ==> is_ok gam (subst e' e)"
+lemma [simp]: "is_ok (extend gam ()) e ==> is_ok gam e' ==> is_ok gam (subst e' first e)"
 by (simp add: subst_def)
 
 primrec is_val :: "expr => bool"
@@ -61,7 +61,7 @@ where "is_val (Var v) = False"
 inductive eval :: "expr => expr => bool"
 where eval_appl_1 [simp]: "eval e1 e1' ==> eval (Appl e1 e2) (Appl e1' e2)"
     | eval_appl_2 [simp]: "is_val e1 ==> eval e2 e2' ==> eval (Appl e1 e2) (Appl e1 e2')"
-    | eval_appl_3 [simp]: "is_val e2 ==> eval (Appl (Lam e1) e2) (subst e2 e1)"
+    | eval_appl_3 [simp]: "is_val e2 ==> eval (Appl (Lam e1) e2) (subst e2 first e1)"
 
 theorem preservation: "eval e e' ==> is_ok del e ==> is_ok del e'"
 by (induction e e' rule: eval.induct, fastforce+)
