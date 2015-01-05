@@ -1,23 +1,6 @@
 theory DeBruijnEnvironment
-imports Main
+imports DeBruijnVar
 begin
-
-datatype var = DBVar nat
-
-definition first :: var
-where "first = DBVar 0"
-
-primrec "next" :: "var => var"
-where "next (DBVar v) = DBVar (Suc v)"
-
-primrec next_by :: "nat => var => var"
-where "next_by n (DBVar v) = DBVar (v + n)"
-
-fun incr :: "var => var => var"
-where "incr (DBVar n) (DBVar v) = DBVar (if v < n then v else Suc v)" 
-
-fun subr :: "var => var => var"
-where "subr (DBVar n) (DBVar v) = DBVar (if v > n then v - 1 else v)" 
 
 datatype 'a env = DBEnv "'a list"
 
@@ -52,6 +35,17 @@ where "extend == extend_at first"
 fun append :: "'a env => 'a env => 'a env" (infix "+++" 65)
 where "DBEnv a +++ DBEnv b = DBEnv (a @ b)"
 
+primrec env_map :: "('a => 'b) => 'a env => 'b env"
+where "env_map f (DBEnv n) = DBEnv (map f n)" 
+
+fun update' :: "'a list => nat => 'a => 'a list"
+where "update' [] n a = undefined"
+    | "update' (b # bs) 0 a = a # bs"
+    | "update' (b # bs) (Suc n) a = b # update' bs n a"
+
+fun update :: "'a env => var => 'a => 'a env"
+where "update (DBEnv e) (DBVar v) a = DBEnv (update' e v a)" 
+
 lemma [simp]: "first in gam"
 by (induction gam, simp add: first_def)
 
@@ -63,30 +57,6 @@ by (induction gam, induction x, induction n, simp)
 
 lemma [simp]: "n in g2 ==> (next_by (env_size g1) n) in (g1 +++ g2)"
 by (induction g1, induction g2, induction n, simp)
-
-lemma [simp]: "subr n (incr n var) = var"
-by (induction n, induction var, simp)
-
-lemma [simp]: "incr n n = next n"
-by (induction n, simp)
-
-lemma [simp]: "next v ~= v"
-by (induction v, simp)
-
-lemma [simp]: "subr v (next v) = v"
-by (induction v, simp)
-
-lemma [simp]: "incr v x ~= v"
-by (induction v, induction x, simp)
-
-lemma [simp]: "next_by 0 v = v"
-by (induction v, simp)
-
-lemma [simp]: "next_by x (next v) = next (next_by x v)"
-by (induction v, simp)
-
-lemma [simp]: "next_by (Suc x) v = next (next_by x v)"
-by (induction v, simp)
 
 lemma [simp]: "x in e ==> env_size (extend_at x e y) = Suc (env_size e)"
 by (induction x e y rule: extend_at.induct, simp)
@@ -172,48 +142,12 @@ by (induction e1, simp_all)
 lemma [simp]: "extend_at (next_by (env_size e1) n) (e1 +++ e2) t = e1 +++ extend_at n e2 t"
 by (induction e1, induction e2, induction n, simp)
 
-fun canswap :: "var => var => bool"
-where "canswap (DBVar m) (DBVar n) = (m <= n)" 
-
 lemma [simp]: "n in gam ==> canswap m n ==>
         extend_at m (extend_at n gam a) b = extend_at (next n) (extend_at m gam b) a"
 by (induction gam, induction n, induction m, simp)
 
-lemma [simp]: "canswap m n ==> incr m (incr n var) = incr (next n) (incr m var)"
-by (induction var, induction n, induction m, simp)
-
-lemma [simp]: "canswap first x"
-by (induction x, simp add: first_def)
-
-lemma [simp]: "canswap m n ==> canswap m (next n)"
-by (induction n, induction m, simp)
-
-lemma [simp]: "canswap m n ==> canswap (next m) (next n)"
-by (induction n, induction m, simp)
-
-lemma [simp]: "canswap m n ==> canswap (next_by x m) (next_by x n)"
-by (induction n, induction m, simp)
-
 lemma [simp]: "n in gam ==> canswap m n ==> m in gam"
 by (induction gam, induction n, induction m, simp)
-
-lemma [simp]: "canswap var del ==> canswap (incr n var) (next del)"
-by (induction del, induction n, induction var, simp)
-
-lemma [simp]: "canswap n del ==> canswap v (next del) ==> canswap (subr n v) del"
-by (induction del, induction n, induction v, auto)
-
-lemma [simp]: "canswap m n ==> incr m (subr n v) = subr (next n) (incr m v)"
-by (induction m, induction n, induction v, auto)
-
-lemma [simp]: "canswap m n ==> incr m n = next n"
-by (induction m, induction n, simp)
-
-lemma [simp]: "canswap m n ==> v ~= n ==> incr m v ~= next n"
-by (induction m, induction n, induction v, simp)
-
-primrec env_map :: "('a => 'b) => 'a env => 'b env"
-where "env_map f (DBEnv n) = DBEnv (map f n)" 
 
 lemma [simp]: "env_map f empty_env = empty_env"
 by (simp add: empty_env_def)
@@ -235,13 +169,5 @@ by (induction env, induction n, simp)
 
 lemma [simp]: "env_map f (env_map g env) = env_map (f o g) env"
 by (induction env, simp)
-
-fun update' :: "'a list => nat => 'a => 'a list"
-where "update' [] n a = undefined"
-    | "update' (b # bs) 0 a = a # bs"
-    | "update' (b # bs) (Suc n) a = b # update' bs n a"
-
-fun update :: "'a env => var => 'a => 'a env"
-where "update (DBEnv e) (DBVar v) a = DBEnv (update' e v a)" 
 
 end
