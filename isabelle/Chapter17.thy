@@ -12,46 +12,28 @@ where "insert n (Var v) = Var (incr n v)"
     | "insert n (Lam e) = Lam (insert (next n) e)"
     | "insert n (Appl e1 e2) = Appl (insert n e1) (insert n e2)"
 
-primrec remove :: "var => expr => expr"
-where "remove n (Var v) = Var (subr n v)"
-    | "remove n (Lam e) = Lam (remove (next n) e)"
-    | "remove n (Appl e1 e2) = Appl (remove n e1) (remove n e2)"
-
-primrec subst' :: "var => expr => expr => expr"
-where "subst' n e' (Var v) = (if v = n then e' else Var v)"
-    | "subst' n e' (Lam e) = Lam (subst' (next n) (insert first e') e)"
-    | "subst' n e' (Appl e1 e2) = Appl (subst' n e' e1) (subst' n e' e2)"
-
-definition subst :: "expr => var => expr => expr"
-where "subst e' n e = remove first (subst' first (insert first e') e)"
-
-lemma [simp]: "remove n (insert n e) = e"
-by (induction e arbitrary: n, simp_all)
+primrec subst :: "expr => var => expr => expr"
+where "subst e' n (Var v) = (if v = n then e' else Var (subr n v))"
+    | "subst e' n (Lam e) = Lam (subst (insert first e') (next n) e)"
+    | "subst e' n (Appl e1 e2) = Appl (subst e' n e1) (subst e' n e2)"
 
 lemma [simp]: "canswap m n ==> insert m (insert n e) = insert (next n) (insert m e)"
 by (induction e arbitrary: n m, simp_all)
 
-lemma [simp]: "remove v (subst' v (insert v e') (insert v e)) = e"
-by (induction e arbitrary: e' v, simp_all)
-
-lemma [simp]: "subst e' first (insert first e) = e"
-by (simp add: subst_def)
+lemma [simp]: "subst e' n (insert n e) = e"
+by (induction e arbitrary: e' n, simp_all)
 
 primrec is_ok :: "unit env => expr => bool"
 where "is_ok del (Var x) = (lookup del x = Some ())"
     | "is_ok del (Lam e) = is_ok (extend del ()) e"
     | "is_ok del (Appl e1 e2) = (is_ok del e1 & is_ok del e2)"
 
-lemma [simp]: "is_ok gam e ==> n in gam ==> 
-         is_ok (extend_at n gam ()) (insert n e)"
+lemma [simp]: "is_ok gam e ==> n in gam ==> is_ok (extend_at n gam ()) (insert n e)"
 by (induction e arbitrary: n gam, fastforce+)
 
 lemma [simp]: "is_ok (extend_at n gam ()) e ==> n in gam ==> is_ok gam e' ==> 
-        is_ok gam (remove n (subst' n (insert n e') e))"
+                  is_ok gam (subst e' n e)"
 by (induction e arbitrary: n gam e', fastforce+)
-
-lemma [simp]: "is_ok (extend gam ()) e ==> is_ok gam e' ==> is_ok gam (subst e' first e)"
-by (simp add: subst_def)
 
 primrec is_val :: "expr => bool"
 where "is_val (Var v) = False"

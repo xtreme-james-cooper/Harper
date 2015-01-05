@@ -25,7 +25,7 @@ where tc_var [simp]: "lookup gam x = Some t ==> typecheck del gam (Var x) t"
     | tc_tylam [simp]: "typecheck (next del) (env_map (type_insert first) gam) e t ==> 
                 typecheck del gam (TyLam e) (All t)"
     | tc_tyappl [simp]: "is_type del t' ==> typecheck del gam e (All t) ==> 
-                typecheck del gam (TyAppl t' e) (type_subst first t' t)"
+                typecheck del gam (TyAppl t' e) (type_subst t' first t)"
     | tc_triv [simp]: "typecheck del gam Triv Unit"
     | tc_pair [simp]: "typecheck del gam e1 t1 ==> typecheck del gam e2 t2 ==> 
                 typecheck del gam (Pair e1 e2) (Prod t1 t2)"
@@ -127,9 +127,9 @@ next case tc_tylam
 next case (tc_tyappl del t' gam e t)
 
 have "is_type (next del) (type_insert n t') ==> typecheck (next del) (env_map (type_insert n) gam) (expr_insert_type n e) (All t) ==> 
-                typecheck (next del) (env_map (type_insert n) gam) (TyAppl (type_insert n t') (expr_insert_type n e)) (type_subst first (type_insert n t') t)" by (rule typecheck.tc_tyappl)
+                typecheck (next del) (env_map (type_insert n) gam) (TyAppl (type_insert n t') (expr_insert_type n e)) (type_subst (type_insert n t') first t)" by (rule typecheck.tc_tyappl)
 
-  have "typecheck (next del) (env_map (type_insert n) gam) (TyAppl (type_insert n t') (expr_insert_type n e)) (type_insert n (type_subst first t' t))" by simp sorry
+  have "typecheck (next del) (env_map (type_insert n) gam) (TyAppl (type_insert n t') (expr_insert_type n e)) (type_insert n (type_subst t' first t))" by simp sorry
   thus ?case by simp
 next case tc_triv
   thus ?case by simp
@@ -159,7 +159,7 @@ lemma [simp]: "typecheck del gam e t ==> typecheck (next del) gam e t"
 by (induction del gam e t rule: typecheck.induct, simp_all)
 
 lemma [simp]: "typecheck del (extend_at n gam t') e t ==> n in gam ==> typecheck del gam e' t' ==> 
-        typecheck del gam (remove n (subst' n (insert n e') e)) t"
+                   typecheck del gam (subst e' n e) t"
 proof (induction del "extend_at n gam t'" e t arbitrary: n gam t' e' rule: typecheck.induct)
 case tc_var
   thus ?case by fastforce
@@ -174,18 +174,8 @@ next case tc_lam
 next case tc_appl
   thus ?case by fastforce
 next case (tc_tylam del e t)
-  from tc_tylam have X: "n in gam" by simp
-  from tc_tylam have "typecheck (next del) (env_map (type_insert first) (extend_at n gam t')) e t" by simp
-  from tc_tylam have "env_map (type_insert first) (extend_at n gam t') = extend_at n (env_map (type_insert first) gam) (type_insert first t') \<Longrightarrow>
-  typecheck (next del) (env_map (type_insert first) gam) e' (type_insert first t') \<Longrightarrow> 
-  typecheck (next del) (env_map (type_insert first) gam) (remove n (subst' n (insert n e') e)) t" by fastforce
-  with X have Y: "typecheck (next del) (env_map (type_insert first) gam) e' (type_insert first t') \<Longrightarrow> 
-  typecheck (next del) (env_map (type_insert first) gam) (remove n (subst' n (insert n e') e)) t" by simp
-  from tc_tylam have "typecheck del gam e' t'" by simp
 
-
-  hence "typecheck (next del) (env_map (type_insert first) gam) e' (type_insert first t')" by simp sorry
-  with Y show ?case by simp
+  thus ?case by simp sorry
 next case tc_tyappl
   thus ?case by simp
 next case tc_triv
@@ -206,22 +196,12 @@ next case tc_inr
   thus ?case by simp
 qed
 
-lemma [simp]: "typecheck del (extend gam t') e t ==> typecheck del gam e' t' ==> 
-                          typecheck del gam (subst e' first e) t"
-by (simp add: subst_def)
-
 lemma [simp]: "canswap n del ==> is_type (next del) t ==> is_type del t' ==> 
-                is_type del (type_remove n (type_subst' n (type_insert n t') t))"
+                  is_type del (type_subst t' n t)"
 by (induction t arbitrary: n del t', simp_all) 
 
-lemma [simp]: "canswap n del ==> is_type (next del) t ==> is_type del t' ==> 
-                  is_type del (type_subst n t' t)"
-by (simp add: type_subst_def)
-
 lemma [simp]: "typecheck (next del) gam e t ==> is_type del t' ==> canswap n del ==> 
-        typecheck del (env_map (%t. type_remove n (type_subst' n (type_insert n t') t)) gam) 
-                  (expr_remove_type n (expr_subst_type' n (type_insert n t') e)) 
-                  (type_remove n (type_subst' n (type_insert n t') t))"
+        typecheck del (env_map (type_subst t' n) gam) (expr_subst_type t' n e) (type_subst t' n t)"
 proof (induction "next del" gam e t arbitrary: del t' n rule: typecheck.induct)
 case tc_var
   thus ?case by simp
@@ -230,9 +210,9 @@ next case tc_zero
 next case tc_suc
   thus ?case by simp
 next case (tc_rec gam et e0 t es)
-  thus ?case by simp sorry
+  thus ?case by simp
 next case (tc_lam t1 gam e t2)
-  thus ?case by simp sorry
+  thus ?case by simp
 next case (tc_appl gam e1 t2 t e2)
   thus ?case by simp sorry
 next case (tc_tylam gam e t)
@@ -244,31 +224,17 @@ next case tc_triv
 next case tc_pair
   thus ?case by simp
 next case tc_projl
-  thus ?case 
-  by (metis expr_remove_type.simps(11) expr_subst_type'.simps(11) type_remove.simps(6) 
-      type_subst'.simps(6) typecheck.tc_projl)
+  thus ?case by (metis expr_subst_type.simps(11) type_subst.simps(6) typecheck.tc_projl)
 next case tc_projr
-  thus ?case 
-  by (metis expr_remove_type.simps(12) expr_subst_type'.simps(12) type_remove.simps(6) 
-      type_subst'.simps(6) typecheck.tc_projr)
+  thus ?case by (metis expr_subst_type.simps(12) type_subst.simps(6) typecheck.tc_projr)
 next case tc_abort
-  thus ?case by simp sorry
+  thus ?case by simp
 next case (tc_case gam et t1 t2 el t er)
   thus ?case by simp sorry
 next case tc_inl
-  thus ?case by simp sorry
+  thus ?case by simp
 next case tc_inr
-  thus ?case by simp sorry
+  thus ?case by simp
 qed
-
-lemma [simp]: "typecheck (next del) gam e t ==> is_type del t' ==>
-        typecheck del (env_map (%v. type_subst first t' v) gam) 
-                  (expr_subst_type t' e) (type_subst first t' t)"
-by (simp add: type_subst_def expr_subst_type_def)
-
-lemma [simp]: "typecheck (next del) gam e t ==> is_type del t' ==> 
-        typecheck del (env_map (type_subst first t') gam) 
-                  (expr_subst_type t' e) (type_subst first t' t)"
-by auto
 
 end
