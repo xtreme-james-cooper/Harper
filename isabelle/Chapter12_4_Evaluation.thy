@@ -103,11 +103,11 @@ next case (tc_ppat p1 t1 s1 p2 t2 s2)
     qed
   qed
 next case tc_lpat
-  thus ?case 
-  by (metis canonical_sum is_val.simps(13) matches.intros(5) no_match.intros(6) no_match.intros(5))
+  thus ?case by (metis canonical_sum expr.distinct(206) expr.inject(11) is_val.simps(13) 
+                 matches.intros(5) no_match.intros(5) no_match.intros(6))
 next case tc_rpat
-  thus ?case 
-  by (metis canonical_sum is_val.simps(14) matches.intros(6) no_match.intros(9) no_match.intros(8))
+  thus ?case by (metis canonical_sum expr.distinct(206) expr.inject(12) is_val.simps(14) 
+                 matches.intros(6) no_match.intros(7) no_match.intros(8))
 qed
 
 theorem preservation: "eval e e' ==> typecheck gam e t ==> typecheck gam e' t"

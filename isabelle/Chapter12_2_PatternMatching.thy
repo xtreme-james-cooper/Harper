@@ -1,5 +1,5 @@
 theory Chapter12_2_PatternMatching
-imports Chapter12_1_Language
+imports Chapter12_1_Language Utilities
 begin
 
 type_synonym substitution = "expr list"
@@ -29,10 +29,8 @@ where "e ~= Triv ==> no_match TrivPat e"
     | "no_match p1 e1 ==> no_match (PairPat p1 p2) (Pair e1 e2)"
     | "no_match p2 e2 ==> no_match (PairPat p1 p2) (Pair e1 e2)"
     | "~ (EX e1 e2. e = Pair e1 e2) ==> no_match (PairPat p1 p2) e"
-    | "no_match (InLPat p) (InR t t' e)"
     | "no_match p e ==> no_match (InLPat p) (InL t t' e)"
     | "~ (EX e' t1 t2. e = InL t1 t2 e') ==> no_match (InLPat p) e"
-    | "no_match (InRPat p) (InL t t' e)"
     | "no_match p e ==> no_match (InRPat p) (InR t t' e)"
     | "~ (EX e' t1 t2. e = InR t1 t2 e') ==> no_match (InRPat p) e"
 
@@ -80,8 +78,82 @@ inductive_cases [elim!]: "satisfies e (InRCon c)"
 inductive_cases [elim!]: "satisfies e TrivCon"
 inductive_cases [elim!]: "satisfies e (PairCon c1 c2)"
 
+primrec negate :: "constraint => constraint"
+where "negate Truth = Falsity"
+    | "negate Falsity = Truth"
+    | "negate (And c1 c2) = Or (negate c1) (negate c2)"
+    | "negate (Or c1 c2) = And (negate c1) (negate c2)"
+    | "negate (InLCon c) = Or (InLCon (negate c)) (InRCon Truth)"
+    | "negate (InRCon c) = Or (InRCon (negate c)) (InLCon Truth)"    
+    | "negate TrivCon = Falsity"
+    | "negate (PairCon c1 c2) = Or (PairCon (negate c1) c2) 
+                                   (Or (PairCon c1 (negate c2)) 
+                                       (PairCon (negate c1) (negate c2)))"
+
+primrec and_count :: "constraint => nat"
+where "and_count Truth = 1"
+    | "and_count Falsity = 1"
+    | "and_count (And c1 c2) = and_count c1 + and_count c2 + 1"
+    | "and_count (Or c1 c2) = and_count c1 + and_count c2"
+    | "and_count (InLCon c) = and_count c"
+    | "and_count (InRCon c) = and_count c"    
+    | "and_count TrivCon = 1"
+    | "and_count (PairCon c1 c2) = and_count c1 + and_count c2"
+
+primrec collect_inls :: "constraint => constraint option"
+where "collect_inls Truth = Some Truth"
+    | "collect_inls Falsity = Some Falsity"
+    | "collect_inls (And c1 c2) = (case collect_inls c1 of
+          None => None
+        | Some c1' => case collect_inls c2 of
+            None => None
+          | Some c2' => Some (And c1' c2'))"
+    | "collect_inls (Or c1 c2) = (case collect_inls c1 of
+          None => None
+        | Some c1' => case collect_inls c2 of
+            None => None
+          | Some c2' => Some (Or c1' c2'))"
+    | "collect_inls (InLCon c) = Some c"
+    | "collect_inls (InRCon c) = None"    
+    | "collect_inls TrivCon = None"
+    | "collect_inls (PairCon c1 c2) = None"
+
+primrec collect_inrs :: "constraint => constraint option"
+where "collect_inrs Truth = Some Truth"
+    | "collect_inrs Falsity = Some Falsity"
+    | "collect_inrs (And c1 c2) = (case collect_inrs c1 of
+          None => None
+        | Some c1' => case collect_inrs c2 of
+            None => None
+          | Some c2' => Some (And c1' c2'))"
+    | "collect_inrs (Or c1 c2) = (case collect_inrs c1 of
+          None => None
+        | Some c1' => case collect_inrs c2 of
+            None => None
+          | Some c2' => Some (Or c1' c2'))"
+    | "collect_inrs (InLCon c) = None"
+    | "collect_inrs (InRCon c) = Some c"    
+    | "collect_inrs TrivCon = None"
+    | "collect_inrs (PairCon c1 c2) = None"
+
+function is_incon :: "constraint list => bool"
+where "is_incon [] = False"
+    | "is_incon (Truth # cs) = is_incon cs"
+    | "is_incon (Falsity # cs) = True"
+    | "is_incon (And c1 c2 # cs) = is_incon (c1 # c2 # cs)"
+    | "is_incon (Or c1 c2 # cs) = (is_incon (c1 # cs) & is_incon (c2 # cs))"
+    | "is_incon (InLCon c # cs) = (case collect_map collect_inls cs of
+          None => True
+        | Some ils => is_incon (c # ils))"
+    | "is_incon (InRCon c # cs) = (case collect_map collect_inrs cs of
+          None => True
+        | Some ils => is_incon (c # ils))"    
+    | "is_incon (TrivCon # cs) = is_incon cs"
+    | "is_incon (PairCon c1 c2 # cs) = undefined"
+by pat_completeness auto
+
 definition satisfies_all :: "constraint => bool"
-where "satisfies_all = undefined"
+where "satisfies_all c = is_incon [negate c]"
 
 lemma [simp]: "rule_constraint (insert_rule n r) = rule_constraint r"
 by (induction r, simp_all)
@@ -100,9 +172,6 @@ by (induction r, simp_all)
 
 lemma [simp]: "rules_constraint (remove_rules n rs) = rules_constraint rs"
 by (induction rs, simp_all)
-
-lemma [simp]: "satisfies_all c ==> satisfies e c"
-by simp sorry
 
 lemma [simp]: "satisfies e (patn_constraint p) ==> (EX s. matches p e s)"
 proof (induction p arbitrary: e)
@@ -142,15 +211,120 @@ next case (PairPat p1 p2)
 next case (InLPat p)
   hence "~ (EX e' t t'. e = InL t t' e') | 
            (EX e' t t'. e = InL t t' e' & ~ satisfies e' (patn_constraint p))" by auto
-  with InLPat show ?case by (metis no_match.intros(6) no_match.intros(7))
+  with InLPat show ?case by (metis no_match.intros(5) no_match.intros(6))
 next case (InRPat p)
   hence "~ (EX e' t t'. e = InR t t' e') | 
            (EX e' t t'. e = InR t t' e' & ~ satisfies e' (patn_constraint p))" by auto
-  with InRPat show ?case by (metis no_match.intros(10) no_match.intros(9))
+  with InRPat show ?case by (metis no_match.intros(7) no_match.intros(8))
 qed
 
 lemma [elim!]: "satisfies e (Or r1 r2) ==> ~ satisfies e r1 ==> satisfies e r2"
 by (induction e "Or r1 r2" rule: satisfies.induct, simp_all)
 
+lemma [simp]: "size (collect_inls c) <= size c"
+proof (induction c)
+case Truth
+  thus ?case by simp
+next case Falsity
+  thus ?case by simp
+next case (And c1 c2)
+  thus ?case by (cases "collect_inls c1", simp, cases "collect_inls c2", fastforce+)
+next case (Or c1 c2)
+  thus ?case by (cases "collect_inls c1", simp, cases "collect_inls c2", fastforce+)
+next case InLCon
+  thus ?case by simp
+next case InRCon
+  thus ?case by simp
+next case TrivCon
+  thus ?case by simp
+next case PairCon
+  thus ?case by simp
+qed
+
+lemma [simp]: "collect_inls c = Some c' ==> and_count c' <= and_count c"
+proof (induction c arbitrary: c')
+case Truth
+  thus ?case by simp
+next case Falsity
+  thus ?case by simp
+next case (And c1 c2)
+  thus ?case by (cases "collect_inls c1", simp, cases "collect_inls c2", fastforce+)
+next case (Or c1 c2)
+  thus ?case by (cases "collect_inls c1", simp, cases "collect_inls c2", fastforce+)
+next case InLCon
+  thus ?case by simp
+next case InRCon
+  thus ?case by simp
+next case TrivCon
+  thus ?case by simp
+next case PairCon
+  thus ?case by simp
+qed
+
+lemma [simp]: "size (collect_inrs c) <= size c"
+proof (induction c)
+case Truth
+  thus ?case by simp
+next case Falsity
+  thus ?case by simp
+next case (And c1 c2)
+  thus ?case by (cases "collect_inrs c1", simp, cases "collect_inrs c2", fastforce+)
+next case (Or c1 c2)
+  thus ?case by (cases "collect_inrs c1", simp, cases "collect_inrs c2", fastforce+)
+next case InLCon
+  thus ?case by simp
+next case InRCon
+  thus ?case by simp
+next case TrivCon
+  thus ?case by simp
+next case PairCon
+  thus ?case by simp
+qed
+
+lemma [simp]: "collect_inrs c = Some c' ==> and_count c' <= and_count c"
+proof (induction c arbitrary: c')
+case Truth
+  thus ?case by simp
+next case Falsity
+  thus ?case by simp
+next case (And c1 c2)
+  thus ?case by (cases "collect_inrs c1", simp, cases "collect_inrs c2", fastforce+)
+next case (Or c1 c2)
+  thus ?case by (cases "collect_inrs c1", simp, cases "collect_inrs c2", fastforce+)
+next case InLCon
+  thus ?case by simp
+next case InRCon
+  thus ?case by simp
+next case TrivCon
+  thus ?case by simp
+next case PairCon
+  thus ?case by simp
+qed
+
+termination is_incon
+proof (relation "measures [mapsum and_count, mapsum size]", auto)
+  fix cs a
+  assume "collect_map collect_inls cs = Some a" 
+     and "\<not> mapsum and_count a < mapsum and_count cs"
+  show "mapsum and_count a = mapsum and_count cs" by simp sorry
+next
+  fix cs a
+  assume "collect_map collect_inls cs = Some a" 
+     and "\<not> mapsum and_count a < mapsum and_count cs"
+  show "mapsum size a < Nat.Suc (mapsum size cs)" by simp sorry
+next
+  fix cs a
+  assume "collect_map collect_inrs cs = Some a" 
+     and "\<not> mapsum and_count a < mapsum and_count cs"
+  show "mapsum and_count a = mapsum and_count cs" by simp sorry
+next
+  fix cs a
+  assume "collect_map collect_inrs cs = Some a" 
+     and "\<not> mapsum and_count a < mapsum and_count cs"
+  show "mapsum size a < Nat.Suc (mapsum size cs)" by simp sorry
+qed
+
+lemma [simp]: "satisfies_all c ==> satisfies e c"
+by (simp add: satisfies_all_def) sorry
 
 end
