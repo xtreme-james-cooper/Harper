@@ -24,7 +24,7 @@ where eval_plus_1 [simp]: "eval (Plus (Num n1) (Num n2)) (Num (n1 + n2))"
     | eval_cat_3 [simp]: "is_val e1 ==> eval e2 e2' ==> eval (Cat e1 e2) (Cat e1 e2')"
     | eval_len_1 [simp]: "eval (Len (Str n1)) (Num (int (length n1)))"
     | eval_len_2 [simp]: "eval e1 e1' ==> eval (Len e1) (Len e1')"
-    | eval_let_1 [simp]: "is_val e1 ==> eval (Let e1 e2) (subst e1 e2)"
+    | eval_let_1 [simp]: "is_val e1 ==> eval (Let e1 e2) (subst e1 first e2)"
     | eval_let_2 [simp]: "eval e1 e1' ==> eval (Let e1 e2) (Let e1' e2)"
 
 lemma canonical_num: "is_val e ==> typecheck gam e NumType ==> EX n. e = Num n"

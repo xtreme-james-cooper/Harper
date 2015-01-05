@@ -14,34 +14,29 @@ datatype expr =
 | Len expr
 | Let expr expr
 
-primrec expr_map :: "(var => var => expr) => var => expr => expr"
-where "expr_map f n (Var v) = f n v"
-    | "expr_map f n (Num x) = Num x"
-    | "expr_map f n (Str s) = Str s"
-    | "expr_map f n (Plus e1 e2) = Plus (expr_map f n e1) (expr_map f n e2)"
-    | "expr_map f n (Times e1 e2) = Times (expr_map f n e1) (expr_map f n e2)"
-    | "expr_map f n (Cat e1 e2) = Cat (expr_map f n e1) (expr_map f n e2)"
-    | "expr_map f n (Len e) = Len (expr_map f n e)"
-    | "expr_map f n (Let e1 e2) = Let (expr_map f n e1) (expr_map f (next n) e2)"
+primrec expr_map :: "(var => var => expr) => 
+                      ((var => var => expr) => (var => var => expr)) => var => expr => expr"
+where "expr_map f c n (Var v) = f n v"
+    | "expr_map f c n (Num x) = Num x"
+    | "expr_map f c n (Str s) = Str s"
+    | "expr_map f c n (Plus e1 e2) = Plus (expr_map f c n e1) (expr_map f c n e2)"
+    | "expr_map f c n (Times e1 e2) = Times (expr_map f c n e1) (expr_map f c n e2)"
+    | "expr_map f c n (Cat e1 e2) = Cat (expr_map f c n e1) (expr_map f c n e2)"
+    | "expr_map f c n (Len e) = Len (expr_map f c n e)"
+    | "expr_map f c n (Let e1 e2) = Let (expr_map f c n e1) (expr_map (c f) c (next n) e2)"
 
 definition insert :: "var => expr => expr"
-where "insert = expr_map (%n. Var o incr n)"
+where "insert = expr_map (%n. Var o incr n) id"
 
 definition remove :: "var => expr => expr"
-where "remove = expr_map (%n. Var o subr n)"
+where "remove = expr_map (%n. Var o subr n) id"
 
-primrec subst' :: "var => expr => expr => expr"
-where "subst' n e' (Var v) = (if v = n then e' else Var v)"
-    | "subst' n e' (Num x) = Num x"
-    | "subst' n e' (Str s) = Str s"
-    | "subst' n e' (Plus e1 e2) = Plus (subst' n e' e1) (subst' n e' e2)"
-    | "subst' n e' (Times e1 e2) = Times (subst' n e' e1) (subst' n e' e2)"
-    | "subst' n e' (Cat e1 e2) = Cat (subst' n e' e1) (subst' n e' e2)"
-    | "subst' n e' (Len e) = Len (subst' n e' e)"
-    | "subst' n e' (Let e1 e2) = Let (subst' n e' e1) (subst' (next n) (insert first e') e2)"
+definition subst' :: "expr => var => expr => expr"
+where "subst' e' = expr_map (%n v. if v = n then e' else Var v) 
+                            (%f n v. if v = n then insert first (f n v) else f n v)"
 
-definition subst :: "var => expr => expr => expr"
-where "subst n e' e = remove n (subst' n (insert n e') e)"
+definition subst :: "expr => var => expr => expr"
+where "subst e' n e = remove n (subst' (insert n e') n e)"
 
 inductive typecheck :: "type env => expr => type => bool"
 where tc_var [simp]: "lookup gam x = Some t ==> typecheck gam (Var x) t"
@@ -72,34 +67,48 @@ by (induction e arbitrary: n, simp_all add: insert_def remove_def)
 lemma [simp]: "canswap m n ==> insert m (insert n e) = insert (next n) (insert m e)"
 by (induction e arbitrary: n m, simp_all add: insert_def)
 
-lemma [simp]: "subst n e' (Var x) = (if x = n then e' else Var (subr n x))"
-proof (cases "x = n")
-case True
-  thus ?thesis by (simp add: subst_def)
-next case False
-  thus ?thesis by (simp add: remove_def subst_def)
+lemma [simp]: "(%m v. if v = m then insert first (if v = m then insert n e else Var v) 
+                      else if v = m then insert n e 
+                      else Var v) =
+               (%m v. if v = m then insert (next n) (insert first e) 
+                      else Var v)"
+proof -
+  have "ALL m v. (%m v. if v = m then insert first (if v = m then insert n e else Var v) 
+                      else if v = m then insert n e 
+                      else Var v) m v =
+               (%m v. if v = m then insert (next n) (insert first e) 
+                      else Var v) m v" by simp
+  thus ?thesis by simp
 qed
 
-lemma [simp]: "subst n e' (Str x) = Str x"
-by (simp add: remove_def subst_def)
+lemma [simp]: "subst e' n (Var x) = (if x = n then e' else Var (subr n x))"
+proof (cases "x = n")
+case True
+  thus ?thesis by (simp add: subst_def subst'_def)
+next case False
+  thus ?thesis by (simp add: remove_def subst_def subst'_def)
+qed
 
-lemma [simp]: "subst n e' (Num x) = Num x"
-by (simp add: remove_def subst_def)
+lemma [simp]: "subst e' n (Str x) = Str x"
+by (simp add: remove_def subst_def subst'_def)
 
-lemma [simp]: "subst n e' (Plus e1 e2) = Plus (subst n e' e1) (subst n e' e2)"
-by (simp add: remove_def subst_def)
+lemma [simp]: "subst e' n (Num x) = Num x"
+by (simp add: remove_def subst_def subst'_def)
 
-lemma [simp]: "subst n e' (Times e1 e2) = Times (subst n e' e1) (subst n e' e2)"
-by (simp add: remove_def subst_def)
+lemma [simp]: "subst e' n (Plus e1 e2) = Plus (subst e' n e1) (subst e' n e2)"
+by (simp add: remove_def subst_def subst'_def)
 
-lemma [simp]: "subst n e' (Cat e1 e2) = Cat (subst n e' e1) (subst n e' e2)"
-by (simp add: remove_def subst_def)
+lemma [simp]: "subst e' n (Times e1 e2) = Times (subst e' n e1) (subst e' n e2)"
+by (simp add: remove_def subst_def subst'_def)
 
-lemma [simp]: "subst n e' (Len e) = Len (subst n e' e)"
-by (simp add: remove_def subst_def)
+lemma [simp]: "subst e' n (Cat e1 e2) = Cat (subst e' n e1) (subst e' n e2)"
+by (simp add: remove_def subst_def subst'_def)
 
-lemma [simp]: "subst n e' (Let e1 e2) = Let (subst n e' e1) (subst (next n) (insert first e') e2)"
-by (simp add: remove_def subst_def)
+lemma [simp]: "subst e' n (Len e) = Len (subst e' n e)"
+by (simp add: remove_def subst_def subst'_def)
+
+lemma [simp]: "subst e' n (Let e1 e2) = Let (subst e' n e1) (subst (insert first e') (next n) e2)"
+by (simp add: subst_def subst'_def remove_def)
 
 lemma [simp]: "typecheck gam e t ==> n in gam ==> typecheck (extend_at n gam t') (insert n e) t"
 proof (induction gam e t arbitrary: n rule: typecheck.induct)
@@ -124,8 +133,8 @@ next case (tc_let gam e1 t1 e2 t2)
 qed
 
 lemma [simp]: "typecheck (extend_at n gam t') e t ==> n in gam ==> typecheck gam e' t' ==> 
-                          typecheck gam (subst n e' e) t"
-proof (induction "extend_at n gam t'" e t arbitrary: gam n e' rule: typecheck.induct)
+                          typecheck gam (subst e' n e) t"
+proof (induction "extend_at n gam t'" e t arbitrary: gam e' n rule: typecheck.induct)
 case tc_var
   thus ?case by auto
 next case tc_str
@@ -141,8 +150,8 @@ next case tc_cat
 next case tc_len
   thus ?case by simp
 next case (tc_let e1 t1 e2 t2)
-  hence "typecheck (extend gam t1) (subst (next n) (insert first e') e2) t2" by simp
-  moreover from tc_let have "typecheck gam (subst n e' e1) t1" by simp 
+  hence "typecheck (extend gam t1) (subst (insert first e') (next n) e2) t2" by simp
+  moreover from tc_let have "typecheck gam (subst e' n e1) t1" by simp 
   ultimately show ?case by simp
 qed
 
