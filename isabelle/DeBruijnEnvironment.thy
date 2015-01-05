@@ -98,8 +98,16 @@ lemma [elim!]: "env_size gam = 0 ==> gam = empty_env"
 by (induction gam, simp add: empty_env_def)
 
 lemma [elim!]: "env_size gam = Suc n ==> EX gam' t. gam = extend gam' t & env_size gam' = n"
-by (induction gam, 
-    metis env_size.simps extend_at'.simps(1) extend_at.simps first_def length_Suc_conv)
+proof (induction gam)
+case (DBEnv g)
+  thus ?case
+  proof (cases g, simp)
+  case (Cons t g')
+    hence "DBEnv g = extend (DBEnv g') t" by (simp add: first_def)
+    moreover from DBEnv Cons have "env_size (DBEnv g') = n" by simp
+    ultimately show ?thesis by auto
+  qed
+qed
 
 lemma [simp]: "env_size (e1 +++ e2) = env_size e1 + env_size e2"
 by (induction e1, induction e2, simp)

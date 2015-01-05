@@ -15,14 +15,9 @@ where "mapsum f [] = 0"
     | "mapsum f (a # as) = f a + mapsum f as"
 
 lemma [simp]: "ALL a. size a <= size (f a) ==> size (collect_map f xs) <= size xs"
-proof (induction xs)
-case Nil
-  thus ?case by simp
-next case (Cons a as)
-  thus ?case by (cases "f a", simp, cases "collect_map f as", simp_all)
-qed
+by (induction xs, simp_all split: option.split)
 
-lemma [simp]: "length xs = length ys ==> ALL n. f (xs ! n) <= f (ys ! n) ==> 
+lemma [simp]: "length xs = length ys ==> (!!n. f (xs ! n) <= f (ys ! n)) ==> 
         mapsum f xs <= mapsum f ys"
 proof (induction xs arbitrary: ys)
 case Nil
@@ -34,7 +29,7 @@ next case (Cons x xs)
     thus ?case by simp
   next case (Cons y ys)
     moreover hence "f x <= f y" by (metis eq_Nil_appendI nth_append_length)
-    moreover from Cons have "ALL n. f (xs ! n) <= f (ys ! n)" by (metis (full_types) nth_Cons_Suc)
+    moreover from Cons have "!!n. f (xs ! n) <= f (ys ! n)" by (metis (full_types) nth_Cons_Suc)
     ultimately show ?case by fastforce
   qed
 qed

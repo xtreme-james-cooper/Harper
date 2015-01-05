@@ -325,6 +325,8 @@ next
 qed
 
 lemma [simp]: "satisfies_all c ==> satisfies e c"
+apply (induction c arbitrary: e)
+apply (simp_all add: satisfies_all_def)
 by (simp add: satisfies_all_def) sorry
 
 end
