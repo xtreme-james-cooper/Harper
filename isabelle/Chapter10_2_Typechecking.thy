@@ -28,16 +28,11 @@ inductive_cases [elim!]: "typecheck gam (Pair e1 e2) t"
 inductive_cases [elim!]: "typecheck gam (ProjL e) t"
 inductive_cases [elim!]: "typecheck gam (ProjR e) t"
 
-lemma [simp]: "typecheck gam e t ==> n in gam ==> 
-         typecheck (extend_at n gam t') (insert n e) t"
+lemma [simp]: "typecheck gam e t ==> n in gam ==> typecheck (extend_at n gam t') (insert n e) t"
 by (induction gam e t arbitrary: n rule: typecheck.induct, fastforce+)
 
 lemma [simp]: "typecheck (extend_at n gam t') e t ==> n in gam ==> typecheck gam e' t' ==> 
-        typecheck gam (remove n (subst' n (insert n e') e)) t"
+                  typecheck gam (subst e' n e) t"
 by (induction "extend_at n gam t'" e t arbitrary: n gam t' e' rule: typecheck.induct, fastforce+)
-
-lemma [simp]: "typecheck (extend gam t') e t ==> typecheck gam e' t' ==> 
-                          typecheck gam (subst e' first e) t"
-by (simp add: subst_def)
 
 end

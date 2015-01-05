@@ -58,7 +58,7 @@ inductive_cases [elim!]: "typecheck gam (Len e) t"
 inductive_cases [elim!]: "typecheck gam (Let e1 e2) t"
 
 lemma [simp]: "typecheck gam e t ==> n in gam ==> typecheck (extend_at n gam t') (insert n e) t"
-by (induction gam e t arbitrary: n rule: typecheck.induct, simp_all add: insert_def, fastforce+)
+by (induction gam e t arbitrary: n rule: typecheck.induct, fastforce+)
 
 lemma [simp]: "typecheck (extend_at n gam t') e t ==> n in gam ==> typecheck gam e' t' ==> 
                           typecheck gam (subst e' n e) t"

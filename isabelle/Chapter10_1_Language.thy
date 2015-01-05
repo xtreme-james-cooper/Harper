@@ -32,37 +32,19 @@ where "insert n (Var v) = Var (incr n v)"
     | "insert n (ProjL e) = ProjL (insert n e)"
     | "insert n (ProjR e) = ProjR (insert n e)"
 
-primrec remove :: "var => expr => expr"
-where "remove n (Var v) = Var (subr n v)"
-    | "remove n Zero = Zero"
-    | "remove n (Suc e) = Suc (remove n e)"
-    | "remove n (Rec et e0 es) = Rec (remove n et) (remove n e0) (remove (next (next n)) es)"
-    | "remove n (Lam t e) = Lam t (remove (next n) e)"
-    | "remove n (Appl e1 e2) = Appl (remove n e1) (remove n e2)"
-    | "remove n Triv = Triv"
-    | "remove n (Pair e1 e2) = Pair (remove n e1) (remove n e2)"
-    | "remove n (ProjL e) = ProjL (remove n e)"
-    | "remove n (ProjR e) = ProjR (remove n e)"
-
-primrec subst' :: "var => expr => expr => expr"
-where "subst' n e' (Var v) = (if v = n then e' else Var v)"
-    | "subst' n e' Zero = Zero"
-    | "subst' n e' (Suc e) = Suc (subst' n e' e)"
-    | "subst' n e' (Rec et e0 es) = 
-                      Rec (subst' n e' et) (subst' n e' e0) 
-                          (subst' (next (next n)) (insert first (insert first e')) es)"
-    | "subst' n e' (Lam t e) = Lam t (subst' (next n) (insert first e') e)"
-    | "subst' n e' (Appl e1 e2) = Appl (subst' n e' e1) (subst' n e' e2)"
-    | "subst' n e' Triv = Triv"
-    | "subst' n e' (Pair e1 e2) = Pair (subst' n e' e1) (subst' n e' e2)"
-    | "subst' n e' (ProjL e) = ProjL (subst' n e' e)"
-    | "subst' n e' (ProjR e) = ProjR (subst' n e' e)"
-
-definition subst :: "expr => var => expr => expr"
-where "subst e' n e = remove first (subst' first (insert first e') e)"
-
-lemma [simp]: "remove n (insert n e) = e"
-by (induction e arbitrary: n, simp_all)
+primrec subst :: "expr => var => expr => expr"
+where "subst e' n (Var v) = (if v = n then e' else Var (subr n v))"
+    | "subst e' n Zero = Zero"
+    | "subst e' n (Suc e) = Suc (subst e' n e)"
+    | "subst e' n (Rec et e0 es) = 
+                      Rec (subst e' n et) (subst e' n e0) 
+                          (subst (insert first (insert first e')) (next (next n)) es)"
+    | "subst e' n (Lam t e) = Lam t (subst (insert first e') (next n) e)"
+    | "subst e' n (Appl e1 e2) = Appl (subst e' n e1) (subst e' n e2)"
+    | "subst e' n Triv = Triv"
+    | "subst e' n (Pair e1 e2) = Pair (subst e' n e1) (subst e' n e2)"
+    | "subst e' n (ProjL e) = ProjL (subst e' n e)"
+    | "subst e' n (ProjR e) = ProjR (subst e' n e)"
 
 lemma [simp]: "canswap m n ==> insert m (insert n e) = insert (next n) (insert m e)"
 by (induction e arbitrary: n m, simp_all)
