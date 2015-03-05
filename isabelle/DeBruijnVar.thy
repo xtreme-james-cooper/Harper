@@ -73,7 +73,22 @@ by (induction m, induction n, induction v, auto)
 lemma [simp]: "canswap m n ==> incr m n = next n"
 by (induction m, induction n, simp)
 
+lemma [elim]: "canswap m n ==> m = next n ==> False"
+by (induction m, induction n, simp)
+
 lemma [simp]: "canswap m n ==> v ~= n ==> incr m v ~= next n"
 by (induction m, induction n, induction v, simp)
+
+lemma [simp]: "canswap (next m) n ==> incr n m = m"
+by (induction m, induction n, simp)
+
+lemma [simp]: "canswap m n ==> v ~= m ==> incr (next n) v ~= m"
+by (induction m, induction n, induction v, simp)
+
+lemma [simp]: "canswap m n ==> v ~= m ==> subr m (incr (next n) v) = incr n (subr m v)"
+by (induction m, induction n, induction v, auto)
+
+lemma [simp]: "canswap m n ==> subr (next n) m = m"
+by (induction m, induction n, simp)
 
 end

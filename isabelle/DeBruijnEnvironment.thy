@@ -157,6 +157,12 @@ by (induction env x rule: lookup'.induct, simp_all)
 
 lemma [simp]: "lookup env x = Some v ==> lookup (env_map f env) x = Some (f v)"
 by (induction env, induction x, simp)
+                
+lemma [elim]: "inj f ==> lookup' (map f env) x = Some (f v) ==> lookup' env x = Some v"
+by (induction env x rule: lookup'.induct, simp, simp add: inj_on_def, fastforce) 
+
+lemma [elim]: "inj f ==> lookup (env_map f env) x = Some (f v) ==> lookup env x = Some v"
+by (induction env, induction x, auto)
 
 lemma [simp]: "n <= length env ==> extend_at' n (map f env) (f t) = map f (extend_at' n env t)" 
 by (induction n env t rule: extend_at'.induct, simp_all)
@@ -169,5 +175,11 @@ by (induction env, induction n, simp)
 
 lemma [simp]: "env_map f (env_map g env) = env_map (f o g) env"
 by (induction env, simp)
+
+lemma [simp]: "lookup' (map f env) n = Some t ==> EX t'. t = f t'"
+by (induction env n rule: lookup'.induct, auto)
+
+lemma [simp]: "lookup (env_map f env) n = Some t ==> EX t'. t = f t'"
+by (induction env, induction n, simp)
 
 end

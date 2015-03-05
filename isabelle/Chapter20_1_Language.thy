@@ -2,6 +2,9 @@ theory Chapter20_1_Language
 imports DeBruijnEnvironment
 begin
 
+datatype kind =
+  Star
+
 datatype type = 
   Tyvar var
 | Nat
@@ -80,33 +83,6 @@ where "insert n (Var v) = Var (incr n v)"
     | "insert n (InL t1 t2 e) = InL t1 t2 (insert n e)"
     | "insert n (InR t1 t2 e) = InR t1 t2 (insert n e)"
 
-primrec subst :: "expr => var => expr => expr"
-where "subst e' n (Var v) = (if v = n then e' else Var (subr n v))"
-    | "subst e' n Zero = Zero"
-    | "subst e' n (Suc e) = Suc (subst e' n e)"
-    | "subst e' n (Iter et e0 es) = 
-                      Iter (subst e' n et) 
-                           (subst e' n e0) 
-                           (subst (insert first e') (next n) es)"
-    | "subst e' n (Lam t e) = Lam t (subst (insert first e') (next n) e)"
-    | "subst e' n (Appl e1 e2) = Appl (subst e' n e1) (subst e' n e2)"
-    | "subst e' n (TyLam e) = TyLam (subst e' n e)"
-    | "subst e' n (TyAppl t e) = TyAppl t (subst e' n e)"
-    | "subst e' n Triv = Triv"
-    | "subst e' n (Pair e1 e2) = Pair (subst e' n e1) (subst e' n e2)"
-    | "subst e' n (ProjL e) = ProjL (subst e' n e)"
-    | "subst e' n (ProjR e) = ProjR (subst e' n e)"
-    | "subst e' n (Abort t e) = Abort t (subst e' n e)"
-    | "subst e' n (Case et el er) = 
-                      Case (subst e' n et) 
-                           (subst (insert first e') (next n)el) 
-                           (subst (insert first e') (next n) er)"
-    | "subst e' n (InL t1 t2 e) = InL t1 t2 (subst e' n e)"
-    | "subst e' n (InR t1 t2 e) = InR t1 t2 (subst e' n e)"
-
-lemma [simp]: "canswap m n ==> insert m (insert n e) = insert (next n) (insert m e)"
-by (induction e arbitrary: n m, simp_all)
-
 primrec expr_insert_type :: "var => expr => expr"
 where "expr_insert_type n (Var v) = Var v"
     | "expr_insert_type n Zero = Zero"
@@ -130,6 +106,30 @@ where "expr_insert_type n (Var v) = Var v"
                       InL (type_insert n t1) (type_insert n t2) (expr_insert_type n e)"
     | "expr_insert_type n (InR t1 t2 e) = 
                       InR (type_insert n t1) (type_insert n t2) (expr_insert_type n e)"
+
+primrec subst :: "expr => var => expr => expr"
+where "subst e' n (Var v) = (if v = n then e' else Var (subr n v))"
+    | "subst e' n Zero = Zero"
+    | "subst e' n (Suc e) = Suc (subst e' n e)"
+    | "subst e' n (Iter et e0 es) = 
+                      Iter (subst e' n et) 
+                           (subst e' n e0) 
+                           (subst (insert first e') (next n) es)"
+    | "subst e' n (Lam t e) = Lam t (subst (insert first e') (next n) e)"
+    | "subst e' n (Appl e1 e2) = Appl (subst e' n e1) (subst e' n e2)"
+    | "subst e' n (TyLam e) = TyLam (subst (expr_insert_type first e') n e)"
+    | "subst e' n (TyAppl t e) = TyAppl t (subst e' n e)"
+    | "subst e' n Triv = Triv"
+    | "subst e' n (Pair e1 e2) = Pair (subst e' n e1) (subst e' n e2)"
+    | "subst e' n (ProjL e) = ProjL (subst e' n e)"
+    | "subst e' n (ProjR e) = ProjR (subst e' n e)"
+    | "subst e' n (Abort t e) = Abort t (subst e' n e)"
+    | "subst e' n (Case et el er) = 
+                      Case (subst e' n et) 
+                           (subst (insert first e') (next n)el) 
+                           (subst (insert first e') (next n) er)"
+    | "subst e' n (InL t1 t2 e) = InL t1 t2 (subst e' n e)"
+    | "subst e' n (InR t1 t2 e) = InR t1 t2 (subst e' n e)"
 
 primrec expr_subst_type :: "type => var => expr => expr"
 where "expr_subst_type t' n (Var v) = Var v"
@@ -157,11 +157,58 @@ where "expr_subst_type t' n (Var v) = Var v"
     | "expr_subst_type t' n (InR t1 t2 e) = 
                       InR (type_subst t' n t1) (type_subst t' n t2) (expr_subst_type t' n e)"
 
+lemma [simp]: "canswap m n ==> insert m (insert n e) = insert (next n) (insert m e)"
+by (induction e arbitrary: n m, simp_all)
+
 lemma [simp]: "insert n (expr_insert_type m e) = expr_insert_type m (insert n e)"
 by (induction e arbitrary: n m, simp_all)
 
 lemma [simp]: "canswap n m ==> expr_insert_type n (expr_insert_type m e) = 
                     expr_insert_type (next m) (expr_insert_type n e)"
 by (induction e arbitrary: n m, simp_all)
+
+lemma [simp]: "canswap m n ==> 
+        type_insert m (type_insert n e) = type_insert (next n) (type_insert m e)"
+by (induction e arbitrary: n m, simp_all)
+
+lemma [simp]: "canswap m n ==> type_insert m o type_insert n = type_insert (next n) o type_insert m"
+by auto
+
+lemma [simp]: "canswap m n ==> type_insert m (type_subst t' n t) =
+                  type_subst (type_insert m t') (next n) (type_insert m t)"
+by (induction t arbitrary: m n t', simp_all)
+
+lemma [simp]: "canswap m n ==> type_insert m o type_subst t' n = 
+                                   type_subst (type_insert m t') (next n) o type_insert m"
+by auto
+
+lemma [simp]: "type_subst t' n (type_insert n t) = t"
+by (induction t arbitrary: n t', simp_all)
+
+lemma [simp]: "canswap m n ==> type_subst (type_insert n t') m (type_insert (next n) t) = 
+                                    type_insert n (type_subst t' m t)"
+by (induction t arbitrary: n m t', simp_all)
+
+lemma [simp]: "canswap m n ==> 
+                  type_subst (type_subst t' n t'') m (type_subst (type_insert m t') (next n) t) = 
+                      type_subst t' n (type_subst t'' m t)"
+proof (induction t arbitrary: n m t' t'')
+case (Tyvar v)
+  thus ?case by (cases n, cases m, cases v, auto)
+next case Arrow
+  thus ?case by simp
+next case All
+  thus ?case by simp
+next case Nat
+  thus ?case by simp
+next case Unit
+  thus ?case by simp
+next case Prod
+  thus ?case by simp
+next case Void
+  thus ?case by simp
+next case Sum
+  thus ?case by simp
+qed
 
 end
