@@ -5,6 +5,7 @@ open import AgdaUtils.Nat
 open import AgdaUtils.Fin
 open import AgdaUtils.Vect
 open import AgdaUtils.Prod
+open import AgdaUtils.SetsB
 
 data type (tn : nat) : Set where
   TyVar : (x : fin tn) -> type tn
@@ -12,6 +13,16 @@ data type (tn : nat) : Set where
   Arr : (t1 t2 : type tn) -> type tn
   Prod : {n : nat} (ts : vect (type tn) n) -> type tn
   Sum : {n : nat} (ts : vect (type tn) n) -> type tn
+
+tfreevars : {tn : nat} -> type tn -> set (fin tn)
+tfreevarsVect : {tn n : nat} -> vect (type tn) n -> set (fin tn)
+tfreevars (TyVar x)   = Insert x Empty
+tfreevars Nat         = Empty
+tfreevars (Arr t1 t2) = tfreevars t1 ∪ tfreevars t2
+tfreevars (Prod ts)   = tfreevarsVect ts
+tfreevars (Sum ts)    = tfreevarsVect ts
+tfreevarsVect []        = Empty
+tfreevarsVect (t :: ts) = tfreevars t ∪ tfreevarsVect ts 
 
 tsubst : {tn : nat} -> type tn -> fin (Suc tn) -> type (Suc tn) -> type tn
 tsubstVect : {tn m : nat} -> type tn -> fin (Suc tn) -> vect (type (Suc tn)) m -> vect (type tn) m
@@ -30,11 +41,29 @@ tsubstVectLookup t' []        x ()
 tsubstVectLookup t' (t :: ts) x FZ     = Refl
 tsubstVectLookup t' (t :: ts) x (FS y) = tsubstVectLookup t' ts x y
 
+tsubstNmemEq : {tn : nat} {x : fin (Suc tn)} (t1 t2 : type tn) (t : type (Suc tn)) -> not (x ∈ tfreevars t) -> tsubst t1 x t == tsubst t2 x t
+tsubstNmemEqVect : {tn m : nat} {x : fin (Suc tn)} (t1 t2 : type tn) (ts : vect (type (Suc tn)) m) -> not (x ∈ tfreevarsVect ts) -> tsubstVect t1 x ts == tsubstVect t2 x ts
+tsubstNmemEq {x = x} t1 t2 (TyVar y)     nmem with finEq y x 
+tsubstNmemEq {x = x} t1 t2 (TyVar .x)    nmem | Yes Refl with nmem Here
+tsubstNmemEq {x = x} t1 t2 (TyVar .x)    nmem | Yes Refl | ()
+tsubstNmemEq {x = x} t1 t2 (TyVar y)     nmem | No neq   = Refl
+tsubstNmemEq {x = x} t1 t2 Nat           nmem = Refl
+tsubstNmemEq {x = x} t1 t2 (Arr tt1 tt2) nmem 
+  rewrite tsubstNmemEq t1 t2 tt1 (nmemUnionFst x (tfreevars tt1) (tfreevars tt2) nmem)
+        | tsubstNmemEq t1 t2 tt2 (nmemUnionSnd x (tfreevars tt1) (tfreevars tt2) nmem) = Refl
+tsubstNmemEq {x = x} t1 t2 (Prod ts)     nmem rewrite tsubstNmemEqVect t1 t2 ts nmem = Refl
+tsubstNmemEq {x = x} t1 t2 (Sum ts)      nmem rewrite tsubstNmemEqVect t1 t2 ts nmem = Refl
+tsubstNmemEqVect {x = x} t1 t2 []        nmem = Refl
+tsubstNmemEqVect {x = x} t1 t2 (t :: ts) nmem 
+  rewrite tsubstNmemEq t1 t2 t (nmemUnionFst x (tfreevars t) (tfreevarsVect ts) nmem) 
+        | tsubstNmemEqVect t1 t2 ts (nmemUnionSnd x (tfreevars t) (tfreevarsVect ts) nmem) = Refl
+
 data polytype {tn : nat} (x : fin tn) : type tn -> Set where
   PolyVar : polytype x (TyVar x)
   PolyNat : polytype x Nat
   PolyProd : {n : nat} {ts : vect (type tn) n} -> all (polytype x) ts -> polytype x (Prod ts)
   PolySum : {n : nat} {ts : vect (type tn) n} -> all (polytype x) ts -> polytype x (Sum ts)
+  PolyArr : (t1 t2 : type tn) -> not (x ∈ tfreevars t1) -> polytype x t2 -> polytype x (Arr t1 t2)
 
 data expr {n tn : nat} (Γ : vect (type tn) n) : type tn -> Set
 data tuple {n tn : nat} (Γ : vect (type tn) n) : {m : nat} -> vect (type tn) m -> Set
@@ -142,6 +171,10 @@ sumMap : {n tn m : nat} {Γ : vect (type tn) n} {t1 t2 : type tn} {ts : vect (ty
   expr (t1 :: Γ) t2 -> expr Γ (Sum (tsubstVect t1 FZ ts)) -> expr Γ (Sum (tsubstVect t2 FZ ts))
 sumMap {ts = ts} pf e' e = Match e (patternMap ts pf ts (λ x -> x) e' (λ x -> Refl))
 
+arrMap : {n tn : nat} {Γ : vect (type tn) n} {t1 t2 : type tn} (tt1 tt2 : type (Suc tn)) -> expr (t1 :: Γ) t2 -> expr Γ (Arr (tsubst t1 FZ tt1) (tsubst t1 FZ tt2)) -> 
+  not (FZ ∈ tfreevars tt1) -> polytype FZ tt2 -> expr Γ (Arr (tsubst t2 FZ tt1) (tsubst t2 FZ tt2))
+arrMap {t1 = t1} {t2} tt1 tt2 e' e pf1 pf2 = Lam (Map (incr (FS FZ) e') (App (incr FZ e) (Var FZ (tsubstNmemEq t2 t1 tt1 pf1))) pf2)
+
 data isVal {n tn : nat} {Γ : vect (type tn) n} : {t : type tn} -> expr Γ t -> Set
 data isTupleVal {n tn : nat} {Γ : vect (type tn) n} : {m : nat} {ts : vect (type tn) m} -> tuple Γ ts -> Set
 data isVal {n} {tn} {Γ} where
@@ -178,6 +211,8 @@ data eval {n} {tn} {Γ} where
     eval (Map e' e (PolyProd pf)) (prodMap pf e' e)
   EvMapSum : {t1 t2 : type tn} {m : nat} {ts : vect (type (Suc tn)) m} {e' : expr (t1 :: Γ) t2} {e : expr Γ (Sum (tsubstVect t1 FZ ts))} {pf : all (polytype FZ) ts} -> 
     eval (Map e' e (PolySum pf)) (sumMap pf e' e)
+  EvMapArr : {t1 t2 : type tn} {tt1 tt2 : type (Suc tn)} {e' : expr (t1 :: Γ) t2} {e : expr Γ (Arr (tsubst t1 FZ tt1) (tsubst t1 FZ tt2))} 
+    {pf1 : not (FZ ∈ tfreevars tt1)} {pf2 : polytype FZ tt2} -> eval (Map e' e (PolyArr tt1 tt2 pf1 pf2)) (arrMap tt1 tt2 e' e pf1 pf2)
 data evalTuple {n} {tn} {Γ} where
   EvTup1 : {t : type tn} {m : nat} {ts : vect (type tn) m} {e e' : expr Γ t} {es : tuple Γ ts} -> eval e e' -> evalTuple (Pair e es) (Pair e' es)
   EvTup2 : {t : type tn} {m : nat} {ts : vect (type tn) m} {e : expr Γ t} {es es' : tuple Γ ts} -> isVal e -> evalTuple es es' -> evalTuple (Pair e es) (Pair e es')
@@ -185,36 +220,37 @@ data evalTuple {n} {tn} {Γ} where
 evaluate : {tn : nat} {t : type tn} (e : expr [] t) -> isVal e \/ (expr [] t * eval e)
 evaluateTuple : {n tn : nat} {ts : vect (type tn) n} (es : tuple [] ts) -> isTupleVal es  \/ (tuple [] ts * evalTuple es)
 evaluate (Var () pf)
-evaluate Zero                     = InL ZVal
-evaluate (Suc e)                  with evaluate e
-evaluate (Suc e)                  | InL v         = InL (SVal e v)
-evaluate (Suc e)                  | InR (e' , ev) = InR (Suc e' , EvSuc ev)
-evaluate (Rec e eO eS)            with evaluate e
-evaluate (Rec .Zero eO eS)        | InL ZVal       = InR (eO , EvRec2)
-evaluate (Rec .(Suc e) eO eS)     | InL (SVal e v) = InR (subst (Rec e eO eS) FZ (subst (incr FZ e) FZ eS) , EvRec3 v)
-evaluate (Rec e eO eS)            | InR (e' , ev)  = InR (Rec e' eO eS , EvRec1 ev)
-evaluate (Lam e)                  = InL (LamVal e)
-evaluate (App e1 e2)              with evaluate e1
-evaluate (App .(Lam e1) e2)       | InL (LamVal e1) with evaluate e2
-evaluate (App .(Lam e1) e2)       | InL (LamVal e1) | InL v2         = InR (subst e2 FZ e1 , EvApp3 v2)
-evaluate (App .(Lam e1) e2)       | InL (LamVal e1) | InR (e2' , ev) = InR (App (Lam e1) e2' , EvApp2 (LamVal e1) ev)
-evaluate (App e1 e2)              | InR (e1' , ev) = InR (App e1' e2 , EvApp1 ev)
-evaluate (Tuple es)               with evaluateTuple es
-evaluate (Tuple es)               | InL v          = InL (TupleVal es v)
-evaluate (Tuple es)               | InR (es' , ev) = InR (Tuple es' , (EvTup ev))
-evaluate (Proj x e)               with evaluate e
-evaluate (Proj x .(Tuple es))     | InL (TupleVal es vs) = InR (lookup es x , EvProj2)
-evaluate (Proj x e)               | InR (e' , ev)        = InR (Proj x e' , EvProj1 ev)
-evaluate (Inj ts x e)             with evaluate e
-evaluate (Inj ts x e)             | InL v         = InL (InjVal ts x e v)
-evaluate (Inj ts x e)             | InR (e' , ev) = InR (Inj ts x e' , EvInj ev)
-evaluate (Match e es)             with evaluate e
-evaluate (Match .(Inj ts x e) es) | InL (InjVal ts x e  v) = InR (subst e FZ (match es x) , EvMatch2)
-evaluate (Match e es)             | InR (e' , ev)          = InR (Match e' es , EvMatch1 ev)
-evaluate (Map e' e PolyVar)       = InR (subst e FZ e' , EvMapVar)
-evaluate (Map e' e PolyNat)       = InR (e , EvMapNat)
-evaluate (Map e' e (PolyProd pf)) = InR (prodMap pf e' e , EvMapProd)
-evaluate (Map e' e (PolySum pf))  = InR (sumMap pf e' e , EvMapSum)
+evaluate Zero                               = InL ZVal
+evaluate (Suc e)                            with evaluate e
+evaluate (Suc e)                            | InL v         = InL (SVal e v)
+evaluate (Suc e)                            | InR (e' , ev) = InR (Suc e' , EvSuc ev)
+evaluate (Rec e eO eS)                      with evaluate e
+evaluate (Rec .Zero eO eS)                  | InL ZVal       = InR (eO , EvRec2)
+evaluate (Rec .(Suc e) eO eS)               | InL (SVal e v) = InR (subst (Rec e eO eS) FZ (subst (incr FZ e) FZ eS) , EvRec3 v)
+evaluate (Rec e eO eS)                      | InR (e' , ev)  = InR (Rec e' eO eS , EvRec1 ev)
+evaluate (Lam e)                            = InL (LamVal e)
+evaluate (App e1 e2)                        with evaluate e1
+evaluate (App .(Lam e1) e2)                 | InL (LamVal e1) with evaluate e2
+evaluate (App .(Lam e1) e2)                 | InL (LamVal e1) | InL v2         = InR (subst e2 FZ e1 , EvApp3 v2)
+evaluate (App .(Lam e1) e2)                 | InL (LamVal e1) | InR (e2' , ev) = InR (App (Lam e1) e2' , EvApp2 (LamVal e1) ev)
+evaluate (App e1 e2)                        | InR (e1' , ev) = InR (App e1' e2 , EvApp1 ev)
+evaluate (Tuple es)                         with evaluateTuple es
+evaluate (Tuple es)                         | InL v          = InL (TupleVal es v)
+evaluate (Tuple es)                         | InR (es' , ev) = InR (Tuple es' , (EvTup ev))
+evaluate (Proj x e)                         with evaluate e
+evaluate (Proj x .(Tuple es))               | InL (TupleVal es vs) = InR (lookup es x , EvProj2)
+evaluate (Proj x e)                         | InR (e' , ev)        = InR (Proj x e' , EvProj1 ev)
+evaluate (Inj ts x e)                       with evaluate e
+evaluate (Inj ts x e)                       | InL v         = InL (InjVal ts x e v)
+evaluate (Inj ts x e)                       | InR (e' , ev) = InR (Inj ts x e' , EvInj ev)
+evaluate (Match e es)                       with evaluate e
+evaluate (Match .(Inj ts x e) es)           | InL (InjVal ts x e  v) = InR (subst e FZ (match es x) , EvMatch2)
+evaluate (Match e es)                       | InR (e' , ev)          = InR (Match e' es , EvMatch1 ev)
+evaluate (Map e' e PolyVar)                 = InR (subst e FZ e' , EvMapVar)
+evaluate (Map e' e PolyNat)                 = InR (e , EvMapNat)
+evaluate (Map e' e (PolyProd pf))           = InR (prodMap pf e' e , EvMapProd)
+evaluate (Map e' e (PolySum pf))            = InR (sumMap pf e' e , EvMapSum)
+evaluate (Map e' e (PolyArr t1 t2 pf1 pf2)) = InR (arrMap t1 t2 e' e pf1 pf2 , EvMapArr)
 evaluateTuple Unit        = InL UnitVal
 evaluateTuple (Pair e es) with evaluate e
 evaluateTuple (Pair e es) | InL v         with evaluateTuple es
